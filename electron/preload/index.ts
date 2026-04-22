@@ -137,6 +137,25 @@ const electronAPI = {
         'openclaw:getConfigDir',
         'openclaw:getSkillsDir',
         'openclaw:getCliCommand',
+        // Marketplace (Independent Kernel)
+        'marketplace:listAgents',
+        'marketplace:getAgent',
+        'marketplace:hireAgent',
+        // Kernel communication
+        'kernel:chat',
+        'kernel:subscribe',
+        'kernel:unsubscribe',
+        'kernel:approvalRespond',
+        // Kernel LLM configuration (independent)
+        'kernel-llm:readConfig',
+        'kernel-llm:addProvider',
+        'kernel-llm:deleteProvider',
+        'kernel-llm:setActive',
+        'kernel-llm:checkActive',
+        'kernel-llm:testConnection',
+        'kernel-llm:updateProviderConfig',
+        'kernel-llm:discoverOpenClaw',
+        'kernel-llm:importFromOpenClaw',
       ];
 
       if (validChannels.includes(channel)) {
@@ -178,6 +197,8 @@ const electronAPI = {
         'oauth:success',
         'oauth:error',
         'openclaw:cli-installed',
+        // Kernel events (Independent Kernel)
+        'kernel:event',
       ];
 
       if (validChannels.includes(channel)) {

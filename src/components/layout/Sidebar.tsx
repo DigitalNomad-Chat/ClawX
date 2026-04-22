@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Trash2,
   Cpu,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings';
@@ -213,6 +214,7 @@ export function Sidebar() {
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels'), testId: 'sidebar-nav-channels' },
     { to: '/skills', icon: <Puzzle className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.skills'), testId: 'sidebar-nav-skills' },
     { to: '/cron', icon: <Clock className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.cronTasks'), testId: 'sidebar-nav-cron' },
+    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || 'Agent 广场', testId: 'sidebar-nav-marketplace' },
   ];
 
   return (

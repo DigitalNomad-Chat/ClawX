@@ -39,6 +39,7 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from 
 import { ensureAllBundledPluginsInstalled } from '../utils/plugin-install';
 import { startHostApiServer } from '../api/server';
 import { HostEventBus } from '../api/event-bus';
+import { registerExtensions, shutdownExtensions } from '../extensions';
 import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
@@ -333,6 +334,9 @@ async function initialize(): Promise<void> {
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, window);
 
+  // Register ClawX Independent Kernel extensions
+  registerExtensions();
+
   hostApiServer = startHostApiServer({
     gatewayManager,
     clawHubService,
@@ -582,11 +586,19 @@ if (gotTheLock) {
     const stopPromise = gatewayManager.stop().catch((err) => {
       logger.warn('gatewayManager.stop() error during quit:', err);
     });
+
+    // Stop independent kernel extensions
+    const extensionsStopPromise = shutdownExtensions().catch((err) => {
+      logger.warn('shutdownExtensions() error during quit:', err);
+    });
     const timeoutPromise = new Promise<'timeout'>((resolve) => {
       setTimeout(() => resolve('timeout'), 5000);
     });
 
-    void Promise.race([stopPromise.then(() => 'stopped' as const), timeoutPromise]).then((result) => {
+    void Promise.race([
+      Promise.all([stopPromise, extensionsStopPromise]).then(() => 'stopped' as const),
+      timeoutPromise,
+    ]).then((result) => {
       if (result === 'timeout') {
         logger.warn('Gateway shutdown timed out during app quit; proceeding with forced quit');
         void gatewayManager.forceTerminateOwnedProcessForQuit().then((terminated) => {

@@ -1,0 +1,25 @@
+{
+  "name": "clawx-kernel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClawX Independent Kernel - Agent execution engine",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:bundle": "esbuild src/main.ts --bundle --platform=node --format=esm --outfile=dist/kernel.js --external:crypto --external:fs --external:path",
+    "package": "node scripts/package-kernel.mjs",
+    "encrypt-agents": "node scripts/encrypt-agents.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.19.0",
+    "@anthropic-ai/sdk": "^0.40.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
+  }
+}
