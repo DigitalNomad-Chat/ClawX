@@ -1,0 +1,27 @@
+{
+  "tasks": [
+    {
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "title": "@安总<运营总监COO>",
+      "status": "done",
+      "owner": "manager",
+      "roomId": "collaboration-hall:coo-214e284e",
+      "definitionOfDone": [],
+      "artifacts": [],
+      "rollback": {
+        "strategy": "manual-rollback",
+        "steps": []
+      },
+      "sessionKeys": [
+        "agent:topic-planner:hall:coo-214e284e"
+      ],
+      "budget": {
+        "warnRatio": 0.8
+      },
+      "updatedAt": "2026-04-26T03:11:14.282Z"
+    }
+  ],
+  "agentBudgets": [],
+  "updatedAt": "2026-04-26T03:11:14.282Z"
+}

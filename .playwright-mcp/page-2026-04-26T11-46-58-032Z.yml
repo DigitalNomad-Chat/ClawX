@@ -1,0 +1,257 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: OpenClaw
+        - generic [ref=e7]:
+          - button "切换主题" [ref=e8] [cursor=pointer]:
+            - img [ref=e9]
+          - button "刷新数据" [ref=e12] [cursor=pointer]:
+            - img [ref=e13]
+      - heading "OpenClaw Control Center" [level=1] [ref=e16]
+      - generic [ref=e17]: 更新时间：2026-04-26 11:21
+      - generic [ref=e18]:
+        - text: 语言：
+        - link "EN" [ref=e19] [cursor=pointer]:
+          - /url: /?compact=1&section=memory&lang=en&quick=all
+        - text: /
+        - link "中文" [ref=e20] [cursor=pointer]:
+          - /url: /?compact=1&section=memory&lang=zh&quick=all
+    - navigation [ref=e21]:
+      - link "总览 今天重点" [ref=e22] [cursor=pointer]:
+        - /url: /?compact=1&section=overview&lang=zh&quick=all
+        - generic [ref=e23]: 总览
+        - generic [ref=e24]: 今天重点
+      - link "用量 预算与额度" [ref=e25] [cursor=pointer]:
+        - /url: /?compact=1&section=usage-cost&lang=zh&quick=all
+        - generic [ref=e26]: 用量
+        - generic [ref=e27]: 预算与额度
+      - link "员工 员工、分工与职责" [ref=e28] [cursor=pointer]:
+        - /url: /?compact=1&section=team&lang=zh&quick=all
+        - generic [ref=e29]: 员工
+        - generic [ref=e30]: 员工、分工与职责
+      - link "协作 智能体交接与协同" [ref=e31] [cursor=pointer]:
+        - /url: /?compact=1&section=collaboration&lang=zh&quick=all
+        - generic [ref=e32]: 协作
+        - generic [ref=e33]: 智能体交接与协同
+      - link "群聊 共享大厅群聊" [ref=e34] [cursor=pointer]:
+        - /url: /?compact=1&section=hall-chat&lang=zh&quick=all
+        - generic [ref=e35]: 群聊
+        - generic [ref=e36]: 共享大厅群聊
+      - link "记忆 每日与长期记忆" [ref=e37] [cursor=pointer]:
+        - /url: /?compact=1&section=memory&lang=zh&quick=all
+        - generic [ref=e38]: 记忆
+        - generic [ref=e39]: 每日与长期记忆
+      - link "文档 Main 与当前启用智能体核心文档" [ref=e40] [cursor=pointer]:
+        - /url: /?compact=1&section=docs&lang=zh&quick=all
+        - generic [ref=e41]: 文档
+        - generic [ref=e42]: Main 与当前启用智能体核心文档
+      - link "任务 任务、排程与活动" [ref=e43] [cursor=pointer]:
+        - /url: /?compact=1&section=projects-tasks&lang=zh&quick=all
+        - generic [ref=e44]: 任务
+        - generic [ref=e45]: 任务、排程与活动
+      - link "设置 安全与数据连接" [ref=e46] [cursor=pointer]:
+        - /url: /?compact=1&section=settings&lang=zh&quick=all
+        - generic [ref=e47]: 设置
+        - generic [ref=e48]: 安全与数据连接
+  - main [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - heading "记忆" [level=2] [ref=e52]
+        - generic [ref=e53]: 每日与长期记忆
+      - button "收起检视栏" [ref=e55] [cursor=pointer]
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - heading "记忆概览" [level=2] [ref=e58]
+        - generic [ref=e59]: Main 记忆 26 份 · 已发现智能体 15 个
+        - generic [ref=e60]: 可切换查看：Main、Cc Dispatcher、Client Marketing、Doubao Writer、Hotsearch Monitor、Hr Manager、Knowledge Clipper、Knowledge Expert、Media Director、Moments Assistant、Ops Manager、Social Media Manager、Topic Planner、Viral Copywriter、Visual Creator、Visual Designer
+        - generic [ref=e61]: 这里只保留记忆相关文件：根目录 MEMORY.md、memory/，以及各智能体自己的 MEMORY.md 与 memory/。
+        - generic [ref=e62]: 这里的编辑会直接同步到 OpenClaw 机器上的真实记忆文件。
+      - generic [ref=e63]:
+        - heading "记忆文件工作台" [level=2] [ref=e64]
+        - generic [ref=e65]: 直接浏览和修改 OpenClaw 的记忆文件。保存后会写回原文件。
+        - generic [ref=e66]: 文件数：69 · 保存后直接写回源文件。
+        - generic [ref=e67]:
+          - complementary [ref=e68]:
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - button "Main" [ref=e71] [cursor=pointer]
+                - button "Cc Dispatcher" [ref=e72] [cursor=pointer]
+                - button "Client Marketing" [ref=e73] [cursor=pointer]
+                - button "Doubao Writer" [ref=e74] [cursor=pointer]
+                - button "Hotsearch Monitor" [ref=e75] [cursor=pointer]
+                - button "Hr Manager" [ref=e76] [cursor=pointer]
+                - button "Knowledge Clipper" [ref=e77] [cursor=pointer]
+                - button "Knowledge Expert" [ref=e78] [cursor=pointer]
+                - button "Media Director" [ref=e79] [cursor=pointer]
+                - button "Moments Assistant" [ref=e80] [cursor=pointer]
+                - button "Ops Manager" [ref=e81] [cursor=pointer]
+                - button "Social Media Manager" [ref=e82] [cursor=pointer]
+                - button "Topic Planner" [ref=e83] [cursor=pointer]
+                - button "Viral Copywriter" [ref=e84] [cursor=pointer]
+                - button "Visual Creator" [ref=e85] [cursor=pointer]
+                - button "Visual Designer" [ref=e86] [cursor=pointer]
+              - searchbox "筛选文件名或路径..." [ref=e87]
+              - generic [ref=e88]: 当前分组：Main · 文件 26 份
+            - generic [ref=e89]:
+              - button "2026-03-05.md Main · Main 记忆记录 · memory/2026-03-05.md" [ref=e90] [cursor=pointer]:
+                - generic [ref=e91]: 2026-03-05.md
+                - generic [ref=e92]: Main · Main 记忆记录 · memory/2026-03-05.md
+              - button "2026-03-08.md Main · Main 记忆记录 · memory/2026-03-08.md" [ref=e93] [cursor=pointer]:
+                - generic [ref=e94]: 2026-03-08.md
+                - generic [ref=e95]: Main · Main 记忆记录 · memory/2026-03-08.md
+              - button "2026-03-06.md Main · Main 记忆记录 · memory/2026-03-06.md" [ref=e96] [cursor=pointer]:
+                - generic [ref=e97]: 2026-03-06.md
+                - generic [ref=e98]: Main · Main 记忆记录 · memory/2026-03-06.md
+              - button "2026-03-13.md Main · Main 记忆记录 · memory/2026-03-13.md" [ref=e99] [cursor=pointer]:
+                - generic [ref=e100]: 2026-03-13.md
+                - generic [ref=e101]: Main · Main 记忆记录 · memory/2026-03-13.md
+              - button "2026-03-10.md Main · Main 记忆记录 · memory/2026-03-10.md" [ref=e102] [cursor=pointer]:
+                - generic [ref=e103]: 2026-03-10.md
+                - generic [ref=e104]: Main · Main 记忆记录 · memory/2026-03-10.md
+              - button "2026-03-09.md Main · Main 记忆记录 · memory/2026-03-09.md" [ref=e105] [cursor=pointer]:
+                - generic [ref=e106]: 2026-03-09.md
+                - generic [ref=e107]: Main · Main 记忆记录 · memory/2026-03-09.md
+              - button "2026-03-22.md Main · Main 记忆记录 · memory/2026-03-22.md" [ref=e108] [cursor=pointer]:
+                - generic [ref=e109]: 2026-03-22.md
+                - generic [ref=e110]: Main · Main 记忆记录 · memory/2026-03-22.md
+              - button "2026-03-21.md Main · Main 记忆记录 · memory/2026-03-21.md" [ref=e111] [cursor=pointer]:
+                - generic [ref=e112]: 2026-03-21.md
+                - generic [ref=e113]: Main · Main 记忆记录 · memory/2026-03-21.md
+              - button "2026-03-20.md Main · Main 记忆记录 · memory/2026-03-20.md" [ref=e114] [cursor=pointer]:
+                - generic [ref=e115]: 2026-03-20.md
+                - generic [ref=e116]: Main · Main 记忆记录 · memory/2026-03-20.md
+              - button "2026-03-19.md Main · Main 记忆记录 · memory/2026-03-19.md" [ref=e117] [cursor=pointer]:
+                - generic [ref=e118]: 2026-03-19.md
+                - generic [ref=e119]: Main · Main 记忆记录 · memory/2026-03-19.md
+              - button "2026-03-18.md Main · Main 记忆记录 · memory/2026-03-18.md" [ref=e120] [cursor=pointer]:
+                - generic [ref=e121]: 2026-03-18.md
+                - generic [ref=e122]: Main · Main 记忆记录 · memory/2026-03-18.md
+              - button "2026-03-26.md Main · Main 记忆记录 · memory/2026-03-26.md" [ref=e123] [cursor=pointer]:
+                - generic [ref=e124]: 2026-03-26.md
+                - generic [ref=e125]: Main · Main 记忆记录 · memory/2026-03-26.md
+              - button "2026-03-25.md Main · Main 记忆记录 · memory/2026-03-25.md" [ref=e126] [cursor=pointer]:
+                - generic [ref=e127]: 2026-03-25.md
+                - generic [ref=e128]: Main · Main 记忆记录 · memory/2026-03-25.md
+              - button "2026-03-24.md Main · Main 记忆记录 · memory/2026-03-24.md" [ref=e129] [cursor=pointer]:
+                - generic [ref=e130]: 2026-03-24.md
+                - generic [ref=e131]: Main · Main 记忆记录 · memory/2026-03-24.md
+              - button "2026-03-23.md Main · Main 记忆记录 · memory/2026-03-23.md" [ref=e132] [cursor=pointer]:
+                - generic [ref=e133]: 2026-03-23.md
+                - generic [ref=e134]: Main · Main 记忆记录 · memory/2026-03-23.md
+              - button "2026-04-21.md Main · Main 记忆记录 · memory/2026-04-21.md" [ref=e135] [cursor=pointer]:
+                - generic [ref=e136]: 2026-04-21.md
+                - generic [ref=e137]: Main · Main 记忆记录 · memory/2026-04-21.md
+              - button "2026-04-20.md Main · Main 记忆记录 · memory/2026-04-20.md" [ref=e138] [cursor=pointer]:
+                - generic [ref=e139]: 2026-04-20.md
+                - generic [ref=e140]: Main · Main 记忆记录 · memory/2026-04-20.md
+              - button "2026-04-18.md Main · Main 记忆记录 · memory/2026-04-18.md" [ref=e141] [cursor=pointer]:
+                - generic [ref=e142]: 2026-04-18.md
+                - generic [ref=e143]: Main · Main 记忆记录 · memory/2026-04-18.md
+              - button "2026-04-14.md Main · Main 记忆记录 · memory/2026-04-14.md" [ref=e144] [cursor=pointer]:
+                - generic [ref=e145]: 2026-04-14.md
+                - generic [ref=e146]: Main · Main 记忆记录 · memory/2026-04-14.md
+              - button "2026-03-27.md Main · Main 记忆记录 · memory/2026-03-27.md" [ref=e147] [cursor=pointer]:
+                - generic [ref=e148]: 2026-03-27.md
+                - generic [ref=e149]: Main · Main 记忆记录 · memory/2026-03-27.md
+              - button "heartbeat-check-2026-03-23-17:34.md Main · Main 记忆记录 · memory/heartbeat-check-2026-03-23-17:34.md" [ref=e150] [cursor=pointer]:
+                - generic [ref=e151]: heartbeat-check-2026-03-23-17:34.md
+                - generic [ref=e152]: Main · Main 记忆记录 · memory/heartbeat-check-2026-03-23-17:34.md
+              - button "2026-04-23.md Main · Main 记忆记录 · memory/2026-04-23.md" [ref=e153] [cursor=pointer]:
+                - generic [ref=e154]: 2026-04-23.md
+                - generic [ref=e155]: Main · Main 记忆记录 · memory/2026-04-23.md
+              - button "2026-04-22.md Main · Main 记忆记录 · memory/2026-04-22.md" [ref=e156] [cursor=pointer]:
+                - generic [ref=e157]: 2026-04-22.md
+                - generic [ref=e158]: Main · Main 记忆记录 · memory/2026-04-22.md
+              - button "2026-04-25-heartbeat-check.md Main · Main 记忆记录 · memory/2026-04-25-heartbeat-check.md" [ref=e159] [cursor=pointer]:
+                - generic [ref=e160]: 2026-04-25-heartbeat-check.md
+                - generic [ref=e161]: Main · Main 记忆记录 · memory/2026-04-25-heartbeat-check.md
+              - button "2026-04-26.md Main · Main 记忆记录 · memory/2026-04-26.md" [ref=e162] [cursor=pointer]:
+                - generic [ref=e163]: 2026-04-26.md
+                - generic [ref=e164]: Main · Main 记忆记录 · memory/2026-04-26.md
+              - button "MEMORY.md Main · Main 长期记忆 · MEMORY.md" [ref=e165] [cursor=pointer]:
+                - generic [ref=e166]: MEMORY.md
+                - generic [ref=e167]: Main · Main 长期记忆 · MEMORY.md
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - generic [ref=e171]: 2026-03-05.md
+                - generic [ref=e172]: /Users/a1-6/.openclaw/workspace/memory/2026-03-05.md
+                - generic [ref=e173]: 更新于 2026-04-24 12:41 · 7,737 bytes
+              - generic [ref=e174]:
+                - textbox "本地令牌" [ref=e175]
+                - button "重新读取" [ref=e176] [cursor=pointer]
+                - button "保存改动" [ref=e177] [cursor=pointer]
+            - textbox [ref=e178]: "# 2026-03-05 ## 上午 - OpenClaw 系统配置 ### 主 Agent 配置完成 - ✅ 创建 SOUL.md - 系统运维总监人设 - ✅ 更新 USER.md - 添加安迪的背景信息 - ✅ 创建 MEMORY.md - 长期记忆结构 - ✅ 配置 HEARTBEAT.md - 主动服务清单 ### 配置重点 **SOUL.md 核心能力：** - OpenClaw 架构专家 - 多 Agent 团队构建顾问 - 系统诊断和故障排查 - 安全审计和最佳实践 **USER.md 用户画像：** - 姓名：安迪 - 身份：AI 高效办公领域畅销书作者 - 当前工作：自媒体运营 + 客户线索挖掘 ## 下午 - 记忆系统规划 ### 三层记忆架构设计 1. **会话记忆**：当前对话上下文 2. **短期记忆**：memory/YYYY-MM-DD.md 每日日志 3. **长期记忆**：MEMORY.md 精选信息 ### 记忆配置要点 - 默认加载今天+昨天的日志 - MEMORY.md 控制在 2000 行以内 - 每周整理一次长期记忆 ## 晚上 - 系统配置完善 ### 高级功能确认 - ✅ **Heartbeat 机制**：确认所有 Agent 都有心跳，每个读取自己的 HEARTBEAT.md - ✅ **contextPruning 配置**：会话上下文自动清理，主 Agent TTL 设为 24h - ✅ **配置指南更新**：添加心跳与上下文管理章节 - ✅ **知识库调阅机制**：SOUL.md 添加知识库调阅流程 ### 知识库建立 **位置：** `/Users/a1-6/Syncthing/workspace/content-vault/06-开发资源及笔记心得/OpenClaw/` **内容结构：** - 官方教程：`awesome-openclaw-tutorial-main/` - Claude Code 集成：`Claude-Code-x-OpenClaw-Guide-Zh/` - 部署笔记： - `OpenClaw在macOS上完整部署教程.md` - `OpenClaw-Agent配置完全指南.md`（新增心跳、contextPruning 章节） - 专题文章： - `你的OpenClaw会主动干活吗-这才是龙虾的王牌场景.md` - `OpenClaw避坑指南-先装这10个Skills-再谈生产力.md` - `OpenClaw-主Agent-系统运维总监配置指南.md` **主 Agent 行为规则更新：** - 遇到不确定的 OpenClaw 问题，**先学习再工作** - 知识库优先级高于网络搜索 - 学习后基于知识库内容给出方案 ## 深夜 - 问题排查与解决 ### 问题 1：Agent 不按照 SOUL.md 回复 **症状：** - Agent 回复\"我是刚上线的AI助手，还没有正式的名字\" - 而非 \"OpenClaw 系统运维总监\" **根本原因：** 1. **BOOTSTRAP.md 未删除** - 旧的启动文件优先级高于 SOUL.md 2. **会话缓存旧数据** - 正在运行的进程使用启动时的配置 3. **Gateway 通过 LaunchAgent 启动** - 未使用代理，Telegram 无法连接 **解决方案：** 1. ✅ 删除 BOOTSTRAP.md 2. ✅ 清除会话缓存文件 3. ✅ 使用 `~/.openclaw/start-with-proxy.sh` 启动（包含代理转换器） ### 问题 2：Telegram Agent 不回复消息 **根本原因：** - Gateway 通过 LaunchAgent 启动，未使用代理 - SOCKS5 代理 (10808) 不能被 undici 直接使用 - 需要代理转换器 (端口 8118) 将 SOCKS5 转为 HTTP **解决方案：** - 使用 `~/.openclaw/start-with-proxy.sh` 启动 - 脚本自动：检查 SOCKS5 → 启动代理转换器 → 设置 HTTP_PROXY → 启动 Gateway ### 问题 3：plist 文件修改被重置 **发现：** - 修改 LaunchAgent plist 添加代理环境变量 - 执行 `openclaw gateway uninstall/install` 后被重置 **结论：** - LaunchAgent 方式不适合代理场景 - 推荐使用脚本启动（已记录在部署教程中） ### 配置指南更新 - ✅ 添加 Q7：BOOTSTRAP.md 问题（初始化后必须删除） - ✅ 添加 Q8：配置更新是否需要重启（大部分支持热重载） ### SOUL.md 修正 - ✅ 移除了错误的 Tools 工具配置部分（tools 配置尚未核实，不应加入） - ✅ 添加了正确的\"配置更新生效机制\"表格（仅 Q8 内容） ### 工具权限安全配置（晚间） - ⚠️ **发现**：OpenClaw 不支持 `custom` profile，允许的值仅为：`minimal`, `coding`, `messaging`, `full` - ✅ 创建《OpenClaw 工具权限安全配置指南》文档（供参考） - ✅ 保持 `full` profile（当前版本不支持细粒度权限控制） - ✅ Gateway 已重启，配置生效 ### 代理自动启动配置（方案 E） - ✅ 创建《OpenClaw-Gateway代理自动启动方案规划.md》 - ✅ 实施 LaunchAgent + Shell 函数混合方案 - ✅ 代理转换器通过 LaunchAgent 自动运行（开机自启、崩溃重启） - ✅ 在 ~/.zshrc 中添加 openclaw 函数，自动为 gateway 命令设置代理 - ✅ 验证通过：`openclaw gateway` 命令可直接使用，Telegram 连接正常 ### SOUL.md 结构优化（方案 B） - ✅ 创建优化方案规划文档 - ✅ 实施\"结构化拆分\"方案 - ✅ 创建 4 个独立文档： - `SAFETY_PROTOCOLS.md`（305 行）- 安全操作手册 - `TROUBLESHOOTING.md`（320 行）- 故障排查手册 - `HEARTBEAT_GUIDE.md`（384 行）- 心跳服务指南 - `OPENCLAW_ARCHITECTURE.md`（384 行）- 架构参考 - ✅ SOUL.md 从 635 行精简到 302 行（减少 52%） - ✅ 保留核心定义，添加文档索引和调阅指引 - ✅ 标注\"强制调阅\"原则（高危操作必须阅读 SAFETY_PROTOCOLS.md） ## 待办事项 ### 明日计划 - [ ] 安装必装 10 大 Skills - [ ] 创建第一个子 Agent（writer 或 director） - [ ] 测试 Agent 间通信 ### 本周目标 - [ ] 完成基础支持层 3 个 Agent - [ ] 验证多 Agent 协作流程 - [ ] 生成第一篇自媒体内容 ## 重要决策 ### Agent 优先级 1. **writer Agent** - 内容生产是核心 2. **planner Agent** - 选题策划指导方向 3. **researcher Agent** - 资料收集支持 ### 平台优先级 1. **小红书** - 流量大，适合快速测试 2. **公众号** - 深度内容，建立权威 3. **抖音** - 短视频，扩大影响力 ## 问题记录 ### 问题 4：SOUL.md 误添加工具配置 **症状：** - 错误地将 Tools 工具配置添加到 SOUL.md - 用户明确指出\"工具的配置不要加到soul里面去,我们都还没有核实清楚\" **根本原因：** - 理解错误，将未核实的内容提前加入 - 用户仅要求添加 Q8（配置重启表格），而非完整工具配置 **解决方案：** - ✅ 移除 Tools 工具配置部分（原第120-186行） - ✅ 仅添加 Q8 配置更新生效机制表格 ### 暂无其他问题 ## 深夜继续 - Claude Code 搜索服务配置 ### Tavily Search MCP 配置完成 **背景：** - 用户发现之前曾配置过搜索服务（search-services-guide skill 有记录） - Tavily Search API key 可用，但未在当前 MCP 配置中激活 **配置操作：** 1. **更新 Claude Desktop 配置** - 文件：`~/Library/Application Support/Claude/claude_desktop_config.json` - 添加 \"tavily-search\" MCP 服务器 - 使用 `@modelcontextprotocol/server-web-search` 包 - 设置环境变量：`TAVILY_API_KEY` 2. **更新权限配置** - 文件：`~/.claude/settings.json` - 在 `permissions.allow` 数组中添加 \"mcp__web-search\" 3. **测试验证** - ✅ 使用 `mcp__web-search__tavily_search` 工具测试 - ✅ 搜索 \"OpenClaw Agent 配置\" 成功返回结果 - ✅ 响应时间：0.62 秒 **可用工具：** - `mcp__web-search__tavily_search` - 网页搜索 - `mcp__web-search__tavily_research` - 综合研究 - `mcp__web-search__tavily_crawl` - 网站爬取 - `mcp__web-search__tavily_extract` - 内容提取 - `mcp__web-search__tavily_map` - 网站地图 **配置文件：** ```json // claude_desktop_config.json \"tavily-search\": { \"command\": \"npx\", \"args\": [\"-y\", \"@modelcontextprotocol/server-web-search\", \"https://tavily-search\" ], \"env\": { \"TAVILY_API_KEY\": \"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\" } } ``` --- _本文档会自动在今天+明天的会话中加载_"
+            - generic [ref=e179]: 当前显示 Main 的文件。可在左侧选择具体文件。
+      - generic [ref=e180]:
+        - generic [ref=e181]:
+          - generic [ref=e182]:
+            - heading "记忆状态" [level=2] [ref=e183]
+            - generic [ref=e184]: 当前可见智能体的记忆状态正常。
+          - generic [ref=e186]: 未知
+        - generic [ref=e187]:
+          - generic [ref=e188]:
+            - generic [ref=e189]: 正常
+            - strong [ref=e190]: "0"
+          - generic [ref=e191]:
+            - generic [ref=e192]: 需关注
+            - strong [ref=e193]: "0"
+          - generic [ref=e194]:
+            - generic [ref=e195]: 不可用
+            - strong [ref=e196]: "0"
+  - complementary [ref=e197]:
+    - generic [ref=e198]:
+      - heading "当前状态" [level=2] [ref=e199]
+      - generic [ref=e200]: 活跃会话：1
+      - generic [ref=e201]: 正在观察中的任务：0
+      - generic [ref=e202]: 审阅队列：0
+      - link "在总览查看四项信号" [ref=e204] [cursor=pointer]:
+        - /url: /?compact=1&section=overview&lang=zh&quick=all
+    - generic [ref=e205]:
+      - heading "用量与订阅摘要" [level=2] [ref=e206]
+      - generic [ref=e207]: 今日 AI 用量：14,116,460
+      - generic [ref=e208]: 今日费用：$3.72
+      - generic [ref=e209]: 近 30 天：$6.51
+      - generic [ref=e210]: 估算已用：7 USD
+      - link "查看完整用量与订阅" [ref=e212] [cursor=pointer]:
+        - /url: /?compact=1&section=usage-cost&lang=zh&quick=all
+    - generic [ref=e213]:
+      - heading "当前活跃智能体" [level=2] [ref=e214]
+      - list [ref=e215]:
+        - listitem [ref=e216]:
+          - strong [ref=e217]: 小剪<知识剪藏KC>
+          - text: 实时
+          - generic [ref=e218]: 会话 0 · 任务 0
+        - listitem [ref=e219]:
+          - strong [ref=e220]: 安总<运营总监COO>
+          - text: 实时
+          - generic [ref=e221]: 会话 0 · 任务 0
+        - listitem [ref=e222]:
+          - strong [ref=e223]: 小圈<朋友圈运营SO>
+          - text: 实时
+          - generic [ref=e224]: 会话 0 · 任务 0
+        - listitem [ref=e225]:
+          - strong [ref=e226]: 小H<人事经理HR>
+          - text: 实时
+          - generic [ref=e227]: 会话 0 · 任务 0
+        - listitem [ref=e228]:
+          - strong [ref=e229]: 小扣<代码调度CC>
+          - text: 实时
+          - generic [ref=e230]: 会话 1 · 任务 0
+    - generic [ref=e231]:
+      - heading "定时与心跳" [level=2] [ref=e232]
+      - generic [ref=e233]:
+        - text: 定时
+        - generic [ref=e234]: warn
+        - text: · 下次 2026-04-26 11:21
+      - generic [ref=e235]:
+        - text: 心跳
+        - generic [ref=e236]: ok
+        - text: · 下次 2026-04-26 11:21
+      - generic [ref=e237]:
+        - link "查看定时任务" [ref=e238] [cursor=pointer]:
+          - /url: /?section=overview#cron-health
+        - text: ·
+        - link "查看任务心跳" [ref=e239] [cursor=pointer]:
+          - /url: /?section=overview#heartbeat-health

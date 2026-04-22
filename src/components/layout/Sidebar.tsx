@@ -19,6 +19,7 @@ import {
   Trash2,
   Cpu,
   Moon,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rendererExtensionRegistry } from '@/extensions/registry';
@@ -208,6 +209,7 @@ export function Sidebar() {
     ...(devModeUnlocked
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
+    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || 'Agent 广场', testId: 'sidebar-nav-marketplace' },
   ];
 
   const navItems = [

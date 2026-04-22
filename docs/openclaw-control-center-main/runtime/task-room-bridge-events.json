@@ -1,0 +1,62 @@
+{
+  "events": [
+    {
+      "eventId": "baf2d7e0-5f23-4bc7-a50c-0ba6b09ba012",
+      "type": "room_created",
+      "status": "local_only",
+      "roomId": "collaboration-hall:coo-214e284e",
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "roomTitle": "@安总<运营总监COO>",
+      "roomStage": "intake",
+      "ownerRole": "human",
+      "taskStatus": "todo",
+      "note": "Room auto-created from collaboration hall task creation.",
+      "deliveredTargets": [],
+      "skippedTargets": [
+        "bridge-disabled"
+      ],
+      "errorTargets": [],
+      "createdAt": "2026-04-26T03:06:27.908Z"
+    },
+    {
+      "eventId": "79027d1e-9357-495a-9d66-e1ec67e9be91",
+      "type": "review_submitted",
+      "status": "local_only",
+      "roomId": "collaboration-hall:coo-214e284e",
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "roomTitle": "@安总<运营总监COO>",
+      "roomStage": "completed",
+      "ownerRole": "manager",
+      "taskStatus": "done",
+      "note": "小客<客户营销AM> 看过了，这一轮可以过。",
+      "deliveredTargets": [],
+      "skippedTargets": [
+        "bridge-disabled"
+      ],
+      "errorTargets": [],
+      "createdAt": "2026-04-26T03:06:43.642Z"
+    },
+    {
+      "eventId": "beef39a4-9313-45bb-9dd9-54533c4d0ae2",
+      "type": "message_posted",
+      "status": "local_only",
+      "roomId": "collaboration-hall:coo-214e284e",
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "roomTitle": "@安总<运营总监COO>",
+      "roomStage": "completed",
+      "ownerRole": "manager",
+      "taskStatus": "done",
+      "note": "Hall message mirrored to linked task context.",
+      "deliveredTargets": [],
+      "skippedTargets": [
+        "bridge-disabled"
+      ],
+      "errorTargets": [],
+      "createdAt": "2026-04-26T03:06:53.839Z"
+    }
+  ],
+  "updatedAt": "2026-04-26T03:06:53.839Z"
+}

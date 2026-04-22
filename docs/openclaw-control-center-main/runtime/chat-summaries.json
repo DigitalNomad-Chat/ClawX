@@ -1,0 +1,122 @@
+{
+  "summaries": [
+    {
+      "roomId": "collaboration-hall:coo-214e284e",
+      "headline": "@安总<运营总监COO>",
+      "currentOwner": "manager",
+      "nextAction": "Completed and waiting for follow-up.",
+      "openQuestions": [],
+      "messageCount": 1,
+      "updatedAt": "2026-04-26T03:06:43.635Z"
+    },
+    {
+      "roomId": "collaboration-hall:prime-the-next-owner-typing-indicator-as-soon-as-e3a940e2",
+      "headline": "Prime the next owner typing indicator as soon as a handoff lands.",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 3,
+      "updatedAt": "2026-04-26T02:54:07.429Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-whose-current-owner-should-ha-acb615e8",
+      "headline": "Create a hall task whose current owner should hand off to an explicitly mentioned revie...",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 3,
+      "updatedAt": "2026-04-26T02:53:55.739Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-whose-middle-review-step-shou-af2eac01",
+      "headline": "Create a hall task whose middle review step should still hand off to the third owner.",
+      "currentOwner": "reviewer",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 5,
+      "updatedAt": "2026-04-26T02:53:55.009Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-whose-runtime-handoff-must-st-6c1a7105",
+      "headline": "Create a hall task whose runtime handoff must stay on the planned next owner even if th...",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 5,
+      "updatedAt": "2026-04-26T02:53:53.537Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-that-should-execute-as-main---c7584708",
+      "headline": "Create a hall task that should execute as main -> otter -> pandas without stopping at t...",
+      "currentOwner": "reviewer",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 5,
+      "updatedAt": "2026-04-26T02:53:52.446Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-that-should-execute-as-pandas-4f65cf7b",
+      "headline": "Create a hall task that should execute as pandas -> coq without skipping ahead.",
+      "currentOwner": "planner",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 5,
+      "updatedAt": "2026-04-26T02:53:51.329Z"
+    },
+    {
+      "roomId": "collaboration-hall:keep-the-runtime-chain-moving-when-the-current-s-e4a728c0",
+      "headline": "Keep the runtime chain moving when the current step already points to the real next owner.",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 3,
+      "updatedAt": "2026-04-26T02:53:43.819Z"
+    },
+    {
+      "roomId": "collaboration-hall:warn-when-a-handoff-skips-the-planned-next-owner-1b64d5d6",
+      "headline": "Warn when a handoff skips the planned next owner.",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 2,
+      "updatedAt": "2026-04-26T02:53:41.288Z"
+    },
+    {
+      "roomId": "collaboration-hall:plan-the-execution-order-for-a-multi-agent-hall--6684fee6",
+      "headline": "Plan the execution order for a multi-agent hall task.",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 2,
+      "updatedAt": "2026-04-26T02:53:41.254Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-whose-rejected-review-should--342b7fda",
+      "headline": "Create a hall task whose rejected review should point back to the current execution item.",
+      "currentOwner": "coder",
+      "nextAction": "Approve or reject the execution result and sync the task state.",
+      "openQuestions": [],
+      "messageCount": 2,
+      "updatedAt": "2026-04-26T02:53:41.236Z"
+    },
+    {
+      "roomId": "collaboration-hall:build-the-public-collaboration-hall-in-control-c-c5cec819",
+      "headline": "Build the public collaboration hall in control-center.",
+      "currentOwner": "manager",
+      "nextAction": "Completed and waiting for follow-up.",
+      "openQuestions": [],
+      "messageCount": 2,
+      "updatedAt": "2026-04-26T02:53:41.220Z"
+    },
+    {
+      "roomId": "collaboration-hall:create-a-hall-task-whose-execution-order-will-be-6f216cff",
+      "headline": "Create a hall task whose execution order will be planned and advanced.",
+      "currentOwner": "coder",
+      "nextAction": "Collect the first human request and begin discussion.",
+      "openQuestions": [],
+      "messageCount": 2,
+      "updatedAt": "2026-04-26T02:53:40.986Z"
+    }
+  ],
+  "updatedAt": "2026-04-26T03:06:43.641Z"
+}

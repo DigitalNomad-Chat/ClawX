@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "schemaVersion": "phase-9",
+  "source": "command",
+  "requestId": "cmd-backup-export",
+  "exportedAt": "2026-04-26T02:54:55.816Z",
+  "snapshotGeneratedAt": "2026-04-26T02:54:55.816Z",
+  "sessions": [
+    {
+      "sessionKey": "agent:main:main",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T02:35:41.542Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-25T18:00:00.045Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5dbee6de-d56c-477f-9ed6-9ed2933fa5b8",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-25T18:00:00.045Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5b308f64-6897-4962-a4de-65b272520a9c",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-25T12:54:56.219Z",
+      "state": "idle"
+    }
+  ],
+  "projects": {
+    "projects": [],
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  "tasks": {
+    "tasks": [],
+    "agentBudgets": [],
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  "budgets": {
+    "policy": {
+      "defaults": {
+        "warnRatio": 0.8
+      },
+      "agent": {},
+      "project": {},
+      "task": {}
+    },
+    "issues": [],
+    "summary": {
+      "total": 0,
+      "ok": 0,
+      "warn": 0,
+      "over": 0,
+      "evaluations": []
+    }
+  },
+  "exceptions": {
+    "generatedAt": "2026-04-26T02:54:55.816Z",
+    "blocked": [],
+    "errors": [],
+    "pendingApprovals": [],
+    "overBudget": [],
+    "tasksDue": [],
+    "counts": {
+      "blocked": 0,
+      "errors": 0,
+      "pendingApprovals": 0,
+      "overBudget": 0,
+      "tasksDue": 0
+    }
+  },
+  "exceptionsFeed": {
+    "generatedAt": "2026-04-26T02:54:55.816Z",
+    "items": [],
+    "counts": {
+      "info": 0,
+      "warn": 0,
+      "actionRequired": 0
+    }
+  }
+}

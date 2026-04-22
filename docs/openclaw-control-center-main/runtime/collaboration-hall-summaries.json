@@ -1,0 +1,26 @@
+{
+  "hallSummaries": [
+    {
+      "hallId": "main",
+      "headline": "安总，这轮的上下文我这边看到的是：小客确认了某个方案可以推进，但安迪认为还需要继续讨论某些细节，还没有到收口的时候。<br>不过既然安迪还没有给出明确的议题方向，作为选题策划CP，我先从我的视角提醒几个可能需要讨论的点：<br>**如果是在讨论内容选题方向的话：**<br>- 这周的核心选题还没最终定稿，小圈<朋友圈运营SO>和小媒<社媒运营SMM>那边的选题清单还没跟我对齐<br>- 最近小察<热点情报Intel>报上来的几个趋...",
+      "activeTaskCount": 1,
+      "waitingReviewCount": 0,
+      "blockedTaskCount": 0,
+      "currentSpeakerLabel": "小喵<选题策划CP>",
+      "updatedAt": "2026-04-26T03:11:14.285Z"
+    }
+  ],
+  "taskSummaries": [
+    {
+      "taskCardId": "collaboration-hall:coo-214e284e",
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "headline": "安总，这轮的上下文我这边看到的是：小客确认了某个方案可以推进，但安迪认为还需要继续讨论某些细节，还没有到收口的时候。\n不过既然安迪还没有给出明确的议题方向，作为选题策划CP，我先从我的视角提醒几个可能需要讨论的点：\n**如果是在讨论内容选题方向的话：**\n- 这周的核心选题还没最终定稿，小圈<朋友圈运营SO>和小媒<社媒运营SMM>那边的选题清单还没跟我对齐\n- 最近小察<热点情报Intel>报上来的几个趋势话题，需要讨论优先级和...",
+      "nextAction": "Finish discussion and let the manager close with a decision.",
+      "stage": "discussion",
+      "blockerCount": 0,
+      "updatedAt": "2026-04-26T03:11:14.281Z"
+    }
+  ],
+  "updatedAt": "2026-04-26T03:11:14.287Z"
+}

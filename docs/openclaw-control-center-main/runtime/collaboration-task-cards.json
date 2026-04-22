@@ -1,0 +1,45 @@
+{
+  "taskCards": [
+    {
+      "hallId": "main",
+      "taskCardId": "collaboration-hall:coo-214e284e",
+      "projectId": "collaboration-hall",
+      "taskId": "coo-214e284e",
+      "roomId": "collaboration-hall:coo-214e284e",
+      "title": "@安总<运营总监COO>",
+      "description": "@安总<运营总监COO>",
+      "stage": "discussion",
+      "status": "todo",
+      "createdByParticipantId": "operator",
+      "proposal": "安总，这轮的上下文我这边看到的是：小客确认了某个方案可以推进，但安迪认为还需要继续讨论某些细节，还没有到收口的时候。\n不过既然安迪还没有给出明确的议题方向，作为选题策划CP，我先从我的视角提醒几个可能需要讨论的点：\n**如果是在讨论内容选题方向的话：**\n- 这周的核心选题还没最终定稿，小圈<朋友圈运营SO>和小媒<社媒运营SMM>那边的选题清单还没跟我对齐\n- 最近小察<热点情报Intel>报上来的几个趋势话题，需要讨论优先级和分配到哪个平台\n- 如果有新的产品发布或重要节点，选题库需要提前布局\n**如果是在讨论内容执行层面的话：**\n- 小导<内容总监CD>那边的内容排期和我的选题规划需要同步一下时间线\n- 小文<爆款文案CW>拿到选题后的产出质量标准，我们还没达成共识\n安迪，是以上哪个方向？还是有其他议题需要安总介入决策的？给个明确的方向，我这边可以马上展开。",
+      "latestSummary": "安总，这轮的上下文我这边看到的是：小客确认了某个方案可以推进，但安迪认为还需要继续讨论某些细节，还没有到收口的时候。<br>不过既然安迪还没有给出明确的议题方向，作为选题策划CP，我先从我的视角提醒几个可能需要讨论的点：<br>**如果是在讨论内容选题方向的话：**<br>- 这周的核心选题还没最终定稿，小圈<朋友圈运营SO>和小媒<社媒运营SMM>那边的选题清单还没跟我对齐<br>- 最近小察<热点情报Intel>报上来的几个趋势话题，需要讨论优先级和分配到哪个平台<br>- 如果有新的产品发布或重要节点，选题库需要提前布局<br>**如果是在讨论内容执行层面的话：**<br>- 小导<内容总监CD>那边的内容排期和我的选题规划需要同步一下时间线<br>- 小文<爆款文案CW>拿到选题后的产出质量标准，我们还没达成共识<br>安迪，是以上哪个方向？还是有其他议题需要安总介入决策的？给个明确的方向，我这边可以马上展开。",
+      "blockers": [],
+      "requiresInputFrom": [],
+      "mentionedParticipantIds": [
+        "main"
+      ],
+      "plannedExecutionOrder": [],
+      "plannedExecutionItems": [],
+      "sessionKeys": [
+        "agent:main:hall:coo-214e284e",
+        "agent:topic-planner:hall:coo-214e284e"
+      ],
+      "discussionCycle": {
+        "cycleId": "0ca20037-f608-4248-9582-b2e7012191d5",
+        "openedAt": "2026-04-26T03:06:53.836Z",
+        "openedByParticipantId": "operator",
+        "expectedParticipantIds": [
+          "main",
+          "topic-planner"
+        ],
+        "completedParticipantIds": [
+          "main",
+          "topic-planner"
+        ]
+      },
+      "createdAt": "2026-04-26T03:06:27.900Z",
+      "updatedAt": "2026-04-26T03:11:14.281Z"
+    }
+  ],
+  "updatedAt": "2026-04-26T03:11:14.281Z"
+}

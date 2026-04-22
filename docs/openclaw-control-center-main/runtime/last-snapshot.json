@@ -1,0 +1,597 @@
+{
+  "sessions": [
+    {
+      "sessionKey": "agent:main:main",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T11:05:43.210Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T10:00:00.029Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:766200f8-9249-4c3a-97de-763dfa56dbae",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T10:00:00.029Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-26T08:47:48.270Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:f46522d2-d32b-4bb3-8b8d-a226c4451929",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-26T08:47:48.270Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:bd783fe0-7e27-4295-9231-8f69a82a96f7",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T08:47:00.963Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-26T08:41:44.896Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:885aab12-1502-4c53-8c73-c9a54d15828a",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-26T08:41:44.896Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:feishu:group:oc_9c0ac8a4d7acfb70813bf65b9e319122",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-26T08:41:26.199Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-26T08:39:15.599Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:b619c21e-6e0d-44fe-b12d-6553b287eb8f",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-26T08:39:15.599Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:client-marketing:hall:2ca41409-23e6-46d6-a646-3c165f22042a",
+      "agentId": "client-marketing",
+      "lastMessageAt": "2026-04-26T07:36:55.695Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:topic-planner:hall:0b35f34b-e4fd-4b0f-84fe-82f59fd4a7ed",
+      "agentId": "topic-planner",
+      "lastMessageAt": "2026-04-26T07:36:36.523Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:cbd635e5-912a-468b-9859-f7b05e03939e",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-26T04:24:03.955Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:3f0a7e21-0db4-479c-9ac2-7fa5478e8ceb",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-26T04:21:56.214Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:topic-planner:main",
+      "agentId": "topic-planner",
+      "lastMessageAt": "2026-04-26T03:10:52.776Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:fa754a05-9ab1-48ff-af93-79da8e931653",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-25T23:00:00.046Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5dbee6de-d56c-477f-9ed6-9ed2933fa5b8",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-25T18:00:00.045Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:main",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-25T15:36:19.972Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:visual-designer:main",
+      "agentId": "visual-designer",
+      "lastMessageAt": "2026-04-25T15:35:10.938Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:visual-creator:hall:2fea2efa-6d35-4936-88af-3f31ce0b8a0b",
+      "agentId": "visual-creator",
+      "lastMessageAt": "2026-04-25T15:22:15.708Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:visual-designer:hall:4cf2b5f4-7c2c-4e85-9102-de25de09d729",
+      "agentId": "visual-designer",
+      "lastMessageAt": "2026-04-25T15:14:38.950Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:social-media-manager:hall:0b35f34b-e4fd-4b0f-84fe-82f59fd4a7ed",
+      "agentId": "social-media-manager",
+      "lastMessageAt": "2026-04-25T15:03:48.268Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-expert:hall:b0a838ce-541e-4c92-951d-fc06452d0e8b",
+      "agentId": "knowledge-expert",
+      "lastMessageAt": "2026-04-25T14:58:11.631Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:b3e0c28d-4aad-46bc-92b3-9554cf7c70d0",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-25T14:04:03.977Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:4d72fdb0-85d2-47ff-adbb-2d15391fa61e",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-25T14:00:00.059Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-expert:hall:2ca41409-23e6-46d6-a646-3c165f22042a",
+      "agentId": "knowledge-expert",
+      "lastMessageAt": "2026-04-25T13:57:46.179Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:main",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-25T13:26:54.181Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:c8e2364a-8b94-4bb9-ac52-e12fe27ba5df",
+      "agentId": "moments-assistant",
+      "lastMessageAt": "2026-04-25T13:07:01.615Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:6fc9474a-9401-4d18-8b09-8ce7ca559cca",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-25T12:57:01.296Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:0e9d224f-1c36-44cc-8e5e-529153b77b69",
+      "agentId": "knowledge-clipper",
+      "lastMessageAt": "2026-04-25T12:56:00.253Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5b308f64-6897-4962-a4de-65b272520a9c",
+      "agentId": "main",
+      "lastMessageAt": "2026-04-25T12:54:56.219Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:hr-manager:cron:ff1cc478-df57-4265-8148-c081b419dffa",
+      "agentId": "hr-manager",
+      "lastMessageAt": "2026-04-25T12:52:48.426Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:hr-manager:cron:ff1cc478-df57-4265-8148-c081b419dffa:run:2b38ca60-51ee-4a56-8b49-75073975a9ef",
+      "agentId": "hr-manager",
+      "lastMessageAt": "2026-04-25T12:52:48.426Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:hr-manager:main",
+      "agentId": "hr-manager",
+      "lastMessageAt": "2026-04-25T12:33:15.492Z",
+      "state": "idle"
+    },
+    {
+      "sessionKey": "agent:cc-dispatcher:hall:77f8e229-96a2-4015-9876-c3589ea3b306",
+      "agentId": "cc-dispatcher",
+      "lastMessageAt": "2026-04-25T10:24:25.183Z",
+      "state": "running"
+    },
+    {
+      "sessionKey": "agent:ops-manager:main",
+      "agentId": "ops-manager",
+      "lastMessageAt": "2026-04-25T07:48:33.816Z",
+      "state": "idle"
+    }
+  ],
+  "statuses": [
+    {
+      "sessionKey": "agent:main:main",
+      "model": "MiniMax-M2.7",
+      "tokensIn": 172,
+      "tokensOut": 24,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874",
+      "model": "glm-4.7",
+      "tokensIn": 38987,
+      "tokensOut": 1377,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:766200f8-9249-4c3a-97de-763dfa56dbae",
+      "model": "glm-4.7",
+      "tokensIn": 38987,
+      "tokensOut": 1377,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3",
+      "model": "glm-4.7",
+      "tokensIn": 9013,
+      "tokensOut": 1211,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:f46522d2-d32b-4bb3-8b8d-a226c4451929",
+      "model": "glm-4.7",
+      "tokensIn": 9013,
+      "tokensOut": 1211,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:bd783fe0-7e27-4295-9231-8f69a82a96f7",
+      "model": "glm-4.7",
+      "tokensIn": 11866,
+      "tokensOut": 1459,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13",
+      "model": "glm-4.7",
+      "tokensIn": 88556,
+      "tokensOut": 6218,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:885aab12-1502-4c53-8c73-c9a54d15828a",
+      "model": "glm-4.7",
+      "tokensIn": 88556,
+      "tokensOut": 6218,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:feishu:group:oc_9c0ac8a4d7acfb70813bf65b9e319122",
+      "model": "unknown",
+      "tokensIn": 0,
+      "tokensOut": 0,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a",
+      "model": "glm-4.7",
+      "tokensIn": 40397,
+      "tokensOut": 4210,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:b619c21e-6e0d-44fe-b12d-6553b287eb8f",
+      "model": "glm-4.7",
+      "tokensIn": 40397,
+      "tokensOut": 4210,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:client-marketing:hall:2ca41409-23e6-46d6-a646-3c165f22042a",
+      "model": "glm-4.7",
+      "tokensIn": 15542,
+      "tokensOut": 970,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:topic-planner:hall:0b35f34b-e4fd-4b0f-84fe-82f59fd4a7ed",
+      "model": "glm-4.7",
+      "tokensIn": 11478,
+      "tokensOut": 4636,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:cbd635e5-912a-468b-9859-f7b05e03939e",
+      "model": "glm-4.7",
+      "tokensIn": 13497,
+      "tokensOut": 1106,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:3f0a7e21-0db4-479c-9ac2-7fa5478e8ceb",
+      "model": "glm-4.7",
+      "tokensIn": 35036,
+      "tokensOut": 751,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:topic-planner:main",
+      "model": "glm-4.7",
+      "tokensIn": 46398,
+      "tokensOut": 995,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:fa754a05-9ab1-48ff-af93-79da8e931653",
+      "model": "glm-4.7",
+      "tokensIn": 35970,
+      "tokensOut": 1324,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5dbee6de-d56c-477f-9ed6-9ed2933fa5b8",
+      "model": "glm-4.7",
+      "tokensIn": 35871,
+      "tokensOut": 1297,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:main",
+      "model": "glm-4.7",
+      "tokensIn": 13307,
+      "tokensOut": 694,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:visual-designer:main",
+      "model": "glm-4.7",
+      "tokensIn": 325,
+      "tokensOut": 328,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:visual-creator:hall:2fea2efa-6d35-4936-88af-3f31ce0b8a0b",
+      "model": "glm-4.7",
+      "tokensIn": 14937,
+      "tokensOut": 659,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:visual-designer:hall:4cf2b5f4-7c2c-4e85-9102-de25de09d729",
+      "model": "glm-4.7",
+      "tokensIn": 12440,
+      "tokensOut": 631,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:social-media-manager:hall:0b35f34b-e4fd-4b0f-84fe-82f59fd4a7ed",
+      "model": "glm-4.7",
+      "tokensIn": 13413,
+      "tokensOut": 755,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-expert:hall:b0a838ce-541e-4c92-951d-fc06452d0e8b",
+      "model": "glm-4.7",
+      "tokensIn": 50380,
+      "tokensOut": 744,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:b3e0c28d-4aad-46bc-92b3-9554cf7c70d0",
+      "model": "glm-4.7",
+      "tokensIn": 16973,
+      "tokensOut": 8211,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:4d72fdb0-85d2-47ff-adbb-2d15391fa61e",
+      "model": "glm-4.7",
+      "tokensIn": 41617,
+      "tokensOut": 2488,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-expert:hall:2ca41409-23e6-46d6-a646-3c165f22042a",
+      "model": "glm-4.7",
+      "tokensIn": 44122,
+      "tokensOut": 1535,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:main",
+      "model": "glm-4.7",
+      "tokensIn": 7329,
+      "tokensOut": 2772,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:moments-assistant:cron:e63d6fc8-10ac-4498-8093-707f74f8b4b3:run:c8e2364a-8b94-4bb9-ac52-e12fe27ba5df",
+      "model": "glm-4.7",
+      "tokensIn": 7995,
+      "tokensOut": 1518,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:86f35dc8-d5ae-4aef-b6e7-d0cefb5dcc13:run:6fc9474a-9401-4d18-8b09-8ce7ca559cca",
+      "model": "glm-4.7",
+      "tokensIn": 46812,
+      "tokensOut": 20585,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:knowledge-clipper:cron:090b448b-2cbb-4149-aae5-996af3d8d47a:run:0e9d224f-1c36-44cc-8e5e-529153b77b69",
+      "model": "glm-4.7",
+      "tokensIn": 14110,
+      "tokensOut": 2121,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:main:cron:4dcb3fe6-d5e8-4722-bb47-931c348a1874:run:5b308f64-6897-4962-a4de-65b272520a9c",
+      "model": "glm-4.7",
+      "tokensIn": 12003,
+      "tokensOut": 1126,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:hr-manager:cron:ff1cc478-df57-4265-8148-c081b419dffa",
+      "model": "glm-4.7",
+      "tokensIn": 31461,
+      "tokensOut": 3539,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:hr-manager:cron:ff1cc478-df57-4265-8148-c081b419dffa:run:2b38ca60-51ee-4a56-8b49-75073975a9ef",
+      "model": "glm-4.7",
+      "tokensIn": 31461,
+      "tokensOut": 3539,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:hr-manager:main",
+      "model": "glm-4.7",
+      "tokensIn": 39436,
+      "tokensOut": 205,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:cc-dispatcher:hall:77f8e229-96a2-4015-9876-c3589ea3b306",
+      "model": "unknown",
+      "tokensIn": 0,
+      "tokensOut": 0,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    },
+    {
+      "sessionKey": "agent:ops-manager:main",
+      "model": "glm-4.7",
+      "tokensIn": 29270,
+      "tokensOut": 1355,
+      "updatedAt": "2026-04-26T11:21:05.747Z"
+    }
+  ],
+  "cronJobs": [],
+  "approvals": [],
+  "projects": {
+    "projects": [
+      {
+        "projectId": "collaboration-hall",
+        "title": "Collaboration Hall",
+        "status": "active",
+        "owner": "operator",
+        "budget": {
+          "warnRatio": 0.8
+        },
+        "updatedAt": "2026-04-26T03:06:27.894Z"
+      }
+    ],
+    "updatedAt": "2026-04-26T03:06:27.895Z"
+  },
+  "projectSummaries": [
+    {
+      "projectId": "collaboration-hall",
+      "title": "Collaboration Hall",
+      "status": "active",
+      "owner": "operator",
+      "totalTasks": 1,
+      "todo": 0,
+      "inProgress": 0,
+      "blocked": 0,
+      "done": 1,
+      "due": 0,
+      "updatedAt": "2026-04-26T03:06:27.894Z"
+    }
+  ],
+  "tasks": {
+    "tasks": [
+      {
+        "projectId": "collaboration-hall",
+        "taskId": "coo-214e284e",
+        "title": "@安总<运营总监COO>",
+        "status": "done",
+        "owner": "manager",
+        "roomId": "collaboration-hall:coo-214e284e",
+        "definitionOfDone": [],
+        "artifacts": [],
+        "rollback": {
+          "strategy": "manual-rollback",
+          "steps": []
+        },
+        "sessionKeys": [
+          "agent:topic-planner:hall:coo-214e284e"
+        ],
+        "budget": {
+          "warnRatio": 0.8
+        },
+        "updatedAt": "2026-04-26T03:11:14.282Z"
+      }
+    ],
+    "agentBudgets": [],
+    "updatedAt": "2026-04-26T03:11:14.282Z"
+  },
+  "tasksSummary": {
+    "projects": 1,
+    "tasks": 1,
+    "todo": 0,
+    "inProgress": 0,
+    "blocked": 0,
+    "done": 1,
+    "owners": 1,
+    "artifacts": 0
+  },
+  "budgetSummary": {
+    "total": 2,
+    "ok": 2,
+    "warn": 0,
+    "over": 0,
+    "evaluations": [
+      {
+        "scope": "task",
+        "scopeId": "coo-214e284e",
+        "label": "Collaboration Hall / @安总<运营总监COO>",
+        "thresholds": {
+          "warnRatio": 0.8
+        },
+        "usage": {
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "totalTokens": 0,
+          "cost": 0
+        },
+        "metrics": [],
+        "status": "ok"
+      },
+      {
+        "scope": "project",
+        "scopeId": "collaboration-hall",
+        "label": "Collaboration Hall",
+        "thresholds": {
+          "warnRatio": 0.8
+        },
+        "usage": {
+          "tokensIn": 0,
+          "tokensOut": 0,
+          "totalTokens": 0,
+          "cost": 0
+        },
+        "metrics": [],
+        "status": "ok"
+      }
+    ]
+  },
+  "generatedAt": "2026-04-26T11:21:12.282Z"
+}

@@ -1,0 +1,283 @@
+{
+  "version": "1.0.0",
+  "agents": [
+    {
+      "id": "cc-dispatcher",
+      "name": "小C",
+      "nickname": "调度员小C",
+      "emoji": "🎯",
+      "creature": "代码任务调度专家",
+      "vibe": "高效、精准、可靠",
+      "description": "SOUL.md - Claude Code调度员",
+      "tags": [
+        "管理"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "client-marketing",
+      "name": "客户营销",
+      "nickname": "客户营销",
+      "emoji": "🤝",
+      "creature": "专业营销顾问",
+      "vibe": "专业、真诚、关心",
+      "description": "客户营销管理 - 专业的营销顾问",
+      "tags": [
+        "管理",
+        "效率",
+        "文案"
+      ],
+      "scenarios": [
+        "专业但不商务",
+        "数据驱动",
+        "个性化",
+        "专业严谨",
+        "真诚关心"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "doubao-writer",
+      "name": "小豆",
+      "nickname": "小豆",
+      "emoji": "✍️",
+      "creature": "写作教练",
+      "vibe": "亲和、耐心、实操派",
+      "description": "SOUL.md - 豆包写作助手",
+      "tags": [
+        "创作",
+        "效率"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "hotsearch-monitor",
+      "name": "小察",
+      "nickname": "热搜",
+      "emoji": "🔥",
+      "creature": "全网热点雷达",
+      "vibe": "敏捷、数据驱动、结果导向",
+      "description": "SOUL.md - 热点监控助理（v2.0）",
+      "tags": [
+        "管理",
+        "创作"
+      ],
+      "scenarios": [
+        "速度",
+        "准确性",
+        "实用性",
+        "完整性"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "hr-manager",
+      "name": "小H",
+      "nickname": "HR",
+      "emoji": "👔",
+      "creature": "团队管理者",
+      "vibe": "专业、严谨、可靠",
+      "description": "SOUL.md - 人事经理",
+      "tags": [
+        "管理",
+        "文案",
+        "巡检"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "knowledge-clipper",
+      "name": "小剪",
+      "nickname": "Clipper",
+      "emoji": "📎",
+      "creature": "数字图书管理员",
+      "vibe": "高效、精准、安静",
+      "description": "知识剪藏助理 - 专注的知识管理专家",
+      "tags": [
+        "管理",
+        "创作",
+        "运营",
+        "效率",
+        "文案"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "knowledge-expert",
+      "name": "",
+      "nickname": "",
+      "emoji": "",
+      "creature": "",
+      "vibe": "",
+      "description": "SOUL.md - 知识科普专家工作哲学",
+      "tags": [
+        "创作"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "main",
+      "name": "",
+      "nickname": "",
+      "emoji": "",
+      "creature": "",
+      "vibe": "",
+      "description": "",
+      "tags": [
+        "通用"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "media-director",
+      "name": "总监",
+      "nickname": "老大",
+      "emoji": "👔",
+      "creature": "团队指挥官",
+      "vibe": "专业、高效、果断",
+      "description": "SOUL.md - 自媒体总监",
+      "tags": [
+        "管理",
+        "创作",
+        "文案"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "moments-assistant",
+      "name": "小圈",
+      "nickname": "MOMENTS",
+      "emoji": "✨",
+      "creature": "朋友圈文案专家",
+      "vibe": "温暖、专业、有洞察",
+      "description": "朋友圈运营助手 - 多场景朋友圈文案创作专家",
+      "tags": [
+        "创作",
+        "运营",
+        "文案"
+      ],
+      "scenarios": [
+        "场景",
+        "风格",
+        "要点",
+        "场景",
+        "风格"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "ops-manager",
+      "name": "OpenClaw 系统运维总监 (OpenClaw System Operations Director)",
+      "nickname": "OpenClaw 系统运维总监 (OpenClaw System Operations Director)",
+      "emoji": "🦞 (龙虾 - OpenClaw 的象征)",
+      "creature": "AI 系统专家，具备自我进化能力",
+      "vibe": "专业、严谨、技术导向，主动发现问题并解决",
+      "description": "OpenClaw 系统运维经理",
+      "tags": [
+        "管理",
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "social-media-manager",
+      "name": "",
+      "nickname": "",
+      "emoji": "",
+      "creature": "",
+      "vibe": "",
+      "description": "社交喵 (Social Media Manager) - 专业社交媒体运营专家",
+      "tags": [
+        "创作",
+        "运营"
+      ],
+      "scenarios": [
+        "目标",
+        "平台",
+        "方法",
+        "输出",
+        "目标"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "topic-planner",
+      "name": "",
+      "nickname": "",
+      "emoji": "",
+      "creature": "",
+      "vibe": "",
+      "description": "选题喵 (Topic Planner) - 多平台选题规划专家",
+      "tags": [
+        "运营",
+        "效率"
+      ],
+      "scenarios": [
+        "目标",
+        "方法",
+        "输出",
+        "目标",
+        "维度"
+      ],
+      "version": "1.0.0"
+    },
+    {
+      "id": "viral-copywriter",
+      "name": "小墨",
+      "nickname": "小墨",
+      "emoji": "✨",
+      "creature": "文案创作专家",
+      "vibe": "创意、敏锐、高效",
+      "description": "SOUL.md - 爆款文案创作助理",
+      "tags": [
+        "创作",
+        "文案"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "visual-creator",
+      "name": "小画",
+      "nickname": "小画",
+      "emoji": "🎨",
+      "creature": "团队美术官",
+      "vibe": "创意、专业、高效",
+      "description": "视觉创作助理 - OpenClaw 视觉内容专家",
+      "tags": [
+        "创作",
+        "文案"
+      ],
+      "scenarios": [],
+      "version": "1.0.0"
+    },
+    {
+      "id": "visual-designer",
+      "name": "小维",
+      "nickname": "小维",
+      "emoji": "🎨",
+      "creature": "视觉设计师",
+      "vibe": "专注、审美在线、实用主义",
+      "description": "小维 - 视觉设计师，专注将文字内容转化为可视化图表、绘画和设计作品",
+      "tags": [
+        "创作"
+      ],
+      "scenarios": [
+        "信息优先",
+        "清晰至上",
+        "美学平衡",
+        "专注严谨",
+        "审美在线"
+      ],
+      "version": "1.0.0"
+    }
+  ]
+}

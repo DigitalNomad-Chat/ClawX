@@ -1,0 +1,59 @@
+{
+  "date": "2026-04-26",
+  "generatedAt": "2026-04-26T11:21:12.283Z",
+  "snapshotGeneratedAt": "2026-04-26T11:21:12.282Z",
+  "sessions": {
+    "total": 37,
+    "byState": {
+      "idle": 36,
+      "running": 1
+    }
+  },
+  "usage": {
+    "statuses": 37,
+    "totalTokensIn": 987127,
+    "totalTokensOut": 91399,
+    "totalCost": 0
+  },
+  "approvals": {
+    "total": 0,
+    "pending": 0,
+    "approved": 0,
+    "denied": 0,
+    "unknown": 0
+  },
+  "projects": {
+    "total": 1,
+    "byStatus": {
+      "active": 1
+    }
+  },
+  "tasks": {
+    "total": 1,
+    "todo": 0,
+    "inProgress": 0,
+    "blocked": 0,
+    "done": 1,
+    "dueNow": 0
+  },
+  "budgets": {
+    "total": 2,
+    "ok": 2,
+    "warn": 0,
+    "over": 0
+  },
+  "alerts": [],
+  "exceptions": {
+    "counts": {
+      "blocked": 0,
+      "errors": 0,
+      "pendingApprovals": 0,
+      "overBudget": 0,
+      "tasksDue": 0,
+      "info": 0,
+      "warn": 0,
+      "actionRequired": 0
+    },
+    "topItems": []
+  }
+}

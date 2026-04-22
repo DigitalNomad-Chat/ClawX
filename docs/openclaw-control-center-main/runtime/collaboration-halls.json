@@ -1,0 +1,220 @@
+{
+  "halls": [
+    {
+      "hallId": "main",
+      "title": "Collaboration Hall",
+      "description": "The shared control-center group chat for task discussion, assignment, execution, and review.",
+      "participants": [
+        {
+          "participantId": "main",
+          "agentId": "main",
+          "displayName": "安总<运营总监COO>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "安总<运营总监COO>",
+            "main"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "hr-manager",
+          "agentId": "hr-manager",
+          "displayName": "小H<人事经理HR>",
+          "semanticRole": "manager",
+          "active": true,
+          "aliases": [
+            "小H<人事经理HR>",
+            "hr-manager"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "ops-manager",
+          "agentId": "ops-manager",
+          "displayName": "小O<系统运维Ops>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小O<系统运维Ops>",
+            "ops-manager"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "knowledge-clipper",
+          "agentId": "knowledge-clipper",
+          "displayName": "小剪<知识剪藏KC>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小剪<知识剪藏KC>",
+            "knowledge-clipper"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "topic-planner",
+          "agentId": "topic-planner",
+          "displayName": "小喵<选题策划CP>",
+          "semanticRole": "planner",
+          "active": true,
+          "aliases": [
+            "小喵<选题策划CP>",
+            "topic-planner"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "moments-assistant",
+          "agentId": "moments-assistant",
+          "displayName": "小圈<朋友圈运营SO>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小圈<朋友圈运营SO>",
+            "moments-assistant"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "social-media-manager",
+          "agentId": "social-media-manager",
+          "displayName": "小媒<社媒运营SMM>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小媒<社媒运营SMM>",
+            "social-media-manager"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "client-marketing",
+          "agentId": "client-marketing",
+          "displayName": "小客<客户营销AM>",
+          "semanticRole": "reviewer",
+          "active": true,
+          "aliases": [
+            "小客<客户营销AM>",
+            "client-marketing"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "hotsearch-monitor",
+          "agentId": "hotsearch-monitor",
+          "displayName": "小察<热点情报Intel>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小察<热点情报Intel>",
+            "hotsearch-monitor"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "media-director",
+          "agentId": "media-director",
+          "displayName": "小导<内容总监CD>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小导<内容总监CD>",
+            "media-director"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "cc-dispatcher",
+          "agentId": "cc-dispatcher",
+          "displayName": "小扣<代码调度CC>",
+          "semanticRole": "coder",
+          "active": true,
+          "aliases": [
+            "小扣<代码调度CC>",
+            "cc-dispatcher"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "viral-copywriter",
+          "agentId": "viral-copywriter",
+          "displayName": "小文<爆款文案CW>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小文<爆款文案CW>",
+            "viral-copywriter"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "visual-creator",
+          "agentId": "visual-creator",
+          "displayName": "小画<AI视觉设计VC>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小画<AI视觉设计VC>",
+            "visual-creator"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "knowledge-expert",
+          "agentId": "knowledge-expert",
+          "displayName": "小知<知识科普KE>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小知<知识科普KE>",
+            "knowledge-expert"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "visual-designer",
+          "agentId": "visual-designer",
+          "displayName": "小维<前端可视化VD>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小维<前端可视化VD>",
+            "visual-designer"
+          ],
+          "isHuman": false
+        },
+        {
+          "participantId": "doubao-writer",
+          "agentId": "doubao-writer",
+          "displayName": "小墨<技术写作TW>",
+          "semanticRole": "generalist",
+          "active": true,
+          "aliases": [
+            "小墨<技术写作TW>",
+            "doubao-writer"
+          ],
+          "isHuman": false
+        }
+      ],
+      "taskCardIds": [
+        "collaboration-hall:coo-214e284e"
+      ],
+      "messageIds": [
+        "ddbbbd17-ef7c-45a0-a1fc-e1956fbaf4e9",
+        "38b819fb-178d-4ab3-9581-cf856bfb2939",
+        "61867909-8514-4dc2-9a12-3a18b50c854e",
+        "96a60904-a0fa-4ac3-9d98-54928d3e7475",
+        "0f17452c-8145-4b65-9ad8-e6d73bf36bfa",
+        "d4f0dd80-1074-4440-a302-a10541185cff"
+      ],
+      "lastMessageId": "d4f0dd80-1074-4440-a302-a10541185cff",
+      "latestMessageAt": "2026-04-26T03:11:14.277Z",
+      "createdAt": "2026-04-26T03:03:36.531Z",
+      "updatedAt": "2026-04-26T11:21:20.256Z"
+    }
+  ],
+  "executionLocks": [],
+  "updatedAt": "2026-04-26T11:21:20.256Z"
+}
