@@ -1,0 +1,13 @@
+node_modules
+dist
+runtime
+tmp
+.git
+.env
+.pr-reviews
+plans
+workflows
+.tmp_*
+1440m
+180m
+720m
