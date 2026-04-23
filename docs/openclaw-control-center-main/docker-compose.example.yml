@@ -1,0 +1,39 @@
+services:
+  control-center:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw-control-center:local
+    restart: unless-stopped
+    ports:
+      - "4310:4310"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      UI_MODE: "true"
+      UI_PORT: "4310"
+      UI_BIND_ADDRESS: "0.0.0.0"
+      UI_TIMEZONE: "UTC"
+      READONLY_MODE: "true"
+      LOCAL_TOKEN_AUTH_REQUIRED: "true"
+      LOCAL_API_TOKEN: "change-this-before-exposing-the-ui"
+      # If the OpenClaw Gateway runs on the host, try host.docker.internal.
+      # On Linux Docker this extra_hosts rule maps it back to the host gateway.
+      # Prefer ws:// for direct host-to-container traffic unless your gateway
+      # endpoint itself is terminating TLS with a cert that matches the hostname.
+      # If it runs as another compose service, replace this with that service name.
+      GATEWAY_URL: "ws://host.docker.internal:18789"
+      OPENCLAW_CONTROL_UI_URL: "http://127.0.0.1:4310/"
+      OPENCLAW_HOME: "/data/.openclaw"
+      OPENCLAW_CONFIG_PATH: "/data/.openclaw/openclaw.json"
+      OPENCLAW_WORKSPACE_ROOT: "/data/workspace"
+      CODEX_HOME: "/data/.codex"
+    volumes:
+      - control-center-runtime:/app/runtime
+      # Mount the same OpenClaw / Codex data used by your real deployment.
+      - /absolute/path/to/openclaw-home:/data/.openclaw:ro
+      - /absolute/path/to/openclaw-workspace:/data/workspace:ro
+      - /absolute/path/to/codex-home:/data/.codex:ro
+
+volumes:
+  control-center-runtime: {}
