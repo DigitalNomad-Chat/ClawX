@@ -9,6 +9,7 @@ import { GatewayManager } from '../gateway/manager';
 import { registerIpcHandlers } from './ipc-handlers';
 import { createTray } from './tray';
 import { createMenu } from './menu';
+import { initModules, shutdownModules } from '../modules/registry';
 
 import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
@@ -334,6 +335,15 @@ async function initialize(): Promise<void> {
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, window);
 
+  // === MODULE EXTENSION POINT ===
+  // Initialize feature modules (errors are swallowed per-module)
+  void initModules({
+    gatewayManager,
+    clawHubService,
+    eventBus: hostEventBus,
+    mainWindow: window,
+  });
+
   // Register ClawX Independent Kernel extensions
   registerExtensions();
 
@@ -591,12 +601,18 @@ if (gotTheLock) {
     const extensionsStopPromise = shutdownExtensions().catch((err) => {
       logger.warn('shutdownExtensions() error during quit:', err);
     });
+
+    // === MODULE EXTENSION POINT ===
+    const modulesStopPromise = shutdownModules().catch((err) => {
+      logger.warn('shutdownModules() error during quit:', err);
+    });
+
     const timeoutPromise = new Promise<'timeout'>((resolve) => {
       setTimeout(() => resolve('timeout'), 5000);
     });
 
     void Promise.race([
-      Promise.all([stopPromise, extensionsStopPromise]).then(() => 'stopped' as const),
+      Promise.all([stopPromise, extensionsStopPromise, modulesStopPromise]).then(() => 'stopped' as const),
       timeoutPromise,
     ]).then((result) => {
       if (result === 'timeout') {

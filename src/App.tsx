@@ -9,6 +9,8 @@ import { Toaster } from 'sonner';
 import i18n from './i18n';
 import { MainLayout } from './components/layout/MainLayout';
 import { TooltipProvider } from '@/components/ui/tooltip';
+// === MODULE EXTENSION POINT ===
+import { moduleRoutes } from './modules/registry';
 import { Models } from './pages/Models';
 import { Chat } from './pages/Chat';
 import { Agents } from './pages/Agents';
@@ -184,6 +186,8 @@ function App() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/agent-chat/:agentId" element={<AgentChat />} />
             <Route path="/settings/*" element={<Settings />} />
+            {/* === MODULE EXTENSION POINT === */}
+            {moduleRoutes}
           </Route>
         </Routes>
 

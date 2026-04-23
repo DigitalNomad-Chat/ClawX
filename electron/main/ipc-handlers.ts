@@ -9,6 +9,7 @@ import { join, extname, basename } from 'node:path';
 import crypto from 'node:crypto';
 import { GatewayManager } from '../gateway/manager';
 import { ClawHubService, ClawHubSearchParams, ClawHubInstallParams, ClawHubUninstallParams } from '../gateway/clawhub';
+import { registerModuleIpcHandlers } from '../modules/registry';
 import {
   type ProviderConfig,
 } from '../utils/secure-storage';
@@ -136,6 +137,10 @@ export function registerIpcHandlers(
 
   // File staging handlers (upload/send separation)
   registerFileHandlers();
+
+  // === MODULE EXTENSION POINT ===
+  // Register feature-module IPC handlers (defensive: module registry swallows errors)
+  void registerModuleIpcHandlers();
 }
 
 function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {

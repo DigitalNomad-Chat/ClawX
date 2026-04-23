@@ -16,6 +16,8 @@ import { handleFileRoutes } from './routes/files';
 import { handleSessionRoutes } from './routes/sessions';
 import { handleCronRoutes } from './routes/cron';
 import { sendJson, setCorsHeaders, requireJsonContentType } from './route-utils';
+// === MODULE EXTENSION POINT ===
+import { moduleRouteHandlers } from '../modules/registry';
 
 type RouteHandler = (
   req: IncomingMessage,
@@ -37,6 +39,8 @@ const routeHandlers: RouteHandler[] = [
   handleCronRoutes,
   handleLogRoutes,
   handleUsageRoutes,
+  // === MODULE EXTENSION POINT ===
+  ...moduleRouteHandlers,
 ];
 
 /**

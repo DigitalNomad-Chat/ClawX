@@ -31,6 +31,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { hostApiFetch } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
 import logoSvg from '@/assets/logo.svg';
+// === MODULE EXTENSION POINT ===
+import { moduleNavItems } from '@/modules/registry';
 
 type SessionBucketKey =
   | 'today'
@@ -215,6 +217,13 @@ export function Sidebar() {
     { to: '/skills', icon: <Puzzle className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.skills'), testId: 'sidebar-nav-skills' },
     { to: '/cron', icon: <Clock className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.cronTasks'), testId: 'sidebar-nav-cron' },
     { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || 'Agent 广场', testId: 'sidebar-nav-marketplace' },
+    // === MODULE EXTENSION POINT ===
+    ...moduleNavItems.map((item) => ({
+      to: item.to,
+      icon: item.icon,
+      label: item.i18nKey ? t(item.i18nKey as never) : item.label,
+      testId: item.testId,
+    })),
   ];
 
   return (

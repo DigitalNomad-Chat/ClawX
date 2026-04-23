@@ -8,7 +8,7 @@ const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 /** Cached Host API auth token, fetched once from the main process via IPC. */
 let cachedHostApiToken: string | null = null;
 
-async function getHostApiToken(): Promise<string> {
+export async function getHostApiToken(): Promise<string> {
   if (cachedHostApiToken) return cachedHostApiToken;
   try {
     cachedHostApiToken = await invokeIpc<string>('hostapi:token');

@@ -98,4 +98,14 @@ i18n
         },
     });
 
+// === MODULE EXTENSION POINT ===
+/** Allow feature modules to register their own translation bundles at runtime */
+export function addModuleI18nResources(
+  language: string,
+  namespace: string,
+  resources: Record<string, unknown>
+): void {
+  i18n.addResourceBundle(language, namespace, resources, true, true);
+}
+
 export default i18n;
