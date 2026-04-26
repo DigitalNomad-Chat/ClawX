@@ -426,6 +426,74 @@ describe('sanitizeOpenClawConfig', () => {
     expect(moonshot).not.toHaveProperty('apiKey');
     expect(moonshot.baseUrl).toBe('https://api.moonshot.cn/v1');
   });
+
+  it('mirrors telegram default account credentials to top level during sanitize', async () => {
+    await writeOpenClawJson({
+      channels: {
+        telegram: {
+          enabled: true,
+          defaultAccount: 'default',
+          accounts: {
+            default: {
+              botToken: 'telegram-token',
+              enabled: true,
+            },
+          },
+          proxy: 'socks5://127.0.0.1:7891',
+        },
+      },
+    });
+
+    const { sanitizeOpenClawConfig } = await import('@electron/utils/openclaw-auth');
+    await sanitizeOpenClawConfig();
+
+    const result = await readOpenClawJson();
+    const channels = result.channels as Record<string, Record<string, unknown>>;
+    const telegram = channels.telegram;
+    // telegram is NOT in the exclude set, so credentials are mirrored to top level
+    expect(telegram.proxy).toBe('socks5://127.0.0.1:7891');
+    expect(telegram.botToken).toBe('telegram-token');
+  });
+
+  it('strips defaultAccount (but preserves accounts) from dingtalk during sanitize', async () => {
+    await writeOpenClawJson({
+      channels: {
+        dingtalk: {
+          enabled: true,
+          defaultAccount: 'default',
+          accounts: {
+            default: {
+              clientId: 'dt-client-id-nested',
+              clientSecret: 'dt-secret-nested',
+              enabled: true,
+            },
+          },
+          clientId: 'dt-client-id',
+          clientSecret: 'dt-secret',
+        },
+      },
+    });
+
+    const { sanitizeOpenClawConfig } = await import('@electron/utils/openclaw-auth');
+    await sanitizeOpenClawConfig();
+
+    const result = await readOpenClawJson();
+    const channels = result.channels as Record<string, Record<string, unknown>>;
+    const dingtalk = channels.dingtalk;
+    // dingtalk's schema accepts `accounts` but NOT `defaultAccount`
+    expect(dingtalk.enabled).toBe(true);
+    expect(dingtalk.accounts).toEqual({
+      default: {
+        clientId: 'dt-client-id-nested',
+        clientSecret: 'dt-secret-nested',
+        enabled: true,
+      },
+    });
+    expect(dingtalk.defaultAccount).toBeUndefined();
+    // Top-level credentials preserved (were already there + mirrored)
+    expect(dingtalk.clientId).toBe('dt-client-id');
+    expect(dingtalk.clientSecret).toBe('dt-secret');
+  });
 });
 
 describe('syncProviderConfigToOpenClaw', () => {
@@ -445,7 +513,7 @@ describe('syncProviderConfigToOpenClaw', () => {
 
     const { syncProviderConfigToOpenClaw } = await import('@electron/utils/openclaw-auth');
 
-    await syncProviderConfigToOpenClaw('moonshot', 'kimi-k2.5', {
+    await syncProviderConfigToOpenClaw('moonshot', 'kimi-k2.6', {
       baseUrl: 'https://api.moonshot.cn/v1',
       api: 'openai-completions',
     });
@@ -470,7 +538,7 @@ describe('syncProviderConfigToOpenClaw', () => {
 
     const { syncProviderConfigToOpenClaw } = await import('@electron/utils/openclaw-auth');
 
-    await syncProviderConfigToOpenClaw('moonshot', 'kimi-k2.5', {
+    await syncProviderConfigToOpenClaw('moonshot', 'kimi-k2.6', {
       baseUrl: 'https://api.moonshot.cn/v1',
       api: 'openai-completions',
     });
