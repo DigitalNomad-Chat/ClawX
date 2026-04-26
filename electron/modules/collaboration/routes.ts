@@ -326,7 +326,7 @@ export async function handleCollaborationRoutes(
                 taskCard,
                 message: message.content,
               });
-              console.log("[collab-routes] dispatchAgentRun result success=%s error=%s", result.success, result.error ?? "none");
+              console.log("[collab-routes] dispatchAgentRun result success=%s error=%s hasResult=%s resultType=%s", result.success, result.error ?? "none", !!result.result, typeof result.result);
               if (!result.success) {
                 publishCollabEvent({
                   type: "invalidate",
@@ -337,7 +337,7 @@ export async function handleCollaborationRoutes(
                     abortReason: result.error || "Gateway dispatch failed",
                   },
                 });
-              } else {
+              } else if (result.result) {
                 publishCollabEvent({
                   type: "invalidate",
                   hallId: hall.hallId,
@@ -345,6 +345,17 @@ export async function handleCollaborationRoutes(
                   payload: {
                     draftId: `dispatch-${target.participantId}`,
                     message: result.result,
+                  },
+                });
+              } else {
+                // dispatch succeeded but no message returned (e.g. retry path)
+                publishCollabEvent({
+                  type: "invalidate",
+                  hallId: hall.hallId,
+                  reason: "draft_abort",
+                  payload: {
+                    draftId: `dispatch-${target.participantId}`,
+                    abortReason: result.error || "Agent 未返回有效消息",
                   },
                 });
               }

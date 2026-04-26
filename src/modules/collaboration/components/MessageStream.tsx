@@ -233,11 +233,11 @@ export function MessageStream({
   );
 
   const handleDraftFinalize = useCallback(
-    (draftId: string, message: HallMessage) => {
+    (draftId: string, message: HallMessage | undefined) => {
       setDrafts((prev) => {
         const copy = { ...prev };
         if (copy[draftId]) {
-          copy[draftId] = { ...copy[draftId], status: 'finalized', finalizedMessageId: message.messageId };
+          copy[draftId] = { ...copy[draftId], status: 'finalized', finalizedMessageId: message?.messageId };
         }
         return copy;
       });
@@ -362,7 +362,7 @@ export function MessageStream({
             暂无消息
           </div>
         )}
-        {filteredMessages.map((msg) => (
+        {filteredMessages.filter(Boolean).map((msg) => (
           <StreamMessageItem
             key={msg.messageId}
             message={msg}

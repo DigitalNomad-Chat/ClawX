@@ -1,4 +1,4 @@
-/"use strict";
+"use strict";
 
 /**
  * Collaboration Hall — Task Lifecycle Tracker

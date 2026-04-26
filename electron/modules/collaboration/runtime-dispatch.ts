@@ -61,13 +61,6 @@ export interface RuntimeDispatchResult {
   error?: string;
 }
 
-interface ChatSendResult {
-  text?: string;
-  message?: string;
-  content?: string;
-  [key: string]: unknown;
-}
-
 // ---------------------------------------------------------------------------
 //  Session key helpers (reused from previous implementation)
 // ---------------------------------------------------------------------------
@@ -114,6 +107,104 @@ async function fetchRecentThreadMessages(
     .filter((m) => !taskCard.taskCardId || m.taskCardId === taskCard.taskCardId)
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .slice(-limit);
+}
+
+// ---------------------------------------------------------------------------
+//  Gateway history polling helper
+// ---------------------------------------------------------------------------
+
+interface HistoryMessage {
+  role?: string;
+  content?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+interface HistoryResult {
+  messages?: HistoryMessage[];
+  [key: string]: unknown;
+}
+
+/**
+ * Extract plain text from a Gateway message content field.
+ * Content may be a string or an array of content blocks (Anthropic/OpenAI format).
+ */
+function extractMessageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const block of content as Array<{ type?: string; text?: string }>) {
+      if (block.type === "text" && block.text) {
+        parts.push(block.text);
+      }
+    }
+    return parts.join("\n");
+  }
+  if (typeof content === "object" && content !== null && "text" in content) {
+    const c = content as { text?: string };
+    return c.text || "";
+  }
+  return "";
+}
+
+/**
+ * Poll chat.history for the latest assistant message.
+ * The Gateway processes the agent run asynchronously; we poll until the
+ * assistant reply appears in the session history or the timeout expires.
+ */
+async function pollHistoryForAssistantReply(
+  ctx: HostApiContext,
+  sessionKey: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  const POLL_INTERVAL = 3_000;
+  const deadline = Date.now() + timeoutMs;
+  let previousMessageCount = 0;
+
+  // Take a snapshot of current history length so we can detect new messages
+  try {
+    const initial = await ctx.gatewayManager.rpc<HistoryResult>(
+      "chat.history", { sessionKey, limit: 200 }, 15_000,
+    );
+    previousMessageCount = initial?.messages?.length ?? 0;
+    console.log("[runtime-dispatch] pollHistory: initial message count=%d", previousMessageCount);
+  } catch {
+    // Gateway may still be processing — start polling anyway
+    console.log("[runtime-dispatch] pollHistory: initial fetch failed, will retry");
+  }
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+
+    try {
+      const history = await ctx.gatewayManager.rpc<HistoryResult>(
+        "chat.history", { sessionKey, limit: 200 }, 15_000,
+      );
+
+      const messages = history?.messages;
+      if (!messages || messages.length === 0) continue;
+
+      // Look for the last assistant message that appeared after our snapshot
+      if (messages.length > previousMessageCount) {
+        // Find the last assistant message
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const msg = messages[i];
+          if (msg.role === "assistant") {
+            const text = extractMessageText(msg.content) || extractMessageText(msg.text);
+            if (text) {
+              console.log("[runtime-dispatch] pollHistory: got assistant reply (%d chars)", text.length);
+              return text;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[runtime-dispatch] pollHistory: error", err instanceof Error ? err.message : err);
+    }
+  }
+
+  console.error("[runtime-dispatch] pollHistory: timed out after %dms", timeoutMs);
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +265,8 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     };
   }
 
-  // Call Gateway
+  // Call Gateway — chat.send is async; it returns { runId } immediately.
+  // We then poll chat.history until an assistant message appears or we time out.
   const rpcParams: Record<string, unknown> = {
     sessionKey,
     message: `${prompt.systemPrompt}\n\n${prompt.userMessage}`,
@@ -186,9 +278,18 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
 
   let rawReply: string;
   try {
-    const result = await ctx.gatewayManager.rpc<ChatSendResult>("chat.send", rpcParams, 180_000);
-    console.log("[runtime-dispatch] Gateway result keys=%j", Object.keys(result ?? {}));
-    rawReply = result.text ?? result.message ?? result.content ?? String(result);
+    // Phase 1: Send the message and obtain runId
+    const sendResult = await ctx.gatewayManager.rpc<{ runId?: string; status?: string } & Record<string, unknown>>(
+      "chat.send", rpcParams, 30_000,
+    );
+    console.log("[runtime-dispatch] Gateway chat.send result keys=%j", Object.keys(sendResult ?? {}));
+
+    // Phase 2: Poll chat.history for the assistant reply
+    rawReply = await pollHistoryForAssistantReply(ctx, sessionKey, 180_000);
+
+    if (!rawReply) {
+      return { success: false, sessionKey, error: "Agent 未返回有效回复（超时）" };
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("[runtime-dispatch] Gateway RPC error:", errorMessage);
@@ -216,10 +317,34 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     operatorIntent,
   );
 
-  // If retry needed, return early (caller should retry)
+  // If retry needed, still persist the agent's reply as a message.
+  // The deliverable enforcer is designed for content pipelines; for collaboration
+  // hall conversations we always surface whatever the agent responded with.
   if (enforceResult.nextAction === "retry") {
+    const retryContent = enforceResult.content || visibleText || buildFallbackVisibleContent(mode, participant, language);
+    const retryMessageKind = resolveRuntimeMessageKind(mode, operatorIntent);
+
+    const message = await appendMessage({
+      hallId: taskCard.hallId,
+      kind: retryMessageKind,
+      authorParticipantId: participant.participantId,
+      authorLabel: participant.displayName,
+      authorSemanticRole: participant.semanticRole,
+      content: retryContent,
+      taskCardId: taskCard.taskCardId,
+      taskId: taskCard.taskId,
+      payload: {
+        ...buildMessagePayload(structuredBlock, artifactRefs, sessionKey),
+        taskStage: taskCard.stage,
+        taskStatus: taskCard.status,
+      },
+    });
+
+    await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant);
+
     return {
       success: true,
+      message,
       sessionKey,
       structured: structuredBlock,
       nextAction: "continue",

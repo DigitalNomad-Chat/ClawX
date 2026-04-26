@@ -141,7 +141,7 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
           }),
         }
       );
-      if (data.success) {
+      if (data.success && data.message) {
         const currentMessages = get().messages;
         set({ messages: [...currentMessages, data.message] });
         return data.message;
