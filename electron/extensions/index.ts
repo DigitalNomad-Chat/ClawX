@@ -1,15 +1,30 @@
-/**
- * ClawX Extensions Registration Entry
- * This is the single registration point for all independent kernel mode extensions.
- * Called from electron/main/index.ts during app initialization.
- */
+// ── Main branch Extension framework re-exports ──
+export { extensionRegistry } from './registry';
+export { registerBuiltinExtension, loadExtensionsFromManifest } from './loader';
+export type {
+  Extension,
+  ExtensionContext,
+  HostApiRouteExtension,
+  MarketplaceProviderExtension,
+  MarketplaceCapability,
+  AuthProviderExtension,
+  AuthStatus,
+  RouteHandler,
+} from './types';
+export {
+  isHostApiRouteExtension,
+  isMarketplaceProviderExtension,
+  isAuthProviderExtension,
+} from './types';
+
+// ── Kernel branch: Independent Kernel extensions ──
 import { KernelLauncher } from './kernel/kernel-launcher.js';
 import { registerMarketplaceRoutes } from './marketplace/marketplace-api.js';
 
 let kernelLauncher: KernelLauncher | null = null;
 
 /**
- * Register all extensions. Called once during Main Process startup.
+ * Register all kernel-mode extensions. Called once during Main Process startup.
  */
 export function registerExtensions(): void {
   console.log('[Extensions] Registering ClawX Independent Kernel extensions...');
@@ -44,7 +59,7 @@ export function getKernelLauncher(): KernelLauncher | null {
 }
 
 /**
- * Gracefully shutdown all extensions
+ * Gracefully shutdown all kernel extensions
  */
 export async function shutdownExtensions(): Promise<void> {
   console.log('[Extensions] Shutting down extensions...');

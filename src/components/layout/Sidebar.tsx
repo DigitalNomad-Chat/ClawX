@@ -21,6 +21,7 @@ import {
   Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { rendererExtensionRegistry } from '@/extensions/registry';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatStore } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
@@ -118,6 +119,7 @@ function getAgentIdFromSessionKey(sessionKey: string): string {
 export function Sidebar() {
   const sidebarCollapsed = useSettingsStore((state) => state.sidebarCollapsed);
   const setSidebarCollapsed = useSettingsStore((state) => state.setSidebarCollapsed);
+  const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
 
   const sessions = useChatStore((s) => s.sessions);
   const currentSessionKey = useChatStore((s) => s.currentSessionKey);
@@ -131,20 +133,23 @@ export function Sidebar() {
 
   const gatewayStatus = useGatewayStore((s) => s.status);
   const isGatewayRunning = gatewayStatus.state === 'running';
+  const isGatewayReady = isGatewayRunning && gatewayStatus.gatewayReady !== false;
 
   useEffect(() => {
-    if (!isGatewayRunning) return;
+    if (!isGatewayReady) return;
     let cancelled = false;
     const hasExistingMessages = useChatStore.getState().messages.length > 0;
     (async () => {
-      await loadSessions();
+      await Promise.allSettled([
+        loadSessions(),
+        loadHistory(hasExistingMessages),
+      ]);
       if (cancelled) return;
-      await loadHistory(hasExistingMessages);
     })();
     return () => {
       cancelled = true;
     };
-  }, [isGatewayRunning, loadHistory, loadSessions]);
+  }, [isGatewayReady, loadHistory, loadSessions]);
   const agents = useAgentsStore((s) => s.agents);
   const fetchAgents = useAgentsStore((s) => s.fetchAgents);
 
@@ -210,7 +215,10 @@ export function Sidebar() {
     sessionBucketMap[bucketKey].sessions.push(session);
   }
 
-  const navItems = [
+  const hiddenRoutes = rendererExtensionRegistry.getHiddenRoutes();
+  const extraNavItems = rendererExtensionRegistry.getExtraNavItems();
+
+  const coreNavItems = [
     { to: '/models', icon: <Cpu className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.models'), testId: 'sidebar-nav-models' },
     { to: '/agents', icon: <Bot className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.agents'), testId: 'sidebar-nav-agents' },
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels'), testId: 'sidebar-nav-channels' },
@@ -222,6 +230,16 @@ export function Sidebar() {
       to: item.to,
       icon: item.icon,
       label: item.i18nKey ? t(item.i18nKey as never) : item.label,
+      testId: item.testId,
+    })),
+  ];
+
+  const navItems = [
+    ...coreNavItems.filter((item) => !hiddenRoutes.has(item.to)),
+    ...extraNavItems.map((item) => ({
+      to: item.to,
+      icon: <item.icon className="h-[18px] w-[18px]" strokeWidth={2} />,
+      label: item.labelI18nKey ? t(item.labelI18nKey) : item.label,
       testId: item.testId,
     })),
   ];
@@ -369,26 +387,28 @@ export function Sidebar() {
           )}
         </NavLink>
 
-        <Button
-          data-testid="sidebar-open-dev-console"
-          variant="ghost"
-          className={cn(
-            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 h-auto text-[14px] font-medium transition-colors w-full mt-1',
-            'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
-            sidebarCollapsed ? 'justify-center px-0' : 'justify-start'
-          )}
-          onClick={openDevConsole}
-        >
-          <div className="flex shrink-0 items-center justify-center text-muted-foreground">
-            <Terminal className="h-[18px] w-[18px]" strokeWidth={2} />
-          </div>
-          {!sidebarCollapsed && (
-            <>
-              <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('common:sidebar.openClawPage')}</span>
-              <ExternalLink className="h-3 w-3 shrink-0 ml-auto opacity-50 text-muted-foreground" />
-            </>
-          )}
-        </Button>
+        {devModeUnlocked && (
+          <Button
+            data-testid="sidebar-open-dev-console"
+            variant="ghost"
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg px-2.5 py-2 h-auto text-[14px] font-medium transition-colors w-full mt-1',
+              'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
+              sidebarCollapsed ? 'justify-center px-0' : 'justify-start'
+            )}
+            onClick={openDevConsole}
+          >
+            <div className="flex shrink-0 items-center justify-center text-muted-foreground">
+              <Terminal className="h-[18px] w-[18px]" strokeWidth={2} />
+            </div>
+            {!sidebarCollapsed && (
+              <>
+                <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('common:sidebar.openClawPage')}</span>
+                <ExternalLink className="h-3 w-3 shrink-0 ml-auto opacity-50 text-muted-foreground" />
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <ConfirmDialog

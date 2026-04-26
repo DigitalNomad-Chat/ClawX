@@ -201,8 +201,7 @@ const electronAPI = {
         'kernel:event',
       ];
 
-      if (validChannels.includes(channel)) {
-        // Wrap the callback to strip the event
+      if (validChannels.includes(channel) || channel.startsWith('ext:')) {
         const subscription = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => {
           callback(...args);
         };
@@ -249,7 +248,7 @@ const electronAPI = {
         'oauth:error',
       ];
 
-      if (validChannels.includes(channel)) {
+      if (validChannels.includes(channel) || channel.startsWith('ext:')) {
         ipcRenderer.once(channel, (_event, ...args) => callback(...args));
         return;
       }
