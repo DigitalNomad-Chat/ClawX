@@ -75,3 +75,9 @@ electron/extensions/_ext-bridge.generated.ts
 src/extensions/_ext-bridge.generated.ts
 # YoYo AI version control directory
 .yoyo/
+
+# Tool artifacts
+.playwright-mcp/
+.spec-workflow/
+docs/.rustdesk_*
+docs/OpenClaw-Desktop-*-extracted/
