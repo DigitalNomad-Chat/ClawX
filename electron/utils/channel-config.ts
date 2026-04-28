@@ -8,7 +8,7 @@ import { access, mkdir, readFile, writeFile, readdir, stat, rm } from 'fs/promis
 import { constants } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { getOpenClawResolvedDir } from './paths';
+import { getOpenClawPluginStageDir, getOpenClawRuntimeDir } from './paths';
 import * as logger from './logger';
 import { proxyAwareFetch } from './proxy-fetch';
 import { withConfigLock } from './config-mutex';
@@ -562,6 +562,7 @@ function transformChannelConfig(
         transformedConfig = { ...restConfig };
 
         transformedConfig.groupPolicy = 'allowlist';
+        transformedConfig.dmPolicy = transformedConfig.dmPolicy ?? existingAccountConfig.dmPolicy ?? 'disabled';
         transformedConfig.dm = { enabled: false };
         transformedConfig.retry = {
             attempts: 3,
@@ -605,6 +606,21 @@ function transformChannelConfig(
                 transformedConfig.allowFrom = users;
             }
         }
+
+        const allowFrom = Array.isArray(transformedConfig.allowFrom)
+            ? transformedConfig.allowFrom
+            : Array.isArray(existingAccountConfig.allowFrom)
+                ? existingAccountConfig.allowFrom
+                : [];
+        const hasWildcardAccess = allowFrom.includes('*');
+        transformedConfig.dmPolicy =
+            transformedConfig.dmPolicy
+            ?? existingAccountConfig.dmPolicy
+            ?? (hasWildcardAccess ? 'open' : 'allowlist');
+        transformedConfig.groupPolicy =
+            transformedConfig.groupPolicy
+            ?? existingAccountConfig.groupPolicy
+            ?? (hasWildcardAccess ? 'open' : 'allowlist');
     }
 
     if (channelType === 'feishu' || channelType === 'wecom') {
@@ -1512,7 +1528,8 @@ export async function validateChannelConfig(channelType: string): Promise<Valida
     const result: ValidationResult = { valid: true, errors: [], warnings: [] };
 
     try {
-        const openclawPath = getOpenClawResolvedDir();
+        const openclawPath = getOpenClawRuntimeDir();
+        const pluginStageDir = getOpenClawPluginStageDir(openclawPath);
 
         // Run openclaw doctor command to validate config (async to avoid
         // blocking the main thread).
@@ -1523,6 +1540,11 @@ export async function validateChannelConfig(channelType: string): Promise<Valida
                     {
                         cwd: openclawPath,
                         encoding: 'utf-8',
+                        env: {
+                            ...process.env,
+                            ...(pluginStageDir ? { OPENCLAW_PLUGIN_STAGE_DIR: pluginStageDir } : {}),
+                            OPENCLAW_NO_RESPAWN: '1',
+                        },
                         timeout: 30000,
                         windowsHide: true,
                     },

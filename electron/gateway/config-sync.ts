@@ -18,7 +18,7 @@ function fsPath(filePath: string): string {
 import { getAllSettings } from '../utils/store';
 import { getApiKey, getDefaultProvider, getProvider } from '../utils/secure-storage';
 import { getProviderEnvVar, getKeyableProviderTypes } from '../utils/provider-registry';
-import { getOpenClawDir, getOpenClawEntryPath, isOpenClawPresent } from '../utils/paths';
+import { getOpenClawPluginStageDir, getOpenClawRuntimeDir, getOpenClawRuntimeEntryPath, isOpenClawPresent } from '../utils/paths';
 import { getUvMirrorEnv } from '../utils/uv-env';
 import { cleanupDanglingWeChatPluginState, listConfiguredChannelsFromConfig, readOpenClawConfig } from '../utils/channel-config';
 import { sanitizeOpenClawConfig, batchSyncConfigFields } from '../utils/openclaw-auth';
@@ -34,6 +34,7 @@ export interface GatewayLaunchContext {
   appSettings: Awaited<ReturnType<typeof getAllSettings>>;
   openclawDir: string;
   entryScript: string;
+  pluginStageDir: string | null;
   gatewayArgs: string[];
   forkEnv: Record<string, string | undefined>;
   mode: 'dev' | 'packaged';
@@ -85,6 +86,25 @@ function readPluginVersion(pkgJsonPath: string): string | null {
   }
 }
 
+function collectPluginRuntimeDeps(pluginDir: string): string[] {
+  try {
+    const raw = readFileSync(fsPath(join(pluginDir, 'package.json')), 'utf-8');
+    const pkg = JSON.parse(raw) as { dependencies?: Record<string, string>; optionalDependencies?: Record<string, string> };
+    return Object.keys({
+      ...pkg.dependencies,
+      ...pkg.optionalDependencies,
+    });
+  } catch {
+    return [];
+  }
+}
+
+function hasPluginRuntimeDeps(pluginDir: string): boolean {
+  const deps = collectPluginRuntimeDeps(pluginDir);
+  if (deps.length === 0) return true;
+  return deps.every((depName) => existsSync(fsPath(join(pluginDir, 'node_modules', ...depName.split('/'), 'package.json'))));
+}
+
 function buildBundledPluginSources(pluginDirName: string): string[] {
   return app.isPackaged
     ? [
@@ -121,7 +141,7 @@ function ensureConfiguredPluginsUpgraded(configuredChannels: string[]): void {
     if (bundledDir) {
       const sourceVersion = readPluginVersion(join(bundledDir, 'package.json'));
       // Install or upgrade if version differs or plugin not installed
-      if (!isInstalled || (sourceVersion && installedVersion && sourceVersion !== installedVersion)) {
+      if (!isInstalled || !hasPluginRuntimeDeps(targetDir) || (sourceVersion && installedVersion && sourceVersion !== installedVersion)) {
         logger.info(`[plugin] ${isInstalled ? 'Auto-upgrading' : 'Installing'} ${channelType} plugin${isInstalled ? `: ${installedVersion} → ${sourceVersion}` : `: ${sourceVersion}`} (bundled)`);
         try {
           mkdirSync(fsPath(join(homedir(), '.openclaw', 'extensions')), { recursive: true });
@@ -223,8 +243,29 @@ function ensureExtensionDepsResolvable(openclawDir: string): void {
   const topNM = join(openclawDir, 'node_modules');
   let linkedCount = 0;
 
+  // Use 'junction' on Windows (no admin required); on other platforms the
+  // type argument is ignored by Node so 'junction' is harmless.
+  const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+
   try {
     if (!existsSync(extDir)) return;
+
+    // Create openclaw self-reference so built-in extension runtime files can
+    // resolve bare `import 'openclaw/plugin-sdk/...'` via native ESM.
+    // Extensions ship their own package.json (e.g. "@openclaw/codex"),
+    // creating a separate package scope that prevents Node's ESM
+    // package-self-reference from reaching the openclaw root package.
+    // Only needed in packaged mode — in dev pnpm already provides resolution.
+    if (app.isPackaged) {
+      const selfRef = join(topNM, 'openclaw');
+      if (!existsSync(selfRef)) {
+        try {
+          mkdirSync(topNM, { recursive: true });
+          symlinkSync(openclawDir, selfRef, symlinkType);
+          linkedCount++;
+        } catch { /* skip on error — non-fatal */ }
+      }
+    }
 
     for (const ext of readdirSync(extDir, { withFileTypes: true })) {
       if (!ext.isDirectory()) continue;
@@ -245,7 +286,7 @@ function ensureExtensionDepsResolvable(openclawDir: string): void {
             if (existsSync(dest)) continue;
             try {
               mkdirSync(join(topNM, pkg.name), { recursive: true });
-              symlinkSync(join(scopeDir, sub.name), dest);
+              symlinkSync(join(scopeDir, sub.name), dest, symlinkType);
               linkedCount++;
             } catch { /* skip on error — non-fatal */ }
           }
@@ -254,7 +295,7 @@ function ensureExtensionDepsResolvable(openclawDir: string): void {
           if (existsSync(dest)) continue;
           try {
             mkdirSync(topNM, { recursive: true });
-            symlinkSync(join(extNM, pkg.name), dest);
+            symlinkSync(join(extNM, pkg.name), dest, symlinkType);
             linkedCount++;
           } catch { /* skip on error — non-fatal */ }
         }
@@ -394,8 +435,9 @@ async function resolveChannelStartupPolicy(): Promise<{
 }
 
 export async function prepareGatewayLaunchContext(port: number): Promise<GatewayLaunchContext> {
-  const openclawDir = getOpenClawDir();
-  const entryScript = getOpenClawEntryPath();
+  const openclawDir = getOpenClawRuntimeDir();
+  const entryScript = getOpenClawRuntimeEntryPath();
+  const pluginStageDir = getOpenClawPluginStageDir(openclawDir);
 
   if (!isOpenClawPresent()) {
     throw new Error(`OpenClaw package not found at: ${openclawDir}`);
@@ -442,6 +484,7 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     OPENCLAW_SKIP_CHANNELS: skipChannels ? '1' : '',
     CLAWDBOT_SKIP_CHANNELS: skipChannels ? '1' : '',
     OPENCLAW_NO_RESPAWN: '1',
+    ...(pluginStageDir ? { OPENCLAW_PLUGIN_STAGE_DIR: pluginStageDir } : {}),
   };
 
   // Ensure extension-specific packages (e.g. grammy from the telegram
@@ -453,6 +496,7 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     appSettings,
     openclawDir,
     entryScript,
+    pluginStageDir,
     gatewayArgs,
     forkEnv,
     mode,
