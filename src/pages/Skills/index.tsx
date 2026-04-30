@@ -685,7 +685,7 @@ export function Skills() {
                 <span>
                   {SEARCH_ERROR_CODES.has(searchError.replace('Error: ', ''))
                     ? t(`toast.${searchError.replace('Error: ', '')}`, { path: skillsDirPath })
-                    : t('marketplace.searchError')}
+                    : searchError}
                 </span>
               </div>
             )}
