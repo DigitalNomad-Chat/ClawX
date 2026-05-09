@@ -1,0 +1,192 @@
+/**
+ * NiceAI Theme Override Stylesheet
+ *
+ * All styles are scoped under `.theme-niceai` class for safe toggle.
+ * `!important` is used where Tailwind utilities would otherwise win.
+ *
+ * Spec: docs/superpowers/specs/2026-04-26-ui-beautification-niceai-design.md
+ */
+
+/* ================================================================
+ * 1. Radial Gradient Background
+ * ================================================================ */
+
+.theme-niceai main {
+  background:
+    radial-gradient(circle at 12% 55%, rgba(22, 93, 255, 0.06), transparent 25%),
+    radial-gradient(circle at 85% 33%, rgba(108, 99, 255, 0.05), transparent 25%),
+    hsl(var(--background));
+}
+
+.dark .theme-niceai main {
+  background:
+    radial-gradient(circle at 12% 55%, rgba(33, 150, 243, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 33%, rgba(108, 99, 255, 0.08), transparent 25%),
+    hsl(var(--background));
+}
+
+/* ================================================================
+ * 2. Frosted Glass Cards — auto-applied to shadcn Card
+ *    <Card> renders as <div class="rounded-lg border bg-card ...">
+ *    !important needed to override Tailwind utilities
+ * ================================================================ */
+
+.theme-niceai .bg-card.rounded-lg.border {
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 16px rgba(55, 99, 170, 0.08) !important;
+  border-radius: 12px !important;
+}
+
+.dark .theme-niceai .bg-card.rounded-lg.border {
+  background: linear-gradient(135deg, rgba(44, 44, 44, 0.9), rgba(24, 24, 24, 0.9)) !important;
+  border: 1px solid rgba(63, 63, 63, 0.5) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ================================================================
+ * 3. Frosted Glass Cards — manual class for non-Card elements
+ * ================================================================ */
+
+.glass-card {
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.9), rgba(243, 245, 248, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(55, 99, 170, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  transition: box-shadow 0.3s, transform 0.2s;
+}
+
+.glass-card:hover {
+  box-shadow: 0 8px 24px rgba(55, 99, 170, 0.12);
+  transform: translateY(-1px);
+}
+
+.dark .glass-card {
+  background: linear-gradient(135deg, rgba(44, 44, 44, 0.9), rgba(24, 24, 24, 0.9));
+  border: 1px solid rgba(63, 63, 63, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.dark .glass-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ================================================================
+ * 4. Sidebar — background override
+ *    Sidebar uses hardcoded bg-[#eae8e1]/60, override via CSS
+ * ================================================================ */
+
+.theme-niceai aside[data-testid="sidebar"] {
+  background: #FFFFFF !important;
+  border-right-color: #F0F0F0 !important;
+}
+
+.dark .theme-niceai aside[data-testid="sidebar"] {
+  background: #202329 !important;
+}
+
+/* ================================================================
+ * 5. Sidebar — navigation item styling
+ * ================================================================ */
+
+.theme-niceai [data-nav-item][data-active="true"] {
+  background: radial-gradient(circle at left, rgba(22, 93, 255, 0.12) 0%, transparent 100%) !important;
+  color: #165DFF !important;
+  font-weight: 600 !important;
+}
+
+.theme-niceai [data-nav-item]:hover {
+  background: rgba(22, 93, 255, 0.05) !important;
+}
+
+.dark .theme-niceai [data-nav-item][data-active="true"] {
+  background: radial-gradient(circle at left, rgba(64, 158, 255, 0.15) 0%, transparent 100%) !important;
+  color: #409EFF !important;
+}
+
+.dark .theme-niceai [data-nav-item]:hover {
+  background: rgba(64, 158, 255, 0.08) !important;
+}
+
+/* Active nav icon color */
+.theme-niceai [data-nav-item][data-active="true"] svg {
+  color: #165DFF !important;
+}
+
+.dark .theme-niceai [data-nav-item][data-active="true"] svg {
+  color: #409EFF !important;
+}
+
+/* ================================================================
+ * 6. Sidebar — session card styling
+ * ================================================================ */
+
+.theme-niceai [data-session-item][data-active="true"] {
+  background: radial-gradient(circle at left, rgba(22, 93, 255, 0.15) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
+  border: 1px solid rgba(22, 93, 255, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+.dark .theme-niceai [data-session-item][data-active="true"] {
+  background: radial-gradient(circle at left, rgba(64, 158, 255, 0.2) 0%, rgba(32, 35, 41, 0.95) 100%) !important;
+  border: 1px solid rgba(64, 158, 255, 0.25) !important;
+}
+
+.theme-niceai [data-session-item]:hover {
+  background: rgba(22, 93, 255, 0.04) !important;
+}
+
+.dark .theme-niceai [data-session-item]:hover {
+  background: rgba(64, 158, 255, 0.06) !important;
+}
+
+/* ================================================================
+ * 7. Sidebar — "New Chat" button
+ * ================================================================ */
+
+.theme-niceai [data-nav-item="new-chat"] {
+  background: rgba(22, 93, 255, 0.08) !important;
+  color: #165DFF !important;
+  border-color: rgba(22, 93, 255, 0.12) !important;
+}
+
+.dark .theme-niceai [data-nav-item="new-chat"] {
+  background: rgba(64, 158, 255, 0.1) !important;
+  color: #409EFF !important;
+  border-color: rgba(64, 158, 255, 0.15) !important;
+}
+
+.theme-niceai [data-nav-item="new-chat"]:hover {
+  background: rgba(22, 93, 255, 0.12) !important;
+}
+
+.dark .theme-niceai [data-nav-item="new-chat"]:hover {
+  background: rgba(64, 158, 255, 0.15) !important;
+}
+
+/* ================================================================
+ * 8. Sidebar — agent badge on session items
+ * ================================================================ */
+
+.theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-black\/\[0\.04\],
+.dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-white\/\[0\.08\] {
+  background: rgba(22, 93, 255, 0.08) !important;
+  color: #165DFF !important;
+}
+
+.dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-black\/\[0\.04\],
+.dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-white\/\[0\.08\] {
+  background: rgba(64, 158, 255, 0.1) !important;
+  color: #409EFF !important;
+}
+
+/* ================================================================
+ * 9. Accessibility — reduced motion
+ * ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-card:hover {
+    transform: none;
+  }
+}

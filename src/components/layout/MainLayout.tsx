@@ -5,10 +5,14 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TitleBar } from './TitleBar';
+import { useSettingsStore } from '@/stores/settings';
+import { cn } from '@/lib/utils';
 
 export function MainLayout() {
+  const niceaiTheme = useSettingsStore((s) => s.niceaiTheme);
+
   return (
-    <div data-testid="main-layout" className="flex h-screen flex-col overflow-hidden bg-background">
+    <div data-testid="main-layout" className={cn('flex h-screen flex-col overflow-hidden bg-background', niceaiTheme && 'theme-niceai')}>
       {/* Title bar: drag region on macOS, icon + controls on Windows */}
       <TitleBar />
 

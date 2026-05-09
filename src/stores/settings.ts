@@ -37,6 +37,7 @@ interface SettingsState {
   // UI State
   sidebarCollapsed: boolean;
   devModeUnlocked: boolean;
+  niceaiTheme: boolean;
 
   // Setup
   setupComplete: boolean;
@@ -61,6 +62,7 @@ interface SettingsState {
   setAutoDownloadUpdate: (value: boolean) => void;
   setSidebarCollapsed: (value: boolean) => void;
   setDevModeUnlocked: (value: boolean) => void;
+  setNiceaiTheme: (value: boolean) => void;
   markSetupComplete: () => void;
   resetSettings: () => void;
 }
@@ -84,6 +86,7 @@ const defaultSettings = {
   autoDownloadUpdate: false,
   sidebarCollapsed: false,
   devModeUnlocked: false,
+  niceaiTheme: true,
   setupComplete: false,
 };
 
@@ -167,6 +170,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoCheckUpdate: (autoCheckUpdate) => set({ autoCheckUpdate }),
       setAutoDownloadUpdate: (autoDownloadUpdate) => set({ autoDownloadUpdate }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+      setNiceaiTheme: (niceaiTheme) => set({ niceaiTheme }),
       setDevModeUnlocked: (devModeUnlocked) => {
         set({ devModeUnlocked });
         void hostApiFetch('/api/settings/devModeUnlocked', {

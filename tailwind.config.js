@@ -188,6 +188,13 @@ module.exports = {
       colors: {
         // ── A. shadcn semantic tokens (do NOT rename — Radix/shadcn
         //       components read these names directly) ──
+        niceai: {
+          primary: '#165DFF',
+          'primary-light': '#409EFF',
+          'bg-light': '#F5F7FA',
+          'bg-dark': '#0C0B10',
+          'card-dark': '#1C1D29',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -259,6 +266,12 @@ module.exports = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        glass: '12px',
+      },
+      boxShadow: {
+        glass: '0 4px 16px rgba(55, 99, 170, 0.08)',
+        'glass-hover': '0 8px 24px rgba(55, 99, 170, 0.12)',
+        'glass-dark': '0 4px 16px rgba(0, 0, 0, 0.2)',
       },
       keyframes: {
         'accordion-down': {
