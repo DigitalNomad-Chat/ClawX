@@ -63,7 +63,7 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       }
     >
       {({ isActive }) => (
-        <>
+        <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
           <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground" : "text-muted-foreground")}>
             {icon}
           </div>
@@ -77,7 +77,7 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
               )}
             </>
           )}
-        </>
+        </div>
       )}
     </NavLink>
   );
@@ -209,7 +209,14 @@ export function Sidebar() {
     ...(devModeUnlocked
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
-    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || 'Agent 广场', testId: 'sidebar-nav-marketplace' },
+    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
+    // === MODULE EXTENSION POINT ===
+    ...moduleNavItems.map((item) => ({
+      to: item.to,
+      icon: item.icon,
+      label: item.i18nKey ? t(item.i18nKey as never) : item.label,
+      testId: item.testId,
+    })),
   ];
 
   const navItems = [
@@ -258,6 +265,7 @@ export function Sidebar() {
       <nav className="flex flex-col px-2 gap-0.5">
         <button
           data-testid="sidebar-new-chat"
+          data-nav-item="new-chat"
           onClick={() => {
             const { messages } = useChatStore.getState();
             if (messages.length > 0) newSession();
@@ -296,14 +304,17 @@ export function Sidebar() {
                 {bucket.sessions.map((s) => {
                   const agentId = getAgentIdFromSessionKey(s.key);
                   const agentName = agentNameById[agentId] || agentId;
+                  const isSessionActive = isOnChat && currentSessionKey === s.key;
                   return (
                     <div key={s.key} className="group relative flex items-center">
                       <button
+                        data-session-item
+                        data-active={isSessionActive || undefined}
                         onClick={() => { switchSession(s.key); navigate('/'); }}
                         className={cn(
                           'w-full text-left rounded-lg px-2.5 py-1.5 text-meta transition-colors pr-7',
                           'hover:bg-black/5 dark:hover:bg-white/5',
-                          isOnChat && currentSessionKey === s.key
+                          isSessionActive
                             ? 'bg-black/5 dark:bg-white/10 text-foreground font-medium'
                             : 'text-foreground/75',
                         )}
@@ -356,12 +367,12 @@ export function Sidebar() {
             }
           >
           {({ isActive }) => (
-            <>
+            <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
               <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground" : "text-muted-foreground")}>
                 <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
               </div>
               {!sidebarCollapsed && <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.settings')}</span>}
-            </>
+            </div>
           )}
         </NavLink>
 
