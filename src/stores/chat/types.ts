@@ -105,6 +105,10 @@ export interface ChatState {
   /** Images collected from tool results, attached to the next assistant message */
   pendingToolImages: AttachedFileMeta[];
 
+  // Abort
+  /** Set to true when user explicitly aborts a run; used to force-close stale execution graphs */
+  userAbortedRun: boolean;
+
   // Sessions
   sessions: ChatSession[];
   currentSessionKey: string;

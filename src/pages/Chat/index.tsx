@@ -114,6 +114,7 @@ export function Chat() {
   const streamingTools = useChatStore((s) => s.streamingTools);
   const pendingFinal = useChatStore((s) => s.pendingFinal);
   const activeRunId = useChatStore((s) => s.activeRunId);
+  const userAbortedRun = useChatStore((s) => s.userAbortedRun);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const abortRun = useChatStore((s) => s.abortRun);
   const clearError = useChatStore((s) => s.clearError);
@@ -354,9 +355,11 @@ export function Chat() {
     // (which clears activeRunId), we must NOT keep the run "open" — so we
     // gate it on activeRunId being present. We also bail out as soon as a
     // terminal model error has been surfaced so the run doesn't appear active.
+    // userAbortedRun provides an additional safety net for abort detection.
     const isLatestRunSegment = nextUserIndex === -1;
     const isLatestOpenRun = isLatestRunSegment
       && !runError
+      && !userAbortedRun
       && (sending || pendingFinal || hasAnyStreamContent || (runStillExecutingTools && !!activeRunId));
     const replyIndexOffset = findReplyMessageIndex(segmentMessages, isLatestOpenRun);
     const replyIndex = replyIndexOffset === -1 ? null : idx + 1 + replyIndexOffset;

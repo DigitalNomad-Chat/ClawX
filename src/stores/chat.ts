@@ -1462,6 +1462,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   pendingFinal: false,
   lastUserMessageAt: null,
   pendingToolImages: [],
+  userAbortedRun: false,
 
   sessions: [],
   currentSessionKey: DEFAULT_SESSION_KEY,
@@ -2127,6 +2128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingTools: [],
       pendingFinal: false,
       lastUserMessageAt: nowMs,
+      userAbortedRun: false,
     }));
 
     // Update session label with first user message text as soon as it's sent
@@ -2277,7 +2279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     clearHistoryPoll();
     clearErrorRecoveryTimer();
     const { currentSessionKey } = get();
-    set({ sending: false, streamingText: '', streamingMessage: null, pendingFinal: false, lastUserMessageAt: null, pendingToolImages: [] });
+    set({ sending: false, streamingText: '', streamingMessage: null, pendingFinal: false, lastUserMessageAt: null, pendingToolImages: [], userAbortedRun: true });
     set({ streamingTools: [] });
 
     try {
