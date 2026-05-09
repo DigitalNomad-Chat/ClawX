@@ -10,6 +10,8 @@
         "settings": "Настройки",
         "devConsole": "Консоль разработчика",
         "models": "Модели",
+        "marketplace": "Маркетплейс",
+        "collaboration": "Сотрудничество",
         "deleteSessionConfirm": "Вы уверены, что хотите удалить сессию \"{{label}}\"?",
         "openClawPage": "Страница OpenClaw",
         "openClawDreams": "Dreams"

@@ -10,6 +10,8 @@
         "settings": "Settings",
         "devConsole": "Developer Console",
         "models": "Models",
+        "marketplace": "Marketplace",
+        "collaboration": "Collaboration",
         "deleteSessionConfirm": "Are you sure you want to delete session \"{{label}}\"?",
         "openClawPage": "OpenClaw Page",
         "openClawDreams": "Dreams"
