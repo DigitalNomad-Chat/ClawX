@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, GitBranch, Link, MessageSquare, Wrench, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { repairMarkdown } from '@/lib/markdown-repair';
 import type { TaskStep } from './task-visualization';
 
 interface ExecutionGraphCardProps {
@@ -155,11 +158,11 @@ function StepDetailCard({ step }: { step: TaskStep }) {
           })()}
           {step.detail && expanded && canExpand && (isNarration || isThinking) && (
             <div className="mt-3 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-              <pre
-                className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground"
-              >
-                {step.detail}
-              </pre>
+              <div className="prose prose-sm dark:prose-invert max-w-none break-words text-[12px] leading-5 text-muted-foreground [&_p]:text-muted-foreground [&_li]:text-muted-foreground [&_td]:text-muted-foreground [&_th]:text-muted-foreground">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {repairMarkdown(step.detail)}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
     </div>

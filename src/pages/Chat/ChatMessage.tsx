@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { invokeIpc, statFile } from '@/lib/api-client';
 import type { RawMessage, AttachedFileMeta } from '@/stores/chat';
 import { extractText, extractImages, extractToolUse, formatTimestamp } from './message-utils';
+import { repairMarkdown } from '@/lib/markdown-repair';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 
 interface ChatMessageProps {
   message: RawMessage;
@@ -565,6 +567,11 @@ function MessageBubble({
   isUser: boolean;
   isStreaming: boolean;
 }) {
+  // Debounce streaming text to batch rapid tokens and avoid O(n²) re-parses
+  const debouncedText = useDebouncedValue(text, isStreaming ? 30 : 0);
+  // Repair incomplete markdown syntax for streaming content
+  const displayText = isStreaming ? repairMarkdown(normalizeLatexDelimiters(debouncedText)) : normalizeLatexDelimiters(text);
+
   return (
     <div
       className={cn(
@@ -610,7 +617,7 @@ function MessageBubble({
               },
             }}
           >
-            {normalizeLatexDelimiters(text)}
+            {displayText}
           </ReactMarkdown>
           {isStreaming && (
             <span className="inline-block w-2 h-4 bg-foreground/50 animate-pulse ml-0.5" />
