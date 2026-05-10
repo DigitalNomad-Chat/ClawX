@@ -45,6 +45,7 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from 
 import { startHostApiServer } from '../api/server';
 import { HostEventBus } from '../api/event-bus';
 import { registerExtensions, shutdownExtensions } from '../extensions';
+import { initModules, shutdownModules } from '../modules/registry';
 import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
@@ -341,6 +342,14 @@ async function initialize(): Promise<void> {
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, window);
 
+  // Initialize feature modules (errors are swallowed per-module)
+  void initModules({
+    gatewayManager,
+    clawHubService,
+    eventBus: hostEventBus,
+    mainWindow: window,
+  });
+
   // Register ClawX Independent Kernel extensions
   registerExtensions();
 
@@ -622,6 +631,9 @@ if (gotTheLock) {
     // Stop independent kernel extensions
     const extensionsStopPromise = shutdownExtensions().catch((err) => {
       logger.warn('shutdownExtensions() error during quit:', err);
+    });
+    const modulesStopPromise = shutdownModules().catch((err) => {
+      logger.warn('shutdownModules() error during quit:', err);
     });
     const timeoutPromise = new Promise<'timeout'>((resolve) => {
       setTimeout(() => resolve('timeout'), 5000);

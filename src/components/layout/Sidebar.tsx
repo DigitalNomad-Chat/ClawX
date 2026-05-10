@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { hostApiFetch } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
+import { moduleNavItems } from '@/modules/registry';
 import logoSvg from '@/assets/logo.svg';
 
 interface NavItemProps {
@@ -210,7 +211,7 @@ export function Sidebar() {
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
     { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
-    // === MODULE EXTENSION POINT ===
+    // === MODULE NAV ITEMS ===
     ...moduleNavItems.map((item) => ({
       to: item.to,
       icon: item.icon,

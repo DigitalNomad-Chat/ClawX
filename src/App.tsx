@@ -16,6 +16,7 @@ import { Channels } from './pages/Channels';
 import { Skills } from './pages/Skills';
 import { Cron } from './pages/Cron';
 import { Dreams } from './pages/Dreams';
+import { moduleRoutes } from './modules/registry';
 import { Marketplace } from './pages/Marketplace';
 import { AgentChat } from './pages/AgentChat';
 import { Settings } from './pages/Settings';
@@ -202,6 +203,7 @@ function App() {
             {extraRoutes.map((r) => (
               <Route key={r.path} path={r.path} element={<r.component />} />
             ))}
+            {moduleRoutes}
           </Route>
         </Routes>
 
