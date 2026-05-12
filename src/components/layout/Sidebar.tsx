@@ -20,6 +20,8 @@ import {
   Cpu,
   Moon,
   Store,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rendererExtensionRegistry } from '@/extensions/registry';
@@ -159,6 +161,7 @@ export function Sidebar() {
   const { t } = useTranslation(['common', 'chat']);
   const [sessionToDelete, setSessionToDelete] = useState<{ key: string; label: string } | null>(null);
   const [nowMs, setNowMs] = useState(INITIAL_NOW_MS);
+  const [navCollapsed, setNavCollapsed] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -285,7 +288,7 @@ export function Sidebar() {
           {!sidebarCollapsed && <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>}
         </button>
 
-        {navItems.map((item) => (
+        {!navCollapsed && navItems.map((item) => (
           <NavItem
             key={item.to}
             {...item}
@@ -293,6 +296,25 @@ export function Sidebar() {
           />
         ))}
       </nav>
+
+      {/* Nav collapse toggle */}
+      {!sidebarCollapsed && (
+        <div className="flex items-center gap-2 px-4 py-1">
+          <div className="h-px flex-1 bg-border/50" />
+          <button
+            onClick={() => setNavCollapsed(!navCollapsed)}
+            className="flex items-center justify-center rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground hover:bg-primary/5 transition-colors"
+            title={navCollapsed ? '展开功能按钮' : '收缩功能按钮'}
+          >
+            {navCollapsed ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronUp className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <div className="h-px flex-1 bg-border/50" />
+        </div>
+      )}
 
       {/* Session list — below Settings, only when expanded */}
       {!sidebarCollapsed && sessions.length > 0 && (
