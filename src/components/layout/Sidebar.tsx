@@ -54,23 +54,23 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       data-testid={testId}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
-          'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
+          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
+          'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
           isActive
-            ? 'bg-black/5 dark:bg-white/10 text-foreground'
-            : '',
-          collapsed && 'justify-center px-0'
+            ? 'bg-gradient-to-r from-primary/10 to-transparent !text-foreground/80 border-l-[3px] border-l-primary'
+            : 'border-l-[3px] border-l-transparent',
+          collapsed && 'justify-center px-0 border-l-0'
         )
       }
     >
       {({ isActive }) => (
         <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
-          <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground" : "text-muted-foreground")}>
+          <div className={cn("flex shrink-0 items-center justify-center", isActive ? "!text-foreground/80" : "text-muted-foreground")}>
             {icon}
           </div>
           {!collapsed && (
             <>
-              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
+              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap", isActive && "font-semibold")}>{label}</span>
               {badge && (
                 <Badge variant="secondary" className="ml-auto shrink-0">
                   {badge}
@@ -273,8 +273,9 @@ export function Sidebar() {
             navigate('/');
           }}
           className={cn(
-            'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors mb-2',
-            'bg-black/5 dark:bg-accent shadow-none border border-transparent text-foreground',
+            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-3',
+            'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
+            'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
             sidebarCollapsed && 'justify-center px-0',
           )}
         >
@@ -313,15 +314,15 @@ export function Sidebar() {
                         data-active={isSessionActive || undefined}
                         onClick={() => { switchSession(s.key); navigate('/'); }}
                         className={cn(
-                          'w-full text-left rounded-lg px-2.5 py-1.5 text-meta transition-colors pr-7',
-                          'hover:bg-black/5 dark:hover:bg-white/5',
+                          'w-full text-left rounded-xl px-2.5 py-1.5 text-meta transition-all duration-200 pr-7',
+                          'hover:bg-primary/4 dark:hover:bg-primary/6',
                           isSessionActive
-                            ? 'bg-black/5 dark:bg-white/10 text-foreground font-medium'
-                            : 'text-foreground/75',
+                            ? 'bg-gradient-to-r from-primary/10 to-transparent text-foreground font-medium border border-primary/15'
+                            : 'text-foreground/75 border border-transparent',
                         )}
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-0.5 text-2xs font-medium text-foreground/70 dark:bg-white/[0.08]">
+                          <span className="shrink-0 rounded-full bg-primary/8 px-2 py-0.5 text-2xs font-medium text-primary/80 dark:bg-primary/12 dark:text-primary">
                             {agentName}
                           </span>
                           <span className="truncate">{getSessionLabel(s.key, s.displayName, s.label)}</span>
@@ -360,19 +361,21 @@ export function Sidebar() {
             data-testid="sidebar-nav-settings"
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
-                'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
-                isActive && 'bg-black/5 dark:bg-white/10 text-foreground',
-                sidebarCollapsed ? 'justify-center px-0' : ''
+                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
+                'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
+                isActive
+                  ? 'bg-gradient-to-r from-primary/10 to-transparent !text-foreground/80 border-l-[3px] border-l-primary'
+                  : 'border-l-[3px] border-l-transparent',
+                sidebarCollapsed ? 'justify-center px-0 border-l-0' : ''
               )
             }
           >
           {({ isActive }) => (
             <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
-              <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground" : "text-muted-foreground")}>
+              <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
                 <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
               </div>
-              {!sidebarCollapsed && <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.settings')}</span>}
+              {!sidebarCollapsed && <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap", isActive && "font-semibold")}>{t('sidebar.settings')}</span>}
             </div>
           )}
         </NavLink>

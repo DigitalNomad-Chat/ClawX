@@ -246,7 +246,7 @@ export function ImportFromOpenClawDialog({
                                 {provider.maskedApiKey}
                               </span>
                             ) : (
-                              <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                              <span className="text-[11px] text-blue-600 dark:text-blue-400">
                                 无 API Key（不可导入）
                               </span>
                             )}

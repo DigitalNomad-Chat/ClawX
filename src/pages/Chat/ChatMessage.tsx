@@ -313,7 +313,7 @@ export const ChatMessage = memo(function ChatMessage({
     >
       {/* Avatar */}
       {!isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-black/5 dark:bg-white/5 text-foreground">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
           <Sparkles className="h-4 w-4" />
         </div>
       )}
@@ -577,13 +577,11 @@ function MessageBubble({
       className={cn(
         'relative rounded-2xl px-4 py-3',
         !isUser && 'w-full',
-        isUser
-          ? 'bg-brand text-white shadow-sm'
-          : 'bg-black/5 dark:bg-white/5 text-foreground',
+        isUser ? 'msg-bubble-user' : 'msg-bubble-ai',
       )}
     >
       {isUser ? (
-        <p className="whitespace-pre-wrap break-words break-all text-sm">{text}</p>
+        <p className="whitespace-pre-wrap break-words break-all text-sm leading-relaxed">{text}</p>
       ) : (
         <div className="prose prose-sm dark:prose-invert max-w-none break-words break-all">
           <ReactMarkdown
@@ -595,14 +593,14 @@ function MessageBubble({
                 const isInline = !match && !className;
                 if (isInline) {
                   return (
-                    <code className="bg-background/50 px-1.5 py-0.5 rounded text-sm font-mono break-words break-all" {...props}>
+                    <code {...props}>
                       {children}
                     </code>
                   );
                 }
                 return (
-                  <pre className="bg-background/50 rounded-lg p-4 overflow-x-auto">
-                    <code className={cn('text-sm font-mono', className)} {...props}>
+                  <pre>
+                    <code className={cn(className)} {...props}>
                       {children}
                     </code>
                   </pre>
@@ -620,7 +618,7 @@ function MessageBubble({
             {displayText}
           </ReactMarkdown>
           {isStreaming && (
-            <span className="inline-block w-2 h-4 bg-foreground/50 animate-pulse ml-0.5" />
+            <span className="streaming-cursor" />
           )}
         </div>
       )}
@@ -659,15 +657,15 @@ function FileCard({ file, onOpen }: { file: AttachedFileMeta; onOpen?: (file: At
   }, [file, onOpen]);
 
   return (
-    <div 
+    <div
       className={cn(
-        "flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 px-3 py-2.5 bg-black/5 dark:bg-white/5 max-w-[220px]",
-        file.filePath && "cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+        "flex items-center gap-3 rounded-xl border border-border/60 px-3 py-2.5 bg-surface-input max-w-[220px]",
+        file.filePath && "cursor-pointer hover:bg-muted transition-all duration-200 hover:shadow-sm hover:border-primary/20"
       )}
       onClick={handleOpen}
       title={file.filePath ? "Open file" : undefined}
     >
-      <FileIcon mimeType={file.mimeType} className="h-5 w-5 shrink-0 text-muted-foreground" />
+      <FileIcon mimeType={file.mimeType} className="h-5 w-5 shrink-0 text-primary/70" />
       <div className="min-w-0 overflow-hidden">
         <p className="text-xs font-medium truncate">{file.fileName}</p>
         <p className="text-2xs text-muted-foreground">
@@ -698,7 +696,7 @@ function ImageThumbnail({
   void filePath; void base64; void mimeType;
   return (
     <div
-      className="relative w-36 h-36 rounded-xl border overflow-hidden border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 group/img cursor-zoom-in"
+      className="relative w-36 h-36 rounded-xl border overflow-hidden border-border/60 bg-muted group/img cursor-zoom-in"
       onClick={onPreview}
     >
       <img src={src} alt={fileName} className="w-full h-full object-cover" />
@@ -824,18 +822,18 @@ function ToolCard({ name, input }: { name: string; input: unknown }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-sm">
+    <div className="rounded-xl border border-border/60 bg-surface-input text-sm overflow-hidden">
       <button
-        className="flex items-center gap-2 w-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors hover:bg-muted/40"
         onClick={() => setExpanded(!expanded)}
       >
-        <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
         <Wrench className="h-3 w-3 shrink-0 opacity-60" />
         <span className="font-mono text-xs">{name}</span>
         {expanded ? <ChevronDown className="h-3 w-3 ml-auto" /> : <ChevronRight className="h-3 w-3 ml-auto" />}
       </button>
       {expanded && input != null && (
-        <pre className="px-3 pb-2 text-xs text-muted-foreground overflow-x-auto">
+        <pre className="px-3 pb-2 text-xs text-foreground/70 overflow-x-auto bg-muted/30 font-mono leading-relaxed">
           {typeof input === 'string' ? input : JSON.stringify(input, null, 2) as string}
         </pre>
       )}

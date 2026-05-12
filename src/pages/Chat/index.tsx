@@ -710,7 +710,7 @@ export function Chat() {
                     return (
                     <div
                       key={msg.id || `msg-${idx}`}
-                      className="space-y-3"
+                      className="space-y-3 animate-message-in"
                       id={`chat-message-${idx}`}
                       data-testid={`chat-message-${idx}`}
                     >
@@ -893,9 +893,10 @@ export function Chat() {
 
       {/* Transparent loading overlay */}
       {minLoading && !sending && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[1px] rounded-xl pointer-events-auto">
-          <div className="bg-background shadow-lg rounded-full p-2.5 border border-border">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/30 backdrop-blur-sm rounded-xl pointer-events-auto transition-all duration-300">
+          <div className="glass-panel rounded-2xl px-6 py-4 flex items-center gap-3 shadow-xl">
             <LoadingSpinner size="md" />
+            <span className="text-sm font-medium text-foreground/70">Loading…</span>
           </div>
         </div>
       )}
@@ -908,26 +909,41 @@ export function Chat() {
 function WelcomeScreen() {
   const { t } = useTranslation('chat');
   const quickActions = [
-    { key: 'askQuestions', label: t('welcome.askQuestions') },
-    { key: 'creativeTasks', label: t('welcome.creativeTasks') },
-    { key: 'brainstorming', label: t('welcome.brainstorming') },
+    { key: 'askQuestions', label: t('welcome.askQuestions'), icon: '❓' },
+    { key: 'creativeTasks', label: t('welcome.creativeTasks'), icon: '✨' },
+    { key: 'brainstorming', label: t('welcome.brainstorming'), icon: '💡' },
   ];
 
   return (
-    <div className="flex flex-col items-center justify-center text-center h-[60vh]">
-      <h1 className="text-4xl md:text-5xl font-serif text-foreground/80 mb-8 font-normal tracking-tight">
-        {t('welcome.subtitle')}
-      </h1>
+    <div className="flex flex-col items-center justify-center h-[60vh] relative overflow-hidden">
+      {/* Ambient background orbs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/3 w-72 h-72 bg-primary/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/3 w-56 h-56 bg-primary/5 rounded-full blur-3xl" />
+      </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-lg w-full">
-        {quickActions.map(({ key, label }) => (
-          <button 
-            key={key}
-            className="px-4 py-1.5 rounded-full border border-black/10 dark:border-white/10 text-meta font-medium text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors bg-black/[0.02]"
-          >
-            {label}
-          </button>
-        ))}
+      <div className="relative z-10 text-center max-w-lg mx-auto">
+        <h1 className="text-4xl md:text-5xl font-serif text-foreground/90 mb-3 font-normal tracking-tight">
+          {t('welcome.subtitle')}
+        </h1>
+        <p className="text-subtitle text-foreground/50 mb-10 font-medium">
+          你的智能桌面助手，随时待命
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {quickActions.map(({ key, label, icon }) => (
+            <button
+              key={key}
+              className="group flex flex-col items-center gap-3 p-4 rounded-2xl
+                         bg-white/60 dark:bg-white/5 border border-black/5 dark:border-white/8
+                         hover:bg-white hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5
+                         transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <span className="text-2xl group-hover:scale-110 transition-transform duration-300">{icon}</span>
+              <span className="text-sm font-medium text-foreground/80">{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -938,14 +954,14 @@ function WelcomeScreen() {
 function TypingIndicator() {
   return (
     <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-black/5 dark:bg-white/5 text-foreground">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
         <Sparkles className="h-4 w-4" />
       </div>
-      <div className="bg-black/5 dark:bg-white/5 text-foreground rounded-2xl px-4 py-3">
-        <div className="flex gap-1">
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="bg-muted/60 dark:bg-white/5 text-foreground rounded-2xl px-4 py-3 border border-border/50">
+        <div className="flex gap-1.5 items-center h-4">
+          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
       </div>
     </div>
@@ -958,10 +974,10 @@ function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
   void phase;
   return (
     <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-black/5 dark:bg-white/5 text-foreground">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
         <Sparkles className="h-4 w-4" />
       </div>
-      <div className="bg-black/5 dark:bg-white/5 text-foreground rounded-2xl px-4 py-3">
+      <div className="bg-muted/60 dark:bg-white/5 text-foreground rounded-2xl px-4 py-3 border border-border/50">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           <span>Processing tool results…</span>

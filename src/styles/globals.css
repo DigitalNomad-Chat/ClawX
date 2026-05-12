@@ -17,10 +17,9 @@
  *      Radix-driven components read these directly.
  *
  *   2. ClawX surface tokens (--surface-modal / --surface-input /
- *      --surface-sidebar). Three light-mode "cream paper" layers added
- *      by ClawX. In dark mode each one is redirected to an existing
- *      shadcn token (--card / --muted / --background) so we don't have
- *      to maintain a second dark-cream palette.
+ *      --surface-sidebar). Three light-mode "clean white" layers.
+ *      In dark mode each one is redirected to an existing
+ *      shadcn token (--card / --muted / --background).
  *
  * Usage:
  *   - Application code should always go through Tailwind utilities, e.g.
@@ -33,82 +32,70 @@
 @layer base {
   :root {
     /* ── shadcn semantic tokens (light) ─────────────────────────── */
-    /* #f1ede1 — ClawX cream page background; gentler than pure white
-     *           for long sessions in front of the editor. */
-    --background: 45 36.4% 91.4%;
-    --foreground: 222.2 84% 4.9%;
+    /* Clean white page background — NiceAI style */
+    --background: 0 0% 100%;
+    --foreground: 220 14% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 225 30% 8%;
+    --card-foreground: 220 14% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 225 30% 8%;
-    --primary: 221 100% 55%;
+    --popover-foreground: 220 14% 15%;
+    /* 主色：明亮蓝 */
+    --primary: 210 100% 63%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 30% 95%;
-    --secondary-foreground: 225 30% 12%;
-    --muted: 210 30% 95%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 30% 95%;
-    --accent-foreground: 225 30% 12%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 220 30% 96%;
+    --secondary-foreground: 220 14% 15%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 50%;
+    --accent: 220 30% 96%;
+    --accent-foreground: 220 14% 15%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 20% 90%;
-    --input: 215 20% 90%;
-    --ring: 221 100% 55%;
-    --radius: 0.5rem;
+    --border: 220 13% 90%;
+    --input: 220 13% 92%;
+    --ring: 210 100% 63%;
+    --radius: 0.75rem;
 
-    /* ── ClawX cream surfaces (light) ────────────────────────────
-     *
-     * Three stacked cream layers — think "a cream paper laid on top
-     * of a slightly paler cream paper". The contrast between layers
-     * is deliberately low so we can suggest hierarchy without using
-     * heavy shadows. Pixel values are extracted from the hex literals
-     * that used to be sprinkled across components.
-     *
-     *   --surface-modal   = #f3f1e9   large rounded modal panels (top)
-     *                                 was: bg-[#f3f1e9] dark:bg-card
-     *   --surface-input   = #eeece3   inputs / selects / code panes
-     *                                 was: bg-[#eeece3] dark:bg-muted
-     *   --surface-sidebar = #eae8e1   left navigation rail (often /60)
-     *                                 was: bg-[#eae8e1]/60 dark:bg-background
-     * ─────────────────────────────────────────────────────────── */
-    --surface-modal: 48 29% 93%;
-    --surface-input: 49 24% 91%;
-    --surface-sidebar: 47 18% 90%;
+    /* ── ClawX clean surfaces (light) ──────────────────────────── */
+    --surface-modal: 0 0% 100%;
+    --surface-input: 220 14% 97%;
+    --surface-sidebar: 220 14% 98%;
+
+    /* ── Status colors (light) ─────────────────────────────────── */
+    --status-success: 145 65% 55%;
+    --status-running: 210 100% 63%;
+    --status-error: 0 85% 75%;
   }
 
-  /* NiceAI-inspired deep dark palette */
+  /* NiceAI deep dark palette */
   .dark {
-    --background: 240 6% 5%;
-    --foreground: 210 20% 96%;
-    --card: 240 3% 12%;
-    --card-foreground: 210 20% 96%;
-    --popover: 240 3% 12%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 3% 15%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 240 3% 15%;
-    --muted-foreground: 220 8% 72%;
-    --accent: 240 3% 18%;
-    --accent-foreground: 210 20% 96%;
-    --destructive: 0 65% 42%;
-    --destructive-foreground: 210 20% 96%;
-    --border: 240 3% 18%;
-    --input: 240 3% 15%;
-    --ring: 217.2 91.2% 59.8%;
+    --background: 240 20% 5%;
+    --foreground: 0 0% 100%;
+    --card: 220 10% 14%;
+    --card-foreground: 0 0% 100%;
+    --popover: 220 10% 14%;
+    --popover-foreground: 0 0% 100%;
+    /* 暗色主色：明亮蓝 */
+    --primary: 210 100% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 10% 16%;
+    --secondary-foreground: 220 8% 92%;
+    --muted: 220 10% 16%;
+    --muted-foreground: 220 8% 60%;
+    --accent: 220 10% 18%;
+    --accent-foreground: 220 8% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 20%;
+    --input: 220 10% 18%;
+    --ring: 210 100% 63%;
 
-    /* In dark mode the three cream surfaces collapse onto existing
-     * shadcn tokens:
-     *     modal   → card
-     *     input   → muted
-     *     sidebar → background
-     * This way every `bg-surface-*` utility resolves correctly in
-     * both themes, and components no longer need `dark:bg-card`-style
-     * companion classes for theme switching. */
-    --surface-modal: 240 3% 14%;
-    --surface-input: 240 3% 18%;
-    --surface-sidebar: 240 4% 11%;
+    --surface-modal: 220 10% 12%;
+    --surface-input: 220 10% 16%;
+    --surface-sidebar: 240 15% 8%;
+
+    --status-success: 145 65% 50%;
+    --status-running: 210 100% 63%;
+    --status-error: 0 85% 75%;
   }
 }
 
@@ -123,7 +110,8 @@
   }
 }
 
-/* Custom scrollbar: keep scrollbars visually quiet until the user hovers a scroll area. */
+/* ── Custom scrollbar ─────────────────────────────────────────── */
+
 * {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -154,7 +142,8 @@
   @apply bg-muted-foreground/30;
 }
 
-/* Monaco's default light diff theme is pure white; keep it aligned with ClawX's cream app background. */
+/* ── Monaco diff editor background alignment ──────────────────── */
+
 :root:not(.dark) .clawx-diff-editor .monaco-diff-editor,
 :root:not(.dark) .clawx-diff-editor .monaco-editor,
 :root:not(.dark) .clawx-diff-editor .monaco-editor-background,
@@ -164,7 +153,8 @@
   background-color: hsl(var(--background)) !important;
 }
 
-/* macOS traffic light spacing */
+/* ── macOS traffic light spacing ──────────────────────────────── */
+
 .drag-region {
   -webkit-app-region: drag;
 }
@@ -173,17 +163,20 @@
   -webkit-app-region: no-drag;
 }
 
-/* Smooth transitions */
+/* ── Smooth transitions ───────────────────────────────────────── */
+
 .transition-theme {
   @apply transition-colors duration-200;
 }
 
-/* Focus ring */
+/* ── Focus ring ───────────────────────────────────────────────── */
+
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
 }
 
-/* Prose styling for markdown */
+/* ── Prose styling for markdown ───────────────────────────────── */
+
 .prose {
   line-height: 1.6;
 }
@@ -241,15 +234,168 @@
   background: hsl(var(--muted));
 }
 
-/* Typing indicator animation */
-@keyframes bounce {
+/* ── Status utilities ─────────────────────────────────────────── */
 
+@layer base {
+  .text-status-success {
+    color: hsl(var(--status-success));
+  }
+  .text-status-running {
+    color: hsl(var(--status-running));
+  }
+  .text-status-error {
+    color: hsl(var(--status-error));
+  }
+  .bg-status-success {
+    background-color: hsl(var(--status-success));
+  }
+  .bg-status-running {
+    background-color: hsl(var(--status-running));
+  }
+  .bg-status-error {
+    background-color: hsl(var(--status-error));
+  }
+}
+
+/* ── Chat message bubbles ─────────────────────────────────────── */
+
+@layer components {
+  .msg-bubble-user {
+    background: linear-gradient(135deg, #409eff 0%, #275bff 100%);
+    box-shadow:
+      0 2px 8px rgba(64, 158, 255, 0.22),
+      0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.08) inset;
+    color: #fff;
+  }
+
+  .msg-bubble-ai {
+    background: hsl(var(--surface-modal));
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    color: hsl(var(--foreground));
+  }
+
+  .dark .msg-bubble-ai {
+    background: hsl(var(--card));
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Code block inside AI bubble */
+  .msg-bubble-ai pre {
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+
+  .msg-bubble-ai pre code {
+    background: transparent;
+    color: #cdd6f4;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .msg-bubble-ai code:not(pre code) {
+    background: rgba(64, 158, 255, 0.08);
+    color: #165dff;
+    padding: 0.15em 0.45em;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  .dark .msg-bubble-ai code:not(pre code) {
+    background: rgba(64, 158, 255, 0.12);
+    color: #8cc5ff;
+  }
+}
+
+/* ── Message entrance animation ───────────────────────────────── */
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-message-in {
+  animation: message-in 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+/* ── Streaming cursor ─────────────────────────────────────────── */
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+  border-radius: 1px;
+}
+
+/* ── Skeleton shimmer ─────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted) / 0.6) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Glass morphism utilities ─────────────────────────────────── */
+
+@layer utilities {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.75));
+    backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+  }
+
+  .dark .glass-panel {
+    background: linear-gradient(180deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 28, 0.8));
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  }
+}
+
+/* ── Typing indicator animation ───────────────────────────────── */
+
+@keyframes bounce {
   0%,
   60%,
   100% {
     transform: translateY(0);
   }
-
   30% {
     transform: translateY(-4px);
   }

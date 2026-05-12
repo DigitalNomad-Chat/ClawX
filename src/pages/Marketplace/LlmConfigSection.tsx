@@ -131,12 +131,12 @@ export function LlmConfigSection() {
           </span>
         </div>
       ) : providers.length === 0 ? (
-        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 text-xs text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
           <AlertCircle className="h-3 w-3" />
           <span>请添加一个 AI 服务商，然后才能与 Agent 对话</span>
         </div>
       ) : (
-        <div className="flex items-center gap-2 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 text-xs text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
           <AlertCircle className="h-3 w-3" />
           <span>请选择一个服务商作为默认</span>
         </div>

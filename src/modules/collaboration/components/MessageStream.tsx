@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 const ROLE_COLORS: Record<string, string> = {
   planner: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   coder: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  reviewer: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  reviewer: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   manager: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   generalist: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300',
 };
@@ -43,7 +43,7 @@ const ROLE_COLORS: Record<string, string> = {
 const ROLE_BUBBLE_STYLES: Record<string, string> = {
   planner: 'border-l-2 border-l-blue-400 bg-blue-50/50 shadow-sm dark:bg-blue-950/20',
   coder: 'border-l-2 border-l-emerald-400 bg-emerald-50/50 shadow-sm dark:bg-emerald-950/20',
-  reviewer: 'border-l-2 border-l-amber-400 bg-amber-50/50 shadow-sm dark:bg-amber-950/20',
+  reviewer: 'border-l-2 border-l-blue-400 bg-blue-50/50 shadow-sm dark:bg-blue-950/20',
   manager: 'border-l-2 border-l-purple-400 bg-purple-50/50 shadow-sm dark:bg-purple-950/20',
   generalist: 'bg-muted shadow-sm',
 };
@@ -51,7 +51,7 @@ const ROLE_BUBBLE_STYLES: Record<string, string> = {
 const ROLE_AVATAR_RING: Record<string, string> = {
   planner: 'ring-blue-200 dark:ring-blue-800',
   coder: 'ring-emerald-200 dark:ring-emerald-800',
-  reviewer: 'ring-amber-200 dark:ring-amber-800',
+  reviewer: 'ring-blue-200 dark:ring-blue-800',
   manager: 'ring-purple-200 dark:ring-purple-800',
   generalist: 'ring-border',
 };
@@ -144,7 +144,7 @@ function HandoffPayload({ payload }: { payload?: HallMessage['payload'] }) {
                 </div>
               ))}
               {handoffValidation.warnings.map((warn, i) => (
-                <div key={`w-${i}`} className="flex items-center gap-1 text-[11px] text-amber-600">
+                <div key={`w-${i}`} className="flex items-center gap-1 text-[11px] text-blue-600">
                   <AlertTriangle className="h-3 w-3" /> {warn.message}
                 </div>
               ))}
@@ -478,7 +478,7 @@ export function MessageStream({
             </Button>
           )}
           {!connected && (
-            <Badge variant="outline" className="text-[11px] text-amber-600 border-amber-200">
+            <Badge variant="outline" className="text-[11px] text-blue-600 border-blue-200">
               <WifiOff className="mr-1 h-3 w-3" />
               离线
             </Badge>

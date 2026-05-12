@@ -35,39 +35,43 @@ function AnimatedDots({ className }: { className?: string }) {
 }
 
 function GraphStatusIcon({ status }: { status: TaskStep['status'] }) {
-  if (status === 'completed') return <CheckCircle2 className="h-4 w-4" />;
-  if (status === 'error') return <XCircle className="h-4 w-4" />;
-  return <CircleDashed className="h-4 w-4" />;
+  if (status === 'completed') return <CheckCircle2 className="h-4 w-4 text-status-success" />;
+  if (status === 'error') return <XCircle className="h-4 w-4 text-status-error" />;
+  return <CircleDashed className="h-4 w-4 text-status-running animate-spin" style={{ animationDuration: '3s' }} />;
 }
 
 function StepDetailCard({ step }: { step: TaskStep }) {
   const { t } = useTranslation('chat');
   const [expanded, setExpanded] = useState(false);
   const hasDetail = !!step.detail;
-  // Narration steps (intermediate pure-text assistant messages folded from
-  // the chat stream) are rendered without a label/status pill: the message
-  // text IS the primary content.
   const isNarration = step.kind === 'message';
   const isTool = step.kind === 'tool';
   const isThinking = step.kind === 'thinking';
-  // System steps (subagent branch roots etc.) share the tool row layout:
-  // bold label + truncated single-line detail preview + click-to-expand,
-  // i.e. no rounded card / no separate detail line below the title.
   const isSystem = step.kind === 'system';
   const isFlatRow = isTool || isSystem;
   const showRunningDots = (isTool || isThinking) && step.status === 'running';
   const hideStatusText = (isTool || isSystem) && step.status === 'completed';
   const detailPreview = step.detail?.replace(/\s+/g, ' ').trim();
   const canExpand = hasDetail;
-    const displayLabel = isThinking ? t('executionGraph.thinkingLabel') : step.label;
+  const displayLabel = isThinking ? t('executionGraph.thinkingLabel') : step.label;
+
+  const statusColorClass =
+    step.status === 'completed' ? 'text-status-success'
+    : step.status === 'error' ? 'text-status-error'
+    : 'text-status-running';
+
+  const statusBorderClass =
+    step.status === 'completed' ? 'border-l-status-success'
+    : step.status === 'error' ? 'border-l-status-error'
+    : 'border-l-status-running';
 
   return (
     <div
       className={cn(
-        'min-w-0 flex-1 text-muted-foreground',
+        'min-w-0 flex-1 text-muted-foreground relative',
         isFlatRow || isNarration || isThinking
           ? 'px-0 py-0'
-          : 'rounded-xl border border-black/10 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]',
+          : cn('rounded-xl border border-black/10 bg-white/40 px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]', statusBorderClass, 'border-l-[3px]'),
       )}
     >
       <button
@@ -104,7 +108,13 @@ function StepDetailCard({ step }: { step: TaskStep }) {
                 </p>
               )}
               {!hideStatusText && !showRunningDots && (
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-black/5 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground dark:bg-white/10">
+                <span className={cn(
+                  "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-medium uppercase tracking-wide",
+                  step.status === 'completed' && "bg-status-success/10 text-status-success",
+                  step.status === 'error' && "bg-status-error/10 text-status-error",
+                  step.status === 'running' && "bg-status-running/10 text-status-running",
+                  step.status === 'pending' && "bg-black/5 text-muted-foreground dark:bg-white/10",
+                )}>
                   {t(`taskPanel.stepStatus.${step.status}`)}
                 </span>
               )}
@@ -112,7 +122,7 @@ function StepDetailCard({ step }: { step: TaskStep }) {
                 <AnimatedDots className="text-sm" />
               )}
               {step.depth > 1 && (
-                <span className="shrink-0 whitespace-nowrap rounded-full bg-black/5 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground dark:bg-white/10">
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-primary/8 px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-primary dark:bg-primary/15">
                   {t('executionGraph.branchLabel')}
                 </span>
               )}
@@ -147,18 +157,16 @@ function StepDetailCard({ step }: { step: TaskStep }) {
               formatted = JSON.stringify(JSON.parse(step.detail), null, 2);
             } catch { /* not valid JSON */ }
             return (
-              <div className="mt-3 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-                <pre
-                  className="whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground"
-                >
+              <div className="mt-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2 dark:bg-white/[0.03]">
+                <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80 font-mono">
                   {formatted}
                 </pre>
               </div>
             );
           })()}
           {step.detail && expanded && canExpand && (isNarration || isThinking) && (
-            <div className="mt-3 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="prose prose-sm dark:prose-invert max-w-none break-words text-[12px] leading-5 text-muted-foreground [&_p]:text-muted-foreground [&_li]:text-muted-foreground [&_td]:text-muted-foreground [&_th]:text-muted-foreground">
+            <div className="mt-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2 dark:bg-white/[0.03]">
+              <div className="prose prose-sm dark:prose-invert max-w-none break-words text-[12px] leading-5 text-foreground/80 [&_p]:text-foreground/80 [&_li]:text-foreground/80 [&_td]:text-foreground/80 [&_th]:text-foreground/80">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {repairMarkdown(step.detail)}
                 </ReactMarkdown>
@@ -209,7 +217,7 @@ export function ExecutionGraphCard({
         data-testid="chat-execution-graph"
         data-collapsed="true"
         onClick={() => setExpanded(true)}
-        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-muted-foreground dark:hover:bg-white/5"
+        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground dark:hover:bg-primary/8"
       >
         <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
         <span className="truncate">
@@ -229,7 +237,7 @@ export function ExecutionGraphCard({
         type="button"
         data-testid="chat-execution-graph-collapse"
         onClick={() => setExpanded(false)}
-        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-muted-foreground dark:hover:bg-white/5"
+        className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground dark:hover:bg-primary/8"
         aria-label={t('executionGraph.collapseAction')}
         title={t('executionGraph.collapseAction')}
       >

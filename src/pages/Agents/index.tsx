@@ -814,7 +814,7 @@ function AgentModelModal({
             </p>
           )}
           {runtimeProviderOptions.length === 0 && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs text-blue-600 dark:text-blue-400">
               {t('settingsDialog.modelProviderEmpty')}
             </p>
           )}

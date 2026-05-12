@@ -474,9 +474,9 @@ export function AgentChat() {
 
       {/* Provider setup guidance */}
       {needsProviderSetup && (
-        <div className="border-t bg-amber-50 px-4 py-3 text-sm dark:bg-amber-950/30">
-          <p className="font-medium text-amber-800 dark:text-amber-200">AI服务商未配置</p>
-          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+        <div className="border-t bg-blue-50 px-4 py-3 text-sm dark:bg-blue-950/30">
+          <p className="font-medium text-blue-800 dark:text-blue-200">AI服务商未配置</p>
+          <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
             请先配置API密钥后再与Agent对话
           </p>
           <Button

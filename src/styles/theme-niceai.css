@@ -13,15 +13,17 @@
 
 .theme-niceai main {
   background:
-    radial-gradient(circle at 12% 55%, rgba(22, 93, 255, 0.06), transparent 25%),
-    radial-gradient(circle at 85% 33%, rgba(108, 99, 255, 0.05), transparent 25%),
+    radial-gradient(circle at 15% 50%, rgba(64, 158, 255, 0.05), transparent 30%),
+    radial-gradient(circle at 85% 30%, rgba(153, 210, 228, 0.04), transparent 25%),
+    radial-gradient(circle at 50% 90%, rgba(255, 212, 218, 0.03), transparent 35%),
     hsl(var(--background));
 }
 
 .dark .theme-niceai main {
   background:
-    radial-gradient(circle at 12% 55%, rgba(33, 150, 243, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 33%, rgba(108, 99, 255, 0.08), transparent 25%),
+    radial-gradient(circle at 15% 50%, rgba(64, 158, 255, 0.07), transparent 30%),
+    radial-gradient(circle at 85% 30%, rgba(39, 91, 255, 0.05), transparent 25%),
+    radial-gradient(circle at 50% 90%, rgba(64, 158, 255, 0.04), transparent 35%),
     hsl(var(--background));
 }
 
@@ -32,16 +34,16 @@
  * ================================================================ */
 
 .theme-niceai .bg-card.rounded-lg.border {
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9)) !important;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.95), rgba(252, 250, 248, 0.9)) !important;
   border: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 4px 16px rgba(55, 99, 170, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(64, 158, 255, 0.06) !important;
   border-radius: 12px !important;
 }
 
 .dark .theme-niceai .bg-card.rounded-lg.border {
-  background: linear-gradient(135deg, rgba(44, 44, 44, 0.9), rgba(24, 24, 24, 0.9)) !important;
-  border: 1px solid rgba(63, 63, 63, 0.5) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  background: linear-gradient(135deg, rgba(34, 34, 44, 0.9), rgba(22, 22, 30, 0.9)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
 /* ================================================================
@@ -49,27 +51,27 @@
  * ================================================================ */
 
 .glass-card {
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.9), rgba(243, 245, 248, 0.8));
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.9), rgba(252, 250, 248, 0.8));
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 16px rgba(55, 99, 170, 0.08);
+  box-shadow: 0 4px 20px rgba(64, 158, 255, 0.06);
   border-radius: 12px;
   backdrop-filter: blur(12px);
   transition: box-shadow 0.3s, transform 0.2s;
 }
 
 .glass-card:hover {
-  box-shadow: 0 8px 24px rgba(55, 99, 170, 0.12);
+  box-shadow: 0 8px 28px rgba(64, 158, 255, 0.1);
   transform: translateY(-1px);
 }
 
 .dark .glass-card {
-  background: linear-gradient(135deg, rgba(44, 44, 44, 0.9), rgba(24, 24, 24, 0.9));
-  border: 1px solid rgba(63, 63, 63, 0.5);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, rgba(34, 34, 44, 0.9), rgba(22, 22, 30, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .dark .glass-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
 }
 
 /* ================================================================
@@ -91,31 +93,35 @@
  * ================================================================ */
 
 .theme-niceai [data-nav-item][data-active="true"] {
-  background: radial-gradient(circle at left, rgba(22, 93, 255, 0.12) 0%, transparent 100%) !important;
-  color: #165DFF !important;
-  font-weight: 600 !important;
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.1) 0%, transparent 100%) !important;
+  border-left: 3px solid #409eff !important;
+  color: inherit !important;
 }
 
 .theme-niceai [data-nav-item]:hover {
-  background: rgba(22, 93, 255, 0.05) !important;
+  background: rgba(64, 158, 255, 0.05) !important;
 }
 
 .dark .theme-niceai [data-nav-item][data-active="true"] {
-  background: radial-gradient(circle at left, rgba(64, 158, 255, 0.15) 0%, transparent 100%) !important;
-  color: #409EFF !important;
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.12) 0%, transparent 100%) !important;
+  border-left-color: #409eff !important;
 }
 
 .dark .theme-niceai [data-nav-item]:hover {
-  background: rgba(64, 158, 255, 0.08) !important;
+  background: rgba(64, 158, 255, 0.06) !important;
 }
 
-/* Active nav icon color */
-.theme-niceai [data-nav-item][data-active="true"] svg {
-  color: #165DFF !important;
+/* Force neutral text color on active nav items (override any residual blue) */
+.theme-niceai [data-nav-item][data-active="true"] div,
+.theme-niceai [data-nav-item][data-active="true"] svg,
+.theme-niceai [data-nav-item][data-active="true"] span {
+  color: hsl(var(--foreground) / 0.8) !important;
 }
 
-.dark .theme-niceai [data-nav-item][data-active="true"] svg {
-  color: #409EFF !important;
+.dark .theme-niceai [data-nav-item][data-active="true"] div,
+.dark .theme-niceai [data-nav-item][data-active="true"] svg,
+.dark .theme-niceai [data-nav-item][data-active="true"] span {
+  color: hsl(var(--foreground) / 0.8) !important;
 }
 
 /* ================================================================
@@ -123,18 +129,18 @@
  * ================================================================ */
 
 .theme-niceai [data-session-item][data-active="true"] {
-  background: radial-gradient(circle at left, rgba(22, 93, 255, 0.15) 0%, rgba(255, 255, 255, 0.95) 100%) !important;
-  border: 1px solid rgba(22, 93, 255, 0.2) !important;
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.1) 0%, transparent 100%) !important;
+  border: 1px solid rgba(64, 158, 255, 0.18) !important;
   border-radius: 12px !important;
 }
 
 .dark .theme-niceai [data-session-item][data-active="true"] {
-  background: radial-gradient(circle at left, rgba(64, 158, 255, 0.2) 0%, rgba(32, 35, 41, 0.95) 100%) !important;
-  border: 1px solid rgba(64, 158, 255, 0.25) !important;
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.12) 0%, transparent 100%) !important;
+  border: 1px solid rgba(64, 158, 255, 0.2) !important;
 }
 
 .theme-niceai [data-session-item]:hover {
-  background: rgba(22, 93, 255, 0.04) !important;
+  background: rgba(64, 158, 255, 0.04) !important;
 }
 
 .dark .theme-niceai [data-session-item]:hover {
@@ -146,23 +152,23 @@
  * ================================================================ */
 
 .theme-niceai [data-nav-item="new-chat"] {
-  background: rgba(22, 93, 255, 0.08) !important;
-  color: #165DFF !important;
-  border-color: rgba(22, 93, 255, 0.12) !important;
+  background: rgba(64, 158, 255, 0.08) !important;
+  color: #165dff !important;
+  border-color: rgba(64, 158, 255, 0.14) !important;
 }
 
 .dark .theme-niceai [data-nav-item="new-chat"] {
   background: rgba(64, 158, 255, 0.1) !important;
-  color: #409EFF !important;
+  color: #8cc5ff !important;
   border-color: rgba(64, 158, 255, 0.15) !important;
 }
 
 .theme-niceai [data-nav-item="new-chat"]:hover {
-  background: rgba(22, 93, 255, 0.12) !important;
+  background: rgba(64, 158, 255, 0.12) !important;
 }
 
 .dark .theme-niceai [data-nav-item="new-chat"]:hover {
-  background: rgba(64, 158, 255, 0.15) !important;
+  background: rgba(64, 158, 255, 0.14) !important;
 }
 
 /* ================================================================
@@ -171,14 +177,14 @@
 
 .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-black\/\[0\.04\],
 .dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-white\/\[0\.08\] {
-  background: rgba(22, 93, 255, 0.08) !important;
-  color: #165DFF !important;
+  background: rgba(64, 158, 255, 0.08) !important;
+  color: #165dff !important;
 }
 
 .dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-black\/\[0\.04\],
 .dark .theme-niceai aside[data-testid="sidebar"] .rounded-full.bg-white\/\[0\.08\] {
   background: rgba(64, 158, 255, 0.1) !important;
-  color: #409EFF !important;
+  color: #8cc5ff !important;
 }
 
 /* ================================================================

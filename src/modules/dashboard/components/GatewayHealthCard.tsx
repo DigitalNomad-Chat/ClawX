@@ -18,7 +18,7 @@ function stateColor(state: string): string {
     case 'running':
       return 'bg-emerald-500';
     case 'starting':
-      return 'bg-amber-500';
+      return 'bg-blue-500';
     case 'reconnecting':
       return 'bg-blue-500';
     case 'error':

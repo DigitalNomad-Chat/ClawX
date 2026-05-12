@@ -780,7 +780,14 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
         )}
 
         {/* Input Container */}
-        <div className={`relative bg-white dark:bg-card rounded-2xl shadow-sm border px-3 pt-2.5 pb-1.5 transition-all ${dragOver ? 'border-primary ring-1 ring-primary' : 'border-black/10 dark:border-white/10'}`}>
+        <div className={cn(
+          "relative rounded-2xl border px-3 pt-2.5 pb-1.5 transition-all duration-300",
+          "bg-white/80 dark:bg-card/80 backdrop-blur-sm",
+          "shadow-[0_2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.15)]",
+          dragOver
+            ? 'border-primary ring-1 ring-primary/40 shadow-[0_0_0_4px_rgba(64,158,255,0.08)]'
+            : 'border-black/8 dark:border-white/8 hover:border-primary/20 hover:shadow-[0_4px_16px_rgba(64,158,255,0.06)]'
+        )}>
           {selectedTarget && (
             <div className="flex flex-wrap gap-2 pb-1.5">
               <button
@@ -1034,11 +1041,12 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               disabled={sending ? !canStop : !canSend}
               size="icon"
               data-testid="chat-composer-send"
-              className={`ml-auto shrink-0 h-8 w-8 rounded-lg transition-colors ${
-                (sending || canSend)
-                  ? 'bg-black/5 dark:bg-white/10 text-foreground hover:bg-black/10 dark:hover:bg-white/20'
-                  : 'text-muted-foreground/50 hover:bg-transparent bg-transparent'
-              }`}
+              className={cn(
+                'ml-auto shrink-0 h-8 w-8 rounded-lg transition-all duration-200',
+                sending || canSend
+                  ? 'bg-primary text-white shadow-sm hover:bg-primary/90 hover:shadow-md hover:shadow-primary/20 hover:-translate-y-px active:translate-y-0'
+                  : 'text-muted-foreground/40 bg-transparent hover:bg-transparent'
+              )}
               variant="ghost"
               title={sending ? t('composer.stop') : t('composer.send')}
             >

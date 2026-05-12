@@ -83,20 +83,15 @@ module.exports = {
        * ────────────────────────────────────────────────────────────── */
       fontFamily: {
         sans: [
+          '"Space Grotesk"',
           '-apple-system',
           'BlinkMacSystemFont',
           '"Segoe UI"',
           'Roboto',
-          '"Helvetica Neue"',
-          'Arial',
-          '"Noto Sans"',
           'sans-serif',
-          '"Apple Color Emoji"',
-          '"Segoe UI Emoji"',
-          '"Segoe UI Symbol"',
-          '"Noto Color Emoji"',
         ],
         serif: [
+          '"Playfair Display"',
           'Georgia',
           'Cambria',
           '"Times New Roman"',
@@ -104,14 +99,13 @@ module.exports = {
           'serif',
         ],
         mono: [
+          '"JetBrains Mono"',
           'ui-monospace',
           'SFMono-Regular',
           '"SF Mono"',
           'Menlo',
           'Monaco',
           'Consolas',
-          '"Liberation Mono"',
-          '"Courier New"',
           'monospace',
         ],
       },
@@ -189,9 +183,9 @@ module.exports = {
         // ── A. shadcn semantic tokens (do NOT rename — Radix/shadcn
         //       components read these names directly) ──
         niceai: {
-          primary: '#165DFF',
-          'primary-light': '#409EFF',
-          'bg-light': '#F5F7FA',
+          primary: '#409eff',
+          'primary-light': '#6aaaff',
+          'bg-light': '#ffffff',
           'bg-dark': '#0C0B10',
           'card-dark': '#1C1D29',
         },
@@ -235,8 +229,8 @@ module.exports = {
         // mode and stays vivid in dark mode), so no CSS variable needed.
         // Pair with `brand-hover` for the hover state.
         brand: {
-          DEFAULT: '#0a84ff',
-          hover: '#007aff',
+          DEFAULT: '#409eff',
+          hover: '#165dff',
         },
 
         // Highlight blue for inline /skill chips in the chat input.

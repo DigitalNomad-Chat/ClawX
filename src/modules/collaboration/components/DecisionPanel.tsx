@@ -118,11 +118,11 @@ export function DecisionPanel({ taskCard, defaultOpen, className }: DecisionPane
               {/* DoneWhen (DOD) */}
               {taskCard.doneWhen && (
                 <div>
-                  <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                  <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-blue-600">
                     <Target className="h-3 w-3" />
                     完成定义 (DOD)
                   </div>
-                  <div className="prose prose-xs max-w-none rounded-md bg-amber-50/50 p-2 text-xs dark:bg-amber-950/20">
+                  <div className="prose prose-xs max-w-none rounded-md bg-blue-50/50 p-2 text-xs dark:bg-blue-950/20">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{taskCard.doneWhen}</ReactMarkdown>
                   </div>
                 </div>

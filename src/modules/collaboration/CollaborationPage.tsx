@@ -50,7 +50,7 @@ function StageBadge({ stage }: { stage: string }) {
   const variants: Record<string, string> = {
     discussion: 'bg-blue-50 text-blue-600 border-blue-200',
     execution: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-    review: 'bg-amber-50 text-amber-600 border-amber-200',
+    review: 'bg-blue-50 text-blue-600 border-blue-200',
     blocked: 'bg-red-50 text-red-600 border-red-200',
     completed: 'bg-slate-50 text-slate-600 border-slate-200',
   };

@@ -432,10 +432,10 @@ export function Models() {
                               <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-sky-500"></div>{t('dashboard:recentTokenHistory.input', { value: formatTokenCount(entry.inputTokens) })}</span>
                               <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-violet-500"></div>{t('dashboard:recentTokenHistory.output', { value: formatTokenCount(entry.outputTokens) })}</span>
                               {entry.cacheReadTokens > 0 && (
-                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div>{t('dashboard:recentTokenHistory.cacheRead', { value: formatTokenCount(entry.cacheReadTokens) })}</span>
+                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{t('dashboard:recentTokenHistory.cacheRead', { value: formatTokenCount(entry.cacheReadTokens) })}</span>
                               )}
                               {entry.cacheWriteTokens > 0 && (
-                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div>{t('dashboard:recentTokenHistory.cacheWrite', { value: formatTokenCount(entry.cacheWriteTokens) })}</span>
+                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div>{t('dashboard:recentTokenHistory.cacheWrite', { value: formatTokenCount(entry.cacheWriteTokens) })}</span>
                               )}
                             </>
                           ) : (
@@ -580,7 +580,7 @@ function UsageBarChart({
           {outputLabel}
         </span>
         <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
           {cacheLabel}
         </span>
       </div>
@@ -615,7 +615,7 @@ function UsageBarChart({
               )}
               {group.cacheTokens > 0 && (
                 <div
-                  className="h-full bg-amber-500"
+                  className="h-full bg-blue-500"
                   style={{ width: `${(group.cacheTokens / group.totalTokens) * 100}%` }}
                 />
               )}

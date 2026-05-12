@@ -58,7 +58,7 @@ const ROLE_INFO = [
   {
     role: 'reviewer',
     label: '审核',
-    color: 'bg-amber-50 text-amber-600 border-amber-200',
+    color: 'bg-blue-50 text-blue-600 border-blue-200',
     desc: '审核产出、提出修改意见、把关质量。适合测试、编辑、内容总监类 Agent。',
   },
   {
@@ -91,7 +91,7 @@ const STAGES = [
   {
     stage: 'review',
     label: '评审中',
-    color: 'bg-amber-50 text-amber-600 border-amber-200',
+    color: 'bg-blue-50 text-blue-600 border-blue-200',
     actions: '通过、打回修改',
   },
   {
@@ -195,7 +195,7 @@ function RolesSection() {
           </div>
         ))}
       </div>
-      <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800"
+      <div className="rounded-md bg-blue-50 border border-blue-200 p-2.5 text-xs text-blue-800"
       >
         <strong>提示：</strong>如果你的 Agent 是内容运营类（如文案、设计、策划），
         可以将其角色映射理解为：planner=策划、coder=创作、reviewer=审核、manager=决策。
@@ -329,7 +329,7 @@ function QuickstartSection() {
             step: 3,
             title: '查看方案',
             desc: '如果 Agent 回复中包含方案，右侧的 DecisionPanel 会自动显示。',
-            icon: <Lightbulb className="h-4 w-4 text-amber-500" />,
+            icon: <Lightbulb className="h-4 w-4 text-blue-500" />,
           },
           {
             step: 4,
@@ -368,7 +368,7 @@ function QuickstartSection() {
           </div>
         ))}
       </div>
-      <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800"
+      <div className="rounded-md bg-blue-50 border border-blue-200 p-2.5 text-xs text-blue-800"
       >
         <AlertTriangle className="inline h-3 w-3 mr-1" />
         <strong>注意：</strong>确保 Gateway 正在运行（状态栏显示在线），否则 Agent 不会响应。

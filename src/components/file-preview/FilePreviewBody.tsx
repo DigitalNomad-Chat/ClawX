@@ -471,7 +471,7 @@ export function FilePreviewBody({
     if (state.status === 'outsideSandbox') {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
             <ShieldAlert className="h-6 w-6" />
           </div>
           <div className="space-y-1.5">

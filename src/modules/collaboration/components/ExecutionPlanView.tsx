@@ -81,7 +81,7 @@ function StatusBadge({ status }: { status: ItemStatus }) {
       );
     case 'handed_off':
       return (
-        <Badge variant="outline" className="gap-0.5 border-amber-200 text-amber-700 bg-amber-50 text-[11px]">
+        <Badge variant="outline" className="gap-0.5 border-blue-200 text-blue-700 bg-blue-50 text-[11px]">
           <ArrowRightLeft className="h-2.5 w-2.5" /> 已移交
         </Badge>
       );
