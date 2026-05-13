@@ -12,6 +12,10 @@ import { createMenu } from './menu';
 import { registerZoomShortcuts } from './zoom-shortcuts';
 
 import { appUpdater, registerUpdateHandlers } from './updater';
+import { initAntiDebug } from './security/anti-debug';
+import { verifyIntegrity } from './security/integrity';
+import { licenseManager } from './security/license-manager';
+import { createActivationWindow, setOnActivationSuccess } from './windows/activation-window';
 import { logger } from '../utils/logger';
 import { warmupNetworkOptimization } from '../utils/uv-env';
 import { initTelemetry } from '../utils/telemetry';
@@ -284,6 +288,33 @@ function createMainWindow(): BrowserWindow {
  * Initialize the application
  */
 async function initialize(): Promise<void> {
+  // Security: init anti-debug early
+  initAntiDebug();
+
+  // Integrity check
+  if (!verifyIntegrity()) {
+    console.error('Application integrity check failed');
+    app.quit();
+    return;
+  }
+
+  // License check
+  const licenseStatus = licenseManager.checkLicense();
+  if (!licenseStatus.valid) {
+    logger.info('License not activated, showing activation window');
+    setOnActivationSuccess(() => {
+      void startMainApp().catch((error) => {
+        logger.error('Application start failed after activation:', error);
+      });
+    });
+    createActivationWindow(licenseStatus.machineCode || '');
+    return;
+  }
+
+  await startMainApp();
+}
+
+async function startMainApp(): Promise<void> {
   // Initialize logger first
   logger.init();
   logger.info('=== ClawX Application Starting ===');

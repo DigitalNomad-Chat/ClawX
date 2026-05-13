@@ -1,0 +1,36 @@
+{
+  "name": "clawx-license-admin",
+  "version": "1.0.0",
+  "description": "ClawX License Admin - Authorization code generator",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --publish never"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2"
+  },
+  "devDependencies": {
+    "electron": "^40.6.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "app.clawx.license-admin",
+    "productName": "ClawX License Admin",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "style.css",
+      "lib/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "../../resources/icons/icon.icns"
+    }
+  }
+}

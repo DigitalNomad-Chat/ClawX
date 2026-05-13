@@ -35,6 +35,10 @@
     "private": true,
     "scripts": {
         "postinstall": "node scripts/patch-browser-hint.mjs",
+        "native:build": "cd native && node-gyp rebuild",
+        "native:build:dev": "cd native && node-gyp rebuild --debug",
+        "obfuscate": "node scripts/obfuscate-main.mjs && node scripts/obfuscate-renderer.mjs",
+        "generate-integrity": "node scripts/generate-integrity.mjs",
         "init": "pnpm install && pnpm run uv:download",
         "predev": "node scripts/generate-ext-bridge.mjs && zx scripts/prepare-preinstalled-skills-dev.mjs",
         "dev": "vite",
@@ -100,7 +104,8 @@
         "remark-math": "^6.0.0",
         "tar": "^6.2.1",
         "ws": "^8.19.0",
-        "xlsx": "^0.18.5"
+        "xlsx": "^0.18.5",
+        "javascript-obfuscator": "^4.1.1"
     },
     "devDependencies": {
         "@buape/carbon": "0.16.0",

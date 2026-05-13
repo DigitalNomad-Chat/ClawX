@@ -188,6 +188,16 @@ export interface OpenClawStatus {
   entryPath: string;
   dir: string;
   version?: string;
+  // Debug fields for diagnosing path issues
+  debug?: {
+    appIsPackaged: boolean;
+    resourcesPath: string;
+    appPath: string;
+    dirname: string;
+    dirExists: boolean;
+    pkgExists: boolean;
+    distExists: boolean;
+  };
 }
 
 export function getOpenClawStatus(): OpenClawStatus {
@@ -205,12 +215,27 @@ export function getOpenClawStatus(): OpenClawStatus {
     // Ignore version read errors
   }
 
+  const pkgJsonPath = join(dir, 'package.json');
+  const distDir = join(dir, 'dist');
+  const electronApp = getElectronApp();
+
+  const debug = {
+    appIsPackaged: electronApp.isPackaged,
+    resourcesPath: process.resourcesPath || '',
+    appPath: electronApp.getAppPath(),
+    dirname: __dirname,
+    dirExists: existsSync(dir),
+    pkgExists: existsSync(pkgJsonPath),
+    distExists: existsSync(distDir),
+  };
+
   const status: OpenClawStatus = {
     packageExists: isOpenClawPresent(),
     isBuilt: isOpenClawBuilt(),
     entryPath: getOpenClawEntryPath(),
     dir,
     version,
+    debug,
   };
 
   try {

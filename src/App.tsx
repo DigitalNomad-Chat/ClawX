@@ -21,6 +21,7 @@ import { Marketplace } from './pages/Marketplace';
 import { AgentChat } from './pages/AgentChat';
 import { Settings } from './pages/Settings';
 import { Setup } from './pages/Setup';
+import ActivationPage from './pages/ActivationPage';
 import { useSettingsStore } from './stores/settings';
 import { useGatewayStore } from './stores/gateway';
 import { useProviderStore } from './stores/providers';
@@ -185,6 +186,9 @@ function App() {
     <ErrorBoundary>
       <TooltipProvider delayDuration={300}>
         <Routes>
+          {/* Activation page (shown when not licensed) */}
+          <Route path="/activation" element={<ActivationPage />} />
+
           {/* Setup wizard (shown on first launch) */}
           <Route path="/setup/*" element={<Setup />} />
 

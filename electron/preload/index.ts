@@ -163,6 +163,9 @@ const electronAPI = {
         'kernel-llm:updateProviderConfig',
         'kernel-llm:discoverOpenClaw',
         'kernel-llm:importFromOpenClaw',
+        // License
+        'license:activate',
+        'license:get-machine-code',
       ];
 
       if (validChannels.includes(channel)) {
@@ -208,6 +211,8 @@ const electronAPI = {
         'openclaw:cli-installed',
         // Kernel events (Independent Kernel)
         'kernel:event',
+        // License
+        'license:machine-code',
       ];
 
       if (validChannels.includes(channel) || channel.startsWith('ext:')) {
@@ -298,8 +303,26 @@ const electronAPI = {
   isDev: process.env.NODE_ENV === 'development' || !!process.env.VITE_DEV_SERVER_URL,
 };
 
+// License API
+const licenseAPI = {
+  getMachineCode: () => ipcRenderer.invoke('license:get-machine-code'),
+  getMachineFactors: () => ipcRenderer.invoke('license:get-machine-factors'),
+  activate: (code: string) => ipcRenderer.invoke('license:activate', code),
+  onMachineCode: (callback: (code: string) => void) => {
+    const subscription = (_event: Electron.IpcRendererEvent, code: string) => {
+      callback(code);
+    };
+    ipcRenderer.on('license:machine-code', subscription);
+    return () => {
+      ipcRenderer.removeListener('license:machine-code', subscription);
+    };
+  },
+};
+
 // Expose the API to the renderer process
 contextBridge.exposeInMainWorld('electron', electronAPI);
+contextBridge.exposeInMainWorld('licenseAPI', licenseAPI);
 
 // Type declarations for the renderer process
 export type ElectronAPI = typeof electronAPI;
+export type LicenseAPI = typeof licenseAPI;

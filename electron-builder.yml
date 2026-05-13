@@ -12,6 +12,8 @@ files:
   - dist
   - dist-electron
   - package.json
+  - native/build/Release/*.node
+  - "!**/*.map"
 
 extraResources:
   - from: resources/
@@ -41,6 +43,8 @@ afterPack: ./scripts/after-pack.cjs
 asar: true
 asarUnpack:
   - "**/*.node"
+  # Native license verification module (must be unpacked for N-API loading)
+  - "native/build/Release/*.node"
   # lru-cache CJS/ESM interop: older CJS versions (v5, v6, v7) don't export
   # `LRUCache` as a named property, breaking `import { LRUCache }` in Node.js
   # 22+ (Electron 40+).  Unpacking lets afterPack patch them in place.
@@ -74,10 +78,10 @@ mac:
   category: public.app-category.productivity
   icon: resources/icons/icon.icns
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
+    # - target: dmg
+    #   arch:
+    #     - x64
+    #     - arm64
     - target: zip
       arch:
         - x64

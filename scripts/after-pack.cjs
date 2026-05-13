@@ -772,7 +772,24 @@ exports.default = async function afterPack(context) {
     console.log(`[after-pack] ✅ Removed ${nativeRemoved} non-target native platform packages.`);
   }
 
-  // 5. Patch lru-cache in app.asar.unpacked
+  // 5. Architecture-specific native module swap (license.node)
+  //    electron-builder copies the same files for all arch targets.
+  //    We compile two versions of the license verification module:
+  //    - build/Release/license.node          (arm64)
+  //    - build/Release-x64/license.node      (x64)
+  //    Swap the correct binary based on the target architecture.
+  const nativeLicenseDest = join(resourcesDir, 'app.asar.unpacked', 'native', 'build', 'Release', 'license.node');
+  if (arch === 'x64' && existsSync(nativeLicenseDest)) {
+    const nativeLicenseX64 = join(__dirname, '..', 'native', 'build-x64', 'license.node');
+    if (existsSync(nativeLicenseX64)) {
+      cpSync(normWin(nativeLicenseX64), normWin(nativeLicenseDest));
+      console.log(`[after-pack] ✅ Swapped license.node for x64 architecture.`);
+    } else {
+      console.warn('[after-pack] ⚠️  x64 license.node not found at', nativeLicenseX64);
+    }
+  }
+
+  // 6. Patch lru-cache in app.asar.unpacked
   //
   // Production dependencies (electron-updater → semver → lru-cache@6,
   // posthog-node → proxy agents → lru-cache@7, etc.) end up inside app.asar.

@@ -329,6 +329,15 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
   const [openclawDir, setOpenclawDir] = useState('');
+  const [openclawDebug, setOpenclawDebug] = useState<{
+    appIsPackaged: boolean;
+    resourcesPath: string;
+    appPath: string;
+    dirname: string;
+    dirExists: boolean;
+    pkgExists: boolean;
+    distExists: boolean;
+  } | null>(null);
   const gatewayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const runChecks = useCallback(async () => {
@@ -352,9 +361,19 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         isBuilt: boolean;
         dir: string;
         version?: string;
+        debug?: {
+          appIsPackaged: boolean;
+          resourcesPath: string;
+          appPath: string;
+          dirname: string;
+          dirExists: boolean;
+          pkgExists: boolean;
+          distExists: boolean;
+        };
       };
 
       setOpenclawDir(openclawStatus.dir);
+      setOpenclawDebug(openclawStatus.debug ?? null);
 
       if (!openclawStatus.packageExists) {
         setChecks((prev) => ({
@@ -580,6 +599,18 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
               <p className="text-xs text-muted-foreground mt-0.5 font-mono break-all">
                 {openclawDir}
               </p>
+            )}
+            {/* Debug info */}
+            {openclawDebug && (
+              <div className="mt-2 p-2 rounded bg-black/30 text-[10px] font-mono space-y-0.5">
+                <div>isPackaged: {openclawDebug.appIsPackaged ? 'true' : 'false'}</div>
+                <div>resourcesPath: {openclawDebug.resourcesPath}</div>
+                <div>appPath: {openclawDebug.appPath}</div>
+                <div>dirname: {openclawDebug.dirname}</div>
+                <div>dirExists: {openclawDebug.dirExists ? 'true' : 'false'}</div>
+                <div>pkgExists: {openclawDebug.pkgExists ? 'true' : 'false'}</div>
+                <div>distExists: {openclawDebug.distExists ? 'true' : 'false'}</div>
+              </div>
             )}
           </div>
           <div className="flex justify-end self-start mt-0.5">

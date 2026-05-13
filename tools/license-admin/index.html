@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClawX License Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border: #334155;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    header .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--primary);
+      color: white;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font);
+      transition: border-color 0.15s;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      font-size: 12px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover { border-color: var(--text-muted); }
+
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+
+    .result-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 12px;
+      word-break: break-all;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .badge-pro { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .badge-standard { background: rgba(34,197,94,0.2); color: #4ade80; }
+    .badge-enterprise { background: rgba(168,85,247,0.2); color: #c084fc; }
+
+    .license-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      justify-content: flex-end;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast-success { background: var(--success); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ClawX License Admin</h1>
+      <span class="badge">v1.0</span>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="generate">生成授权码</button>
+      <button class="tab-btn" data-tab="history">历史记录</button>
+    </nav>
+
+    <!-- Generate Panel -->
+    <div id="panel-generate" class="panel active">
+      <div class="card">
+        <h2>机器信息</h2>
+        <div class="form-group">
+          <label>机器码 (Machine Code)</label>
+          <input type="text" id="displayCode" placeholder="粘贴用户提供的机器码，如：3110-4974-9A41-8937" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>授权配置</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label>版本</label>
+            <select id="edition">
+              <option value="standard">Standard</option>
+              <option value="pro" selected>Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>有效期（天）</label>
+            <input type="number" id="days" value="365" min="1" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>备注（可选）</label>
+          <input type="text" id="note" placeholder="客户名称、订单号等..." />
+        </div>
+        <button class="btn btn-primary" id="btnGenerate">
+          生成授权码
+        </button>
+
+        <div id="resultArea" class="hidden">
+          <div class="result-box" id="licenseCode"></div>
+          <div class="result-actions">
+            <button class="btn btn-success" id="btnCopy">复制授权码</button>
+            <button class="btn btn-secondary" id="btnReset">继续生成</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Panel -->
+    <div id="panel-history" class="panel">
+      <div class="toolbar">
+        <button class="btn btn-secondary" id="btnRefresh">刷新</button>
+        <button class="btn btn-secondary" id="btnExport">导出 JSON</button>
+      </div>
+      <div class="card">
+        <div id="historyTable">
+          <div class="empty-state">加载中...</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast toast-success">已复制到剪贴板</div>
+  </div>
+
+  <script>
+    // renderer.js - ClawX License Admin frontend logic
+
+    const api = window.licenseAdminAPI;
+
+    // Tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.panel');
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        tabBtns.forEach(b => b.classList.toggle('active', b === btn));
+        panels.forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+        if (tab === 'history') loadHistory();
+      });
+    });
+
+    // Generate
+    const displayCodeInput = document.getElementById('displayCode');
+    const editionInput = document.getElementById('edition');
+    const daysInput = document.getElementById('days');
+    const noteInput = document.getElementById('note');
+    const btnGenerate = document.getElementById('btnGenerate');
+    const resultArea = document.getElementById('resultArea');
+    const licenseCodeEl = document.getElementById('licenseCode');
+    const btnCopy = document.getElementById('btnCopy');
+    const btnReset = document.getElementById('btnReset');
+
+    btnGenerate.addEventListener('click', async () => {
+      const machineCode = displayCodeInput.value.trim();
+      const edition = editionInput.value;
+      const days = parseInt(daysInput.value, 10);
+      const note = noteInput.value.trim();
+
+      if (!machineCode) {
+        showToast('请输入机器码', 'error');
+        return;
+      }
+
+      // Validate machine code format: XXXX-XXXX-XXXX-XXXX
+      if (!/^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/.test(machineCode)) {
+        showToast('机器码格式错误，应为 XXXX-XXXX-XXXX-XXXX', 'error');
+        return;
+      }
+
+      btnGenerate.disabled = true;
+      btnGenerate.textContent = '生成中...';
+
+      try {
+        const result = await api.generate({ machineCode, days, edition, note });
+        if (result.success) {
+          licenseCodeEl.textContent = result.license;
+          resultArea.classList.remove('hidden');
+          btnGenerate.classList.add('hidden');
+          showToast('授权码生成成功');
+        } else {
+          showToast(`生成失败: ${result.error}`, 'error');
+        }
+      } catch (err) {
+        showToast(`错误: ${String(err)}`, 'error');
+      } finally {
+        btnGenerate.disabled = false;
+        btnGenerate.textContent = '生成授权码';
+      }
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      const code = licenseCodeEl.textContent.trim();
+      if (code) {
+        await api.copy(code);
+        showToast('已复制到剪贴板');
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      displayCodeInput.value = '';
+      noteInput.value = '';
+      resultArea.classList.add('hidden');
+      btnGenerate.classList.remove('hidden');
+      displayCodeInput.focus();
+    });
+
+    // History
+    const historyTable = document.getElementById('historyTable');
+    const btnRefresh = document.getElementById('btnRefresh');
+    const btnExport = document.getElementById('btnExport');
+
+    async function loadHistory() {
+      historyTable.innerHTML = '<div class="empty-state">加载中...</div>';
+      try {
+        const result = await api.list();
+        if (result.success) {
+          renderHistory(result.records);
+        } else {
+          historyTable.innerHTML = `<div class="empty-state">加载失败: ${result.error}</div>`;
+        }
+      } catch (err) {
+        historyTable.innerHTML = `<div class="empty-state">错误: ${String(err)}</div>`;
+      }
+    }
+
+    function renderHistory(records) {
+      if (!records || records.length === 0) {
+        historyTable.innerHTML = '<div class="empty-state">暂无授权记录</div>';
+        return;
+      }
+
+      const badgeClass = {
+        standard: 'badge-standard',
+        pro: 'badge-pro',
+        enterprise: 'badge-enterprise',
+      };
+
+      const rows = records
+        .slice()
+        .reverse()
+        .map(r => {
+          const date = new Date(r.createdAt).toLocaleString('zh-CN');
+          const editionClass = badgeClass[r.edition] || 'badge-standard';
+          return `
+            <tr>
+              <td>${r.machine}</td>
+              <td><span class="badge ${editionClass}">${r.edition}</span></td>
+              <td>${r.days} 天</td>
+              <td class="license-code" title="${r.license}">${r.license}</td>
+              <td>${r.note || '-'}</td>
+              <td>${date}</td>
+              <td>
+                <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="copyLicense('${r.license}')">复制</button>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      historyTable.innerHTML = `
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>机器码</th>
+                <th>版本</th>
+                <th>有效期</th>
+                <th>授权码</th>
+                <th>备注</th>
+                <th>创建时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    window.copyLicense = async (code) => {
+      await api.copy(code);
+      showToast('已复制到剪贴板');
+    };
+
+    btnRefresh.addEventListener('click', loadHistory);
+
+    btnExport.addEventListener('click', async () => {
+      const result = await api.export();
+      if (result.success) {
+        showToast('导出成功');
+      } else if (result.error !== 'Canceled') {
+        showToast(`导出失败: ${result.error}`, 'error');
+      }
+    });
+
+    // Toast
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast toast-${type}`;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // Auto-focus
+    displayCodeInput.focus();
+  </script>
+</body>
+</html>

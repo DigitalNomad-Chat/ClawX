@@ -1,0 +1,14 @@
+{
+  "name": "@clawx/license",
+  "version": "1.0.0",
+  "private": true,
+  "gypfile": true,
+  "scripts": {
+    "build": "node-gyp rebuild",
+    "build:dev": "node-gyp rebuild --debug",
+    "clean": "node-gyp clean"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.3.1"
+  }
+}

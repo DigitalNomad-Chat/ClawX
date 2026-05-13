@@ -81,3 +81,10 @@ src/extensions/_ext-bridge.generated.ts
 .spec-workflow/
 docs/.rustdesk_*
 docs/OpenClaw-Desktop-*-extracted/
+
+# License system sensitive files
+tools/license-generator/keys/
+tools/license-generator/issued-licenses.json
+scripts/issued-licenses.json
+native/build/
+native/*.node
