@@ -39,6 +39,7 @@ interface SettingsState {
   devModeUnlocked: boolean;
   niceaiTheme: boolean;
   expandedAgentGroups: Record<string, boolean>;
+  managementToolsExpanded: boolean;
 
   // Setup
   setupComplete: boolean;
@@ -65,6 +66,7 @@ interface SettingsState {
   setDevModeUnlocked: (value: boolean) => void;
   setNiceaiTheme: (value: boolean) => void;
   toggleAgentGroup: (agentId: string) => void;
+  toggleManagementTools: () => void;
   markSetupComplete: () => void;
   resetSettings: () => void;
 }
@@ -90,6 +92,7 @@ const defaultSettings = {
   devModeUnlocked: false,
   niceaiTheme: true,
   expandedAgentGroups: {},
+  managementToolsExpanded: false,
   setupComplete: false,
 };
 
@@ -179,6 +182,9 @@ export const useSettingsStore = create<SettingsState>()(
           ...state.expandedAgentGroups,
           [agentId]: !state.expandedAgentGroups[agentId],
         },
+      })),
+      toggleManagementTools: () => set((state) => ({
+        managementToolsExpanded: !state.managementToolsExpanded,
       })),
       setDevModeUnlocked: (devModeUnlocked) => {
         set({ devModeUnlocked });

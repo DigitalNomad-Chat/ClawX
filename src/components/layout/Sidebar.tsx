@@ -20,9 +20,8 @@ import {
   Cpu,
   Moon,
   Store,
-  ChevronUp,
-  ChevronDown,
   ChevronRight,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rendererExtensionRegistry } from '@/extensions/registry';
@@ -153,10 +152,11 @@ export function Sidebar() {
 
   const { t } = useTranslation(['common', 'chat']);
   const [sessionToDelete, setSessionToDelete] = useState<{ key: string; label: string } | null>(null);
-  const [navCollapsed, setNavCollapsed] = useState(false);
 
   const expandedAgentGroups = useSettingsStore((s) => s.expandedAgentGroups);
   const toggleAgentGroup = useSettingsStore((s) => s.toggleAgentGroup);
+  const managementToolsExpanded = useSettingsStore((s) => s.managementToolsExpanded);
+  const toggleManagementTools = useSettingsStore((s) => s.toggleManagementTools);
 
   useEffect(() => {
     void fetchAgents();
@@ -174,7 +174,10 @@ export function Sidebar() {
   const hiddenRoutes = rendererExtensionRegistry.getHiddenRoutes();
   const extraNavItems = rendererExtensionRegistry.getExtraNavItems();
 
-  const coreNavItems = [
+  // Routes shown as top-level persistent nav items
+  const TOP_NAV_PATHS = new Set(['/marketplace', '/dashboard', '/collaboration']);
+
+  const allNavItems = [
     { to: '/models', icon: <Cpu className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.models'), testId: 'sidebar-nav-models' },
     { to: '/agents', icon: <Bot className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.agents'), testId: 'sidebar-nav-agents' },
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels'), testId: 'sidebar-nav-channels' },
@@ -184,24 +187,22 @@ export function Sidebar() {
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
     { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
-    // === MODULE NAV ITEMS ===
     ...moduleNavItems.map((item) => ({
       to: item.to,
       icon: item.icon,
       label: item.i18nKey ? t(item.i18nKey as never) : item.label,
       testId: item.testId,
     })),
-  ];
-
-  const navItems = [
-    ...coreNavItems.filter((item) => !hiddenRoutes.has(item.to)),
     ...extraNavItems.map((item) => ({
       to: item.to,
       icon: <item.icon className="h-[18px] w-[18px]" strokeWidth={2} />,
       label: item.labelI18nKey ? t(item.labelI18nKey) : item.label,
       testId: item.testId,
     })),
-  ];
+  ].filter((item) => !hiddenRoutes.has(item.to));
+
+  const topNavItems = allNavItems.filter((item) => TOP_NAV_PATHS.has(item.to));
+  const managementNavItems = allNavItems.filter((item) => !TOP_NAV_PATHS.has(item.to));
 
   return (
     <aside
@@ -235,7 +236,7 @@ export function Sidebar() {
         </Button>
       </div>
 
-      {/* Navigation */}
+      {/* Layer 1: Top persistent nav — new chat + topNavItems */}
       <nav className="flex flex-col px-2 gap-0.5">
         <button
           data-testid="sidebar-new-chat"
@@ -246,7 +247,7 @@ export function Sidebar() {
             navigate('/');
           }}
           className={cn(
-            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-3',
+            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-2',
             'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
             'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
             sidebarCollapsed && 'justify-center px-0',
@@ -258,37 +259,14 @@ export function Sidebar() {
           {!sidebarCollapsed && <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>}
         </button>
 
-        {!navCollapsed && navItems.map((item) => (
-          <NavItem
-            key={item.to}
-            {...item}
-            collapsed={sidebarCollapsed}
-          />
+        {!sidebarCollapsed && topNavItems.map((item) => (
+          <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
         ))}
       </nav>
 
-      {/* Nav collapse toggle */}
+      {/* Layer 2: Session list — grouped by Agent */}
       {!sidebarCollapsed && (
-        <div className="flex items-center gap-2 px-4 py-1">
-          <div className="h-px flex-1 bg-border/50" />
-          <button
-            onClick={() => setNavCollapsed(!navCollapsed)}
-            className="flex items-center justify-center rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground hover:bg-primary/5 transition-colors"
-            title={navCollapsed ? '展开功能按钮' : '收缩功能按钮'}
-          >
-            {navCollapsed ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronUp className="h-3.5 w-3.5" />
-            )}
-          </button>
-          <div className="h-px flex-1 bg-border/50" />
-        </div>
-      )}
-
-      {/* Session list — grouped by Agent */}
-      {!sidebarCollapsed && sessions.length > 0 && (
-        <div className="mt-4 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2.5">
+        <div className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2.5">
           {agentGroups.map((group) => {
             const isExpanded = expandedAgentGroups[group.agentId] !== false;
             return (
@@ -363,8 +341,34 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* Layer 3: Management tools (collapsible) */}
+      {!sidebarCollapsed && managementNavItems.length > 0 && (
+        <div className="px-2 pb-1">
+          <button
+            onClick={toggleManagementTools}
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/60 hover:text-foreground rounded-md hover:bg-muted/40 transition-colors"
+          >
+            <Wrench className="h-3 w-3 shrink-0" />
+            <span className="flex-1 text-left">{t('sidebar.managementTools') || '管理工具'}</span>
+            <ChevronRight
+              className={cn(
+                'h-3 w-3 shrink-0 transition-transform duration-200',
+                managementToolsExpanded && 'rotate-90'
+              )}
+            />
+          </button>
+          {managementToolsExpanded && (
+            <nav className="flex flex-col gap-px mt-0.5">
+              {managementNavItems.map((item) => (
+                <NavItem key={item.to} {...item} collapsed={false} />
+              ))}
+            </nav>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
-      <div className="p-2 mt-auto">
+      <div className="p-2 mt-auto shrink-0">
         <NavLink
             to="/settings"
             data-testid="sidebar-nav-settings"
