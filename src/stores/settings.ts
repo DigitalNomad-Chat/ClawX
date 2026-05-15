@@ -38,6 +38,7 @@ interface SettingsState {
   sidebarCollapsed: boolean;
   devModeUnlocked: boolean;
   niceaiTheme: boolean;
+  expandedAgentGroups: Record<string, boolean>;
 
   // Setup
   setupComplete: boolean;
@@ -63,6 +64,7 @@ interface SettingsState {
   setSidebarCollapsed: (value: boolean) => void;
   setDevModeUnlocked: (value: boolean) => void;
   setNiceaiTheme: (value: boolean) => void;
+  toggleAgentGroup: (agentId: string) => void;
   markSetupComplete: () => void;
   resetSettings: () => void;
 }
@@ -87,6 +89,7 @@ const defaultSettings = {
   sidebarCollapsed: false,
   devModeUnlocked: false,
   niceaiTheme: true,
+  expandedAgentGroups: {},
   setupComplete: false,
 };
 
@@ -171,6 +174,12 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoDownloadUpdate: (autoDownloadUpdate) => set({ autoDownloadUpdate }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setNiceaiTheme: (niceaiTheme) => set({ niceaiTheme }),
+      toggleAgentGroup: (agentId) => set((state) => ({
+        expandedAgentGroups: {
+          ...state.expandedAgentGroups,
+          [agentId]: !state.expandedAgentGroups[agentId],
+        },
+      })),
       setDevModeUnlocked: (devModeUnlocked) => {
         set({ devModeUnlocked });
         void hostApiFetch('/api/settings/devModeUnlocked', {

@@ -1,5 +1,12 @@
 import type { ChatSession } from '@/stores/chat';
 
+export interface AgentGroup {
+  agentId: string;
+  agentName: string;
+  sessions: ChatSession[];
+  latestActivityMs: number;
+}
+
 export type SessionBucketKey =
   | 'today'
   | 'yesterday'
@@ -45,4 +52,38 @@ export function getSessionActivityMs(
   }
 
   return getSessionCreatedAtMsFromKey(session.key) ?? 0;
+}
+
+export function groupSessionsByAgent(
+  sessions: ChatSession[],
+  sessionLastActivity: Record<string, number>,
+  agentNameById: Record<string, string>,
+): AgentGroup[] {
+  const groups = new Map<string, AgentGroup>();
+
+  for (const session of sessions) {
+    const match = session.key.match(/^agent:([^:]+)/);
+    const agentId = match ? match[1]! : 'main';
+    const agentName = agentNameById[agentId] || agentId;
+    const activityMs = getSessionActivityMs(session, sessionLastActivity);
+
+    if (!groups.has(agentId)) {
+      groups.set(agentId, { agentId, agentName, sessions: [], latestActivityMs: 0 });
+    }
+    const group = groups.get(agentId)!;
+    group.sessions.push(session);
+    if (activityMs > group.latestActivityMs) {
+      group.latestActivityMs = activityMs;
+    }
+  }
+
+  for (const group of groups.values()) {
+    group.sessions.sort((a, b) => {
+      const aMs = getSessionActivityMs(a, sessionLastActivity);
+      const bMs = getSessionActivityMs(b, sessionLastActivity);
+      return bMs - aMs;
+    });
+  }
+
+  return Array.from(groups.values()).sort((a, b) => b.latestActivityMs - a.latestActivityMs);
 }
