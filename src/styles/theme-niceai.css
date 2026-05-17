@@ -130,13 +130,15 @@
 
 .theme-niceai [data-session-item][data-active="true"] {
   background: linear-gradient(90deg, rgba(64, 158, 255, 0.1) 0%, transparent 100%) !important;
-  border: 1px solid rgba(64, 158, 255, 0.18) !important;
-  border-radius: 12px !important;
+  border: none !important;
+  border-left: 3px solid #409eff !important;
+  border-radius: 6px !important;
 }
 
 .dark .theme-niceai [data-session-item][data-active="true"] {
   background: linear-gradient(90deg, rgba(64, 158, 255, 0.12) 0%, transparent 100%) !important;
-  border: 1px solid rgba(64, 158, 255, 0.2) !important;
+  border: none !important;
+  border-left: 3px solid #409eff !important;
 }
 
 .theme-niceai [data-session-item]:hover {

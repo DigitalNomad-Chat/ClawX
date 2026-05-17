@@ -21,6 +21,8 @@ import {
   Moon,
   Store,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -66,7 +68,7 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       }
     >
       {({ isActive }) => (
-        <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
+        <div className="flex items-center gap-2.5 w-full">
           <div className={cn("flex shrink-0 items-center justify-center", isActive ? "!text-foreground/80" : "text-muted-foreground")}>
             {icon}
           </div>
@@ -152,6 +154,7 @@ export function Sidebar() {
 
   const { t } = useTranslation(['common', 'chat']);
   const [sessionToDelete, setSessionToDelete] = useState<{ key: string; label: string } | null>(null);
+  const [topNavCollapsed, setTopNavCollapsed] = useState(false);
 
   const expandedAgentGroups = useSettingsStore((s) => s.expandedAgentGroups);
   const toggleAgentGroup = useSettingsStore((s) => s.toggleAgentGroup);
@@ -186,13 +189,14 @@ export function Sidebar() {
     ...(devModeUnlocked
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
-    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
+    // Module nav items (dashboard, collaboration, etc.) — placed before marketplace
     ...moduleNavItems.map((item) => ({
       to: item.to,
       icon: item.icon,
       label: item.i18nKey ? t(item.i18nKey as never) : item.label,
       testId: item.testId,
     })),
+    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
     ...extraNavItems.map((item) => ({
       to: item.to,
       icon: <item.icon className="h-[18px] w-[18px]" strokeWidth={2} />,
@@ -237,7 +241,7 @@ export function Sidebar() {
       </div>
 
       {/* Layer 1: Top persistent nav — new chat + topNavItems */}
-      <nav className="flex flex-col px-2 gap-0.5">
+      <nav className="shrink-0 flex flex-col px-2 gap-0.5 pb-1">
         <button
           data-testid="sidebar-new-chat"
           data-nav-item="new-chat"
@@ -247,7 +251,7 @@ export function Sidebar() {
             navigate('/');
           }}
           className={cn(
-            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-2',
+            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-1',
             'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
             'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
             sidebarCollapsed && 'justify-center px-0',
@@ -259,26 +263,56 @@ export function Sidebar() {
           {!sidebarCollapsed && <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>}
         </button>
 
-        {!sidebarCollapsed && topNavItems.map((item) => (
+        {!sidebarCollapsed && !topNavCollapsed && topNavItems.map((item) => (
           <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
         ))}
       </nav>
+
+      {/* Divider between Layer 1 and Layer 2 with collapse toggle */}
+      {!sidebarCollapsed && (
+        <div className="flex items-center gap-2 px-3 py-1 shrink-0">
+          <div className="h-px flex-1 bg-border/60" />
+          <button
+            onClick={() => setTopNavCollapsed(!topNavCollapsed)}
+            className="flex items-center justify-center rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground hover:bg-primary/5 transition-colors"
+            title={topNavCollapsed ? '展开快捷入口' : '收起快捷入口'}
+          >
+            {topNavCollapsed ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronUp className="h-3 w-3" />
+            )}
+          </button>
+          <div className="h-px flex-1 bg-border/60" />
+        </div>
+      )}
 
       {/* Layer 2: Session list — grouped by Agent */}
       {!sidebarCollapsed && (
         <div className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2.5">
           {agentGroups.map((group) => {
-            const isExpanded = expandedAgentGroups[group.agentId] !== false;
+            const isExpanded = expandedAgentGroups[group.agentId] === true;
+            const hasActiveSession = isOnChat && group.sessions.some((s) => s.key === currentSessionKey);
             return (
               <div
                 key={group.agentId}
                 data-testid={`agent-group-${group.agentId}`}
-                className="rounded-lg bg-secondary/60 dark:bg-card/40 border border-border/40 dark:border-border/30 overflow-hidden"
+                className={cn(
+                  'rounded-lg overflow-hidden border transition-colors',
+                  hasActiveSession
+                    ? 'bg-primary/10 dark:bg-primary/12 border-primary/15 dark:border-primary/10'
+                    : 'bg-secondary/60 dark:bg-card/40 border-border/40 dark:border-border/30'
+                )}
               >
                 {/* Group header — container band */}
                 <button
                   onClick={() => toggleAgentGroup(group.agentId)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-muted-foreground/80 hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/[0.04] transition-colors"
+                  className={cn(
+                    'flex w-full items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors',
+                    hasActiveSession
+                      ? 'text-foreground/90'
+                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60 dark:hover:bg-white/[0.04]'
+                  )}
                 >
                   <ChevronRight
                     className={cn(
@@ -341,24 +375,31 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* Divider between Layer 2 and Layer 3 */}
+      {!sidebarCollapsed && managementNavItems.length > 0 && (
+        <div className="px-3 shrink-0">
+          <div className="h-px bg-border/60" />
+        </div>
+      )}
+
       {/* Layer 3: Management tools (collapsible) */}
       {!sidebarCollapsed && managementNavItems.length > 0 && (
-        <div className="px-2 pb-1">
+        <div className="px-2 pt-1.5 pb-1 shrink-0">
           <button
             onClick={toggleManagementTools}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/60 hover:text-foreground rounded-md hover:bg-muted/40 transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 dark:bg-card/30 border border-border/30 dark:border-border/25 text-sm font-medium text-muted-foreground/80 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/[0.04] transition-colors"
           >
-            <Wrench className="h-3 w-3 shrink-0" />
-            <span className="flex-1 text-left">{t('sidebar.managementTools') || '管理工具'}</span>
+            <Wrench className="h-4 w-4 shrink-0" />
+            <span className="flex-1 text-left">{t('sidebar.managementTools')}</span>
             <ChevronRight
               className={cn(
-                'h-3 w-3 shrink-0 transition-transform duration-200',
+                'h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-200',
                 managementToolsExpanded && 'rotate-90'
               )}
             />
           </button>
           {managementToolsExpanded && (
-            <nav className="flex flex-col gap-px mt-0.5">
+            <nav className="flex flex-col gap-px mt-1">
               {managementNavItems.map((item) => (
                 <NavItem key={item.to} {...item} collapsed={false} />
               ))}
@@ -384,7 +425,7 @@ export function Sidebar() {
             }
           >
           {({ isActive }) => (
-            <div data-nav-item data-active={isActive || undefined} className="flex items-center gap-2.5 w-full">
+            <div className="flex items-center gap-2.5 w-full">
               <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
                 <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
               </div>
