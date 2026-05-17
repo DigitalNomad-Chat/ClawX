@@ -922,7 +922,7 @@ function WelcomeScreen() {
         <div className="absolute bottom-1/4 right-1/3 w-56 h-56 bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 text-center max-w-lg mx-auto">
+      <div className="relative text-center max-w-lg mx-auto">
         <h1 className="text-4xl md:text-5xl font-serif text-foreground/90 mb-3 font-normal tracking-tight">
           {t('welcome.subtitle')}
         </h1>

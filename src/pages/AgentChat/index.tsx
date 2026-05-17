@@ -2,13 +2,33 @@
  * Agent Chat Page
  * Dedicated chat interface for a specific hired agent
  * Communicates with the independent kernel via kernelClient
+ *
+ * Features:
+ * - ReactMarkdown rendering (GFM, math, code blocks)
+ * - Syntax-highlighted code blocks with copy button
+ * - Tool call visualization (expandable cards + status bar)
+ * - Streaming cursor animation
+ * - Auto-resize textarea input
+ * - Welcome screen with quick prompts
+ * - Message hover actions (copy, timestamp)
  */
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bot, Loader2, Wrench } from 'lucide-react';
+import {
+  ArrowLeft, Loader2, Wrench, Copy, Check,
+  ChevronDown, ChevronRight, Send, Shield,
+  Paperclip, X, FileText, File,
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kernelClient, type KernelEvent } from '@/lib/kernel-client';
+import { repairMarkdown } from '@/lib/markdown-repair';
+
+// ── Types ──────────────────────────────────────────────────────────
 
 interface AgentInfo {
   id: string;
@@ -16,16 +36,424 @@ interface AgentInfo {
   nickname: string;
   emoji: string;
   creature: string;
+  vibe: string;
+  description: string;
+  tags: string[];
+  scenarios: string[];
+}
+
+interface ToolCallInfo {
+  name: string;
+  input: unknown;
+  status: 'running' | 'completed' | 'error';
+  duration?: number;
+  startTime: number;
 }
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  /** Active tool call (if any) */
-  activeTool?: string;
-  /** Whether the message is still streaming */
+  toolCalls?: ToolCallInfo[];
   streaming?: boolean;
+  timestamp?: number;
 }
+
+interface FileAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  base64: string;
+  status: 'ready' | 'error';
+  error?: string;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function getMimeTypeFromExt(ext: string): string {
+  const map: Record<string, string> = {
+    txt: 'text/plain', md: 'text/markdown', json: 'application/json',
+    xml: 'application/xml', csv: 'text/csv', html: 'text/html',
+    css: 'text/css', js: 'text/javascript', ts: 'text/typescript',
+    py: 'text/x-python', pdf: 'application/pdf',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+    mp4: 'video/mp4', mp3: 'audio/mpeg', wav: 'audio/wav',
+    zip: 'application/zip', doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+function readFileAsBase64(file: globalThis.File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(',')[1];
+      if (!base64) {
+        reject(new Error(`Empty base64 data for ${file.name}`));
+        return;
+      }
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Utility: copy to clipboard ─────────────────────────────────────
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Sub-component: Copy Button ─────────────────────────────────────
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [text]);
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+      onClick={handleCopy}
+      title="复制"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+    </Button>
+  );
+}
+
+// ── Sub-component: Code Block with copy ────────────────────────────
+
+interface CodeBlockProps {
+  language?: string;
+  children: React.ReactNode;
+}
+
+function CodeBlock({ language, children }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+  const codeText = typeof children === 'string' ? children : '';
+
+  const handleCopy = useCallback(async () => {
+    const ok = await copyToClipboard(codeText);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [codeText]);
+
+  return (
+    <div className="relative my-2 rounded-lg border bg-muted/50 overflow-hidden">
+      {language && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b">
+          <span className="text-[11px] font-mono text-muted-foreground uppercase">{language}</span>
+          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopy} title="复制代码">
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          </Button>
+        </div>
+      )}
+      <pre className={cn('overflow-x-auto p-3 text-sm', !language && 'pt-3')}>
+        <code className="font-mono text-sm">{children}</code>
+      </pre>
+    </div>
+  );
+}
+
+// ── Sub-component: Tool Card ───────────────────────────────────────
+
+function ToolCard({ tool }: { tool: ToolCallInfo }) {
+  const [expanded, setExpanded] = useState(false);
+  const isRunning = tool.status === 'running';
+  const isError = tool.status === 'error';
+
+  return (
+    <div className={cn(
+      'my-2 rounded-lg border overflow-hidden',
+      isRunning && 'border-primary/30 bg-primary/5',
+      isError && 'border-destructive/30 bg-destructive/5',
+      !isRunning && !isError && 'border-border bg-muted/30',
+    )}>
+      <button
+        className="flex items-center gap-2 w-full px-3 py-2 text-muted-foreground hover:text-foreground transition-colors hover:bg-muted/40"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
+        {!isRunning && !isError && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+        {isError && <Wrench className="h-3.5 w-3.5 text-destructive shrink-0" />}
+        <Wrench className="h-3 w-3 shrink-0 opacity-60" />
+        <span className="font-mono text-xs font-medium">{tool.name}</span>
+        {tool.duration !== undefined && (
+          <span className="ml-auto text-[10px] text-muted-foreground">{tool.duration}ms</span>
+        )}
+        {expanded ? <ChevronDown className="h-3 w-3 ml-auto" /> : <ChevronRight className="h-3 w-3 ml-auto" />}
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3">
+          <pre className="rounded-md bg-muted p-2 text-[11px] font-mono overflow-x-auto">
+            {tool.input && Object.keys(tool.input).length > 0
+              ? JSON.stringify(tool.input, null, 2)
+              : '// 无参数'}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-component: Tool Status Bar ─────────────────────────────────
+
+function ToolStatusBar({ tools }: { tools: ToolCallInfo[] }) {
+  if (!tools || tools.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 my-1">
+      {tools.map((tool, i) => (
+        <span
+          key={i}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-mono border',
+            tool.status === 'running' && 'border-primary/30 bg-primary/5 text-primary',
+            tool.status === 'completed' && 'border-green-500/30 bg-green-500/5 text-green-600',
+            tool.status === 'error' && 'border-destructive/30 bg-destructive/5 text-destructive',
+          )}
+        >
+          {tool.status === 'running' && <Loader2 className="h-3 w-3 animate-spin" />}
+          {tool.status === 'completed' && <Check className="h-3 w-3" />}
+          {tool.status === 'error' && <Wrench className="h-3 w-3" />}
+          {tool.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Sub-component: Message Bubble ──────────────────────────────────
+
+interface MessageBubbleProps {
+  message: ChatMessage;
+  agentEmoji: string;
+  isStreaming: boolean;
+}
+
+const MessageBubble = memo(function MessageBubble({ message, agentEmoji, isStreaming }: MessageBubbleProps) {
+  const isUser = message.role === 'user';
+  const isLastAssistant = !isUser && message.streaming && isStreaming;
+
+  // Repair markdown for streaming messages to avoid broken syntax
+  const displayContent = (!isUser && message.streaming)
+    ? repairMarkdown(message.content)
+    : message.content;
+
+  return (
+    <div
+      className={cn(
+        'flex gap-3 group',
+        isUser ? 'flex-row-reverse' : 'flex-row'
+      )}
+    >
+      {/* Avatar */}
+      <div
+        className={cn(
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm',
+          isUser
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-primary/10'
+        )}
+      >
+        {isUser ? '我' : agentEmoji}
+      </div>
+
+      {/* Bubble + Tools */}
+      <div className={cn('flex flex-col max-w-[80%]', isUser ? 'items-end' : 'items-start')}>
+        {/* Tool calls — shown ABOVE text for assistant */}
+        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+          <div className="w-full mb-1">
+            <ToolStatusBar tools={message.toolCalls} />
+            {message.toolCalls.map((tool, i) => (
+              <ToolCard key={i} tool={tool} />
+            ))}
+          </div>
+        )}
+
+        <div
+          className={cn(
+            'relative rounded-xl px-4 py-2.5 text-sm',
+            isUser
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted border'
+          )}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false, output: 'html' }]]}
+                components={{
+                  code({ className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    const isInline = !match && !className;
+                    if (isInline) {
+                      return (
+                        <code className="rounded bg-muted-foreground/10 px-1 py-0.5 text-[13px] font-mono" {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+                    return <CodeBlock language={match?.[1]}>{children}</CodeBlock>;
+                  },
+                  a({ href, children }) {
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline break-words"
+                      >
+                        {children}
+                      </a>
+                    );
+                  },
+                  img({ src, alt }) {
+                    return (
+                      <img
+                        src={src}
+                        alt={alt || ''}
+                        className="max-w-full rounded-lg border max-h-[300px] object-contain my-2"
+                        loading="lazy"
+                      />
+                    );
+                  },
+                }}
+              >
+                {displayContent}
+              </ReactMarkdown>
+              {isLastAssistant && (
+                <span className="inline-block h-4 w-0.5 ml-0.5 animate-pulse bg-primary align-middle" />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Hover actions + timestamp (assistant only) */}
+        {!isUser && (
+          <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <CopyButton text={message.content} />
+            {message.timestamp && (
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ── Sub-component: Welcome Screen ──────────────────────────────────
+
+function WelcomeScreen({ agent, onQuickPrompt }: { agent: AgentInfo; onQuickPrompt: (text: string) => void }) {
+  // Pick up to 3 scenarios as quick prompts
+  const quickPrompts = agent.scenarios.slice(0, 3);
+  // Fallback prompts if no scenarios
+  const fallbackPrompts = [
+    `介绍一下你自己`,
+    `你能帮我做什么？`,
+    `开始工作吧`,
+  ];
+  const prompts = quickPrompts.length > 0 ? quickPrompts : fallbackPrompts;
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground px-6">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-4xl">
+        {agent.emoji}
+      </div>
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-foreground">{agent.name}</h2>
+        <p className="text-sm mt-1">{agent.creature} · {agent.vibe}</p>
+        <p className="text-xs mt-2 max-w-sm mx-auto">{agent.description}</p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2 mt-2">
+        {prompts.map((prompt) => (
+          <button
+            key={prompt}
+            onClick={() => onQuickPrompt(prompt)}
+            className="rounded-full border bg-background px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-component: Auto-resize Textarea ────────────────────────────
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  onKeyDown,
+  onCompositionStart,
+  onCompositionEnd,
+  placeholder,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onCompositionStart?: (e: React.CompositionEvent<HTMLTextAreaElement>) => void;
+  onCompositionEnd?: (e: React.CompositionEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+      onCompositionStart={onCompositionStart}
+      onCompositionEnd={onCompositionEnd}
+      placeholder={placeholder}
+      disabled={disabled}
+      rows={1}
+      className="min-h-[44px] max-h-[200px] flex-1 resize-none rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+    />
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────
 
 export function AgentChat() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -46,23 +474,21 @@ export function AgentChat() {
     tool: string;
     input: unknown;
   } | null>(null);
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeToolRef = useRef<string | undefined>(undefined);
+  const toolStartTimes = useRef<Map<string, number>>(new Map());
+  const isComposingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // DEBUG: log messages state changes
-  useEffect(() => {
-    console.log('[AgentChat] messages updated, count=', messages.length, messages.map(m => ({ role: m.role, content: m.content.slice(0, 30), streaming: m.streaming })));
-  }, [messages]);
-
   // Subscribe/unsubscribe kernel events when sessionId changes
-  // NOTE: Directly use window.electron.ipcRenderer.on/off instead of kernelClient
-  // to avoid the subscription wrapper mismatch bug in kernelClient.teardownIpc()
   useEffect(() => {
     if (!sessionId) return;
 
@@ -77,7 +503,20 @@ export function AgentChat() {
             if (last && last.role === 'assistant' && last.streaming) {
               return [...prev.slice(0, -1), { ...last, content: last.content + content }];
             }
-            return [...prev, { role: 'assistant', content, streaming: true, activeTool: activeToolRef.current }];
+            return [...prev, {
+              role: 'assistant',
+              content,
+              streaming: true,
+              timestamp: Date.now(),
+              toolCalls: activeToolRef.current
+                ? [{
+                    name: activeToolRef.current,
+                    input: {},
+                    status: 'running',
+                    startTime: toolStartTimes.current.get(activeToolRef.current) || Date.now(),
+                  }]
+                : undefined,
+            }];
           });
           break;
         }
@@ -85,24 +524,81 @@ export function AgentChat() {
         case 'tool.started': {
           const toolName = event.tool as string;
           activeToolRef.current = toolName;
+          toolStartTimes.current.set(toolName, Date.now());
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last && last.role === 'assistant' && last.streaming) {
-              return [...prev.slice(0, -1), { ...last, activeTool: toolName }];
+              const existing = last.toolCalls || [];
+              const already = existing.find((t) => t.name === toolName && t.status === 'running');
+              if (already) return prev;
+              return [...prev.slice(0, -1), {
+                ...last,
+                toolCalls: [...existing, {
+                  name: toolName,
+                  input: event.input || {},
+                  status: 'running',
+                  startTime: Date.now(),
+                }],
+              }];
             }
-            return prev;
+            // No streaming assistant message exists (e.g. tool call without preceding text)
+            // Create a new assistant message to hold the tool call
+            return [...prev, {
+              role: 'assistant',
+              content: '',
+              streaming: true,
+              timestamp: Date.now(),
+              toolCalls: [{
+                name: toolName,
+                input: event.input || {},
+                status: 'running',
+                startTime: Date.now(),
+              }],
+            }];
           });
           break;
         }
 
         case 'tool.completed': {
+          const completedTool = event.tool as string;
+          const startTime = toolStartTimes.current.get(completedTool);
           activeToolRef.current = undefined;
           setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant' && last.streaming) {
-              return [...prev.slice(0, -1), { ...last, activeTool: undefined }];
+            // Find the last assistant message (streaming or not) that has this tool
+            for (let i = prev.length - 1; i >= 0; i--) {
+              const msg = prev[i];
+              if (msg.role === 'assistant' && msg.toolCalls) {
+                const hasTool = msg.toolCalls.some((t) => t.name === completedTool && t.status === 'running');
+                if (hasTool) {
+                  const updatedTools = msg.toolCalls.map((t) => {
+                    if (t.name === completedTool && t.status === 'running') {
+                      return {
+                        ...t,
+                        status: 'completed' as const,
+                        duration: startTime ? Date.now() - startTime : undefined,
+                      };
+                    }
+                    return t;
+                  });
+                  const updated = { ...msg, toolCalls: updatedTools };
+                  return [...prev.slice(0, i), updated, ...prev.slice(i + 1)];
+                }
+              }
             }
-            return prev;
+            // Tool completed without a matching started message — create a completed entry
+            return [...prev, {
+              role: 'assistant',
+              content: '',
+              streaming: true,
+              timestamp: Date.now(),
+              toolCalls: [{
+                name: completedTool,
+                input: {},
+                status: 'completed',
+                startTime: startTime || Date.now(),
+                duration: startTime ? Date.now() - startTime : undefined,
+              }],
+            }];
           });
           break;
         }
@@ -110,11 +606,31 @@ export function AgentChat() {
         case 'turn.complete':
         case 'session.completed': {
           activeToolRef.current = undefined;
+          toolStartTimes.current.clear();
           setStreaming(false);
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last && last.role === 'assistant' && last.streaming) {
-              return [...prev.slice(0, -1), { ...last, streaming: false, activeTool: undefined }];
+              // Mark all running tools as completed
+              const finalizedTools = (last.toolCalls || []).map((t) =>
+                t.status === 'running'
+                  ? { ...t, status: 'completed' as const, duration: Date.now() - t.startTime }
+                  : t
+              );
+              return [...prev.slice(0, -1), { ...last, streaming: false, toolCalls: finalizedTools }];
+            }
+            // If the last assistant message is already non-streaming but has running tools,
+            // also finalize them (handles fast tool calls that completed before turn.complete)
+            if (last && last.role === 'assistant' && last.toolCalls) {
+              const hasRunning = last.toolCalls.some((t) => t.status === 'running');
+              if (hasRunning) {
+                const finalizedTools = last.toolCalls.map((t) =>
+                  t.status === 'running'
+                    ? { ...t, status: 'completed' as const, duration: Date.now() - t.startTime }
+                    : t
+                );
+                return [...prev.slice(0, -1), { ...last, toolCalls: finalizedTools }];
+              }
             }
             return prev;
           });
@@ -124,6 +640,8 @@ export function AgentChat() {
         case 'error': {
           const errorMsg = (event.message as string) || '未知错误';
           setStreaming(false);
+          activeToolRef.current = undefined;
+          toolStartTimes.current.clear();
           const isAuthError = /No API key|401|authentication|invalid.*key|unauthorized/i.test(errorMsg);
           if (isAuthError) setNeedsProviderSetup(true);
           setMessages((prev) => {
@@ -131,13 +649,13 @@ export function AgentChat() {
             if (last && last.role === 'assistant' && last.streaming) {
               return [
                 ...prev.slice(0, -1),
-                { ...last, streaming: false, activeTool: undefined },
-                { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}` },
+                { ...last, streaming: false },
+                { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
               ];
             }
             return [
               ...prev,
-              { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}` },
+              { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
             ];
           });
           break;
@@ -168,10 +686,9 @@ export function AgentChat() {
     };
   }, [sessionId]);
 
-  // Initialize: 只加载 agent info，不创建 session（延迟到首次发送）
+  // Initialize: load agent info, pre-hire agent
   useEffect(() => {
     if (!agentId) return;
-
     let cancelled = false;
 
     async function init() {
@@ -179,7 +696,6 @@ export function AgentChat() {
         setLoading(true);
         setError(null);
 
-        // 只加载 agent 信息（manifest 数据，内核仅需快速启动）
         const infoResult = await window.electron.ipcRenderer.invoke(
           'marketplace:getAgent',
           agentId
@@ -194,7 +710,6 @@ export function AgentChat() {
           return;
         }
 
-        // Pre-check: verify AI provider is configured (independent kernel LLM store)
         const checkResult = await window.electron.ipcRenderer.invoke(
           'kernel-llm:checkActive'
         ) as { success: boolean; error?: string; providerName?: string; model?: string; needsSetup?: boolean };
@@ -208,7 +723,6 @@ export function AgentChat() {
           setProviderInfo({ name: checkResult.providerName || '', model: checkResult.model || '' });
           setInitPhase('initializing');
 
-          // 后台预启动内核并 hire agent（将冷启动成本从"发送时"转移到"页面加载时"）
           window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId)
             .then((hireResult) => {
               if (cancelled) return;
@@ -232,64 +746,49 @@ export function AgentChat() {
           setError((err as Error).message || '初始化失败');
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
     init();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [agentId]);
 
-  /**
-   * Respond to a pending approval request from the permission checker.
-   */
-  async function respondApproval(approved: boolean) {
+  async function respondApproval(approved: boolean, autoApprove = false) {
     if (!approvalRequest) return;
     const reqId = approvalRequest.requestId;
     setApprovalRequest(null);
     try {
-      await window.electron.ipcRenderer.invoke('kernel:approvalRespond', reqId, approved);
+      await window.electron.ipcRenderer.invoke('kernel:approvalRespond', reqId, approved, autoApprove);
     } catch (err) {
       console.error('[AgentChat] approval respond failed:', err);
     }
   }
 
-  /**
-   * Send a chat message to the agent.
-   * If no session exists, first initialize: load config → create session → subscribe.
-   */
-  async function sendMessage() {
-    if (!input.trim() || !agentId || streaming) return;
+  async function sendMessage(textOverride?: string) {
+    const text = textOverride ?? input.trim();
+    const readyAttachments = attachments.filter((a) => a.status === 'ready');
+    if ((!text && readyAttachments.length === 0) || !agentId || streaming) return;
 
-    // Block sending if provider is not configured (pre-flight check failed)
     if (needsProviderSetup) {
       setMessages((prev) => [
         ...prev,
-        { role: 'user', content: input.trim() },
-        { role: 'assistant', content: '⚠️ 请先配置AI服务商的API密钥，然后再发送消息。' },
+        { role: 'user', content: text || '[文件附件]', timestamp: Date.now() },
+        { role: 'assistant', content: '⚠️ 请先配置AI服务商的API密钥，然后再发送消息。', timestamp: Date.now() },
       ]);
-      setInput('');
+      if (!textOverride) setInput('');
       return;
     }
 
-    const userMessage = input.trim();
-    setInput('');
+    if (!textOverride) setInput('');
     setStreaming(true);
     setError(null);
 
-    // Add user message to UI
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    setMessages((prev) => [...prev, { role: 'user', content: text || '[文件附件]', timestamp: Date.now() }]);
 
     try {
-      // 首次发送：按需初始化 session（hire + subscribe）
       let sid = sessionId;
       if (!sid) {
-        // Hire agent (内核此时才按需加载 Agent 配置)
         const hireResult = await window.electron.ipcRenderer.invoke(
           'marketplace:hireAgent',
           agentId
@@ -299,35 +798,165 @@ export function AgentChat() {
           setStreaming(false);
           setMessages((prev) => [
             ...prev,
-            { role: 'assistant', content: `[激活失败] ${hireResult.error || '未知错误'}` },
+            { role: 'assistant', content: `[激活失败] ${hireResult.error || '未知错误'}`, timestamp: Date.now() },
           ]);
           return;
         }
 
         sid = hireResult.sessionId;
         setSessionId(sid);
-        // sessionId useEffect 会自动处理订阅和 setSessionReady
       }
 
-      // 发送消息
-      const result = await kernelClient.sendChat(sid, agentId, userMessage);
+      // Stage attachments to session workspace
+      let stagedAttachments: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }> | undefined;
+      if (readyAttachments.length > 0) {
+        const stageResult = await kernelClient.stageFiles(
+          sid,
+          readyAttachments.map((a) => ({ fileName: a.fileName, mimeType: a.mimeType, base64: a.base64 }))
+        );
+        if (stageResult.success && stageResult.staged) {
+          stagedAttachments = stageResult.staged;
+        } else {
+          console.error('[AgentChat] Stage files failed:', stageResult.error);
+        }
+      }
+
+      setAttachments([]);
+
+      const result = await kernelClient.sendChat(sid, agentId, text, stagedAttachments);
 
       if (!result.success) {
         setStreaming(false);
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `[发送失败] ${result.error || '未知错误'}` },
+          { role: 'assistant', content: `[发送失败] ${result.error || '未知错误'}`, timestamp: Date.now() },
         ]);
       }
-      // Streaming response will be handled by useEffect handler
     } catch (err) {
       setStreaming(false);
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `[通信错误] ${(err as Error).message}` },
+        { role: 'assistant', content: `[通信错误] ${(err as Error).message}`, timestamp: Date.now() },
       ]);
     }
   }
+
+  // ── File attachment handlers ───────────────────────────────────────
+
+  const pickFiles = useCallback(async () => {
+    try {
+      const result = await window.electron.ipcRenderer.invoke('dialog:open', {
+        properties: ['openFile', 'multiSelections'],
+      }) as { canceled: boolean; filePaths?: string[] };
+      if (result.canceled || !result.filePaths?.length) return;
+
+      for (const filePath of result.filePaths) {
+        const fileName = filePath.split(/[\\/]/).pop() || 'file';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        const mimeType = getMimeTypeFromExt(ext);
+
+        try {
+          const base64 = await window.electron.ipcRenderer.invoke('fs:readFileBase64', filePath) as string;
+          setAttachments((prev) => [...prev, {
+            id: crypto.randomUUID(),
+            fileName,
+            mimeType,
+            fileSize: Math.round(base64.length * 0.75),
+            base64,
+            status: 'ready',
+          }]);
+        } catch (err) {
+          console.error('[AgentChat] Failed to read file:', err);
+          setAttachments((prev) => [...prev, {
+            id: crypto.randomUUID(),
+            fileName,
+            mimeType,
+            fileSize: 0,
+            base64: '',
+            status: 'error',
+            error: String(err),
+          }]);
+        }
+      }
+    } catch (err) {
+      console.error('[AgentChat] pickFiles error:', err);
+    }
+  }, []);
+
+  const stageBufferFiles = useCallback(async (files: globalThis.File[]) => {
+    for (const file of files) {
+      try {
+        const base64 = await readFileAsBase64(file);
+        setAttachments((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          base64,
+          status: 'ready',
+        }]);
+      } catch (err) {
+        console.error('[AgentChat] stageBuffer error:', err);
+        setAttachments((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          base64: '',
+          status: 'error',
+          error: String(err),
+        }]);
+      }
+    }
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const pastedFiles: globalThis.File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) pastedFiles.push(file);
+      }
+    }
+    if (pastedFiles.length > 0) {
+      e.preventDefault();
+      void stageBufferFiles(pastedFiles);
+    }
+  }, [stageBufferFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    if (e.dataTransfer?.files?.length) {
+      void stageBufferFiles(Array.from(e.dataTransfer.files));
+    }
+  }, [stageBufferFiles]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isComposingRef.current) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [input, streaming, agentId, needsProviderSetup, sessionId]);
 
   if (loading) {
     return (
@@ -361,83 +990,64 @@ export function AgentChat() {
   }
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div
+      className={cn('relative flex h-full flex-col', dragOver && 'ring-2 ring-primary/30')}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 border-b pb-4">
+      <div className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
         <Button variant="ghost" size="icon" onClick={() => navigate('/marketplace')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl">
           {agentInfo.emoji}
         </div>
-        <div>
-          <h1 className="font-semibold">{agentInfo.name}</h1>
-          <p className="text-xs text-muted-foreground">
+        <div className="min-w-0">
+          <h1 className="font-semibold truncate">{agentInfo.name}</h1>
+          <p className="text-xs text-muted-foreground truncate">
             {agentInfo.creature} · {agentInfo.nickname}
           </p>
         </div>
         {sessionReady && initPhase === 'ready' ? (
-          <span className="ml-auto text-xs text-green-600">● 已连接{providerInfo ? ` · ${providerInfo.model}` : ''}</span>
+          <span className="ml-auto flex items-center gap-1 text-xs text-green-600 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            已连接{providerInfo ? ` · ${providerInfo.model}` : ''}
+          </span>
         ) : needsProviderSetup ? (
-          <span className="ml-auto text-xs text-red-500">● 未配置服务商</span>
+          <span className="ml-auto flex items-center gap-1 text-xs text-red-500 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            未配置服务商
+          </span>
         ) : initPhase === 'initializing' ? (
-          <span className="ml-auto flex items-center gap-1 text-xs text-blue-600">
+          <span className="ml-auto flex items-center gap-1 text-xs text-blue-600 shrink-0">
             <Loader2 className="h-3 w-3 animate-spin" />
             正在初始化...
           </span>
         ) : (
-          <span className="ml-auto text-xs text-yellow-600">● 待激活</span>
+          <span className="ml-auto flex items-center gap-1 text-xs text-yellow-600 shrink-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+            待激活
+          </span>
         )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {messages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Bot className="h-10 w-10" />
-            <p>开始与 {agentInfo.name} 对话</p>
-            <p className="text-xs">Agent 已准备就绪，请输入您的问题</p>
-          </div>
+          <WelcomeScreen
+            agent={agentInfo}
+            onQuickPrompt={(text) => sendMessage(text)}
+          />
         )}
         {messages.map((msg, index) => (
-          <div
+          <MessageBubble
             key={index}
-            className={cn(
-              'flex gap-3',
-              msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-            )}
-          >
-            <div
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm',
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-primary/10'
-              )}
-            >
-              {msg.role === 'user' ? '我' : agentInfo.emoji}
-            </div>
-            <div
-              className={cn(
-                'max-w-[80%] rounded-lg px-4 py-2 text-sm',
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              )}
-            >
-              <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
-              {msg.streaming && (
-                <span className="inline-block h-4 w-1 animate-pulse bg-current" />
-              )}
-              {msg.activeTool && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Wrench className="h-3 w-3" />
-                  <span>使用工具: {msg.activeTool}</span>
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                </div>
-              )}
-            </div>
-          </div>
+            message={msg}
+            agentEmoji={agentInfo.emoji}
+            isStreaming={streaming}
+          />
         ))}
         {streaming && messages[messages.length - 1]?.role !== 'assistant' && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -451,22 +1061,33 @@ export function AgentChat() {
       {/* Approval Dialog */}
       {approvalRequest && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg">
+          <div className="mx-4 w-full max-w-md rounded-xl border bg-background p-6 shadow-lg">
             <h3 className="text-lg font-semibold">需要您的确认</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Agent 请求执行以下操作：
             </p>
-            <div className="mt-3 rounded-md bg-muted p-3 text-sm">
-              <p className="font-medium">工具：{approvalRequest.tool}</p>
-              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+            <div className="mt-3 rounded-lg bg-muted p-3">
+              <p className="text-sm font-medium">工具：{approvalRequest.tool}</p>
+              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground font-mono">
                 {JSON.stringify(approvalRequest.input, null, 2)}
               </pre>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => respondApproval(false)}>
-                拒绝
-              </Button>
-              <Button onClick={() => respondApproval(true)}>允许</Button>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Shield className="h-3.5 w-3.5" />
+                <span>此工具需要您的确认后才能执行。您可以选择仅允许本次，或在本会话中始终允许此工具。</span>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => respondApproval(false)}>
+                  拒绝
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => respondApproval(true, true)}>
+                  始终允许
+                </Button>
+                <Button size="sm" onClick={() => respondApproval(true)}>
+                  允许
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -474,7 +1095,7 @@ export function AgentChat() {
 
       {/* Provider setup guidance */}
       {needsProviderSetup && (
-        <div className="border-t bg-blue-50 px-4 py-3 text-sm dark:bg-blue-950/30">
+        <div className="border-t bg-blue-50 px-4 py-3 text-sm dark:bg-blue-950/30 shrink-0">
           <p className="font-medium text-blue-800 dark:text-blue-200">AI服务商未配置</p>
           <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
             请先配置API密钥后再与Agent对话
@@ -492,34 +1113,82 @@ export function AgentChat() {
 
       {/* Error bar */}
       {error && agentInfo && (
-        <div className="border-t bg-destructive/10 px-4 py-2 text-xs text-destructive">
+        <div className="border-t bg-destructive/10 px-4 py-2 text-xs text-destructive shrink-0">
           {error}
         </div>
       )}
 
       {/* Input */}
-      <div className="border-t pt-4">
-        <div className="flex gap-2">
-          <textarea
+      <div className="border-t px-4 py-3 shrink-0">
+        {attachments.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {attachments.map((att) => (
+              <div
+                key={att.id}
+                className={cn(
+                  'group relative flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs',
+                  att.status === 'error' ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/50'
+                )}
+              >
+                {att.mimeType.startsWith('image/') ? (
+                  <img src={`data:${att.mimeType};base64,${att.base64}`} alt={att.fileName} className="h-8 w-8 rounded object-cover" />
+                ) : (
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium max-w-[120px]">{att.fileName}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatFileSize(att.fileSize)}</p>
+                </div>
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  className="rounded-full p-0.5 hover:bg-muted transition-colors"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <AutoResizeTextarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder={`向 ${agentInfo.name} 发送消息...`}
-            className="min-h-[60px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-            rows={2}
+            onChange={setInput}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={() => { isComposingRef.current = true; }}
+            onCompositionEnd={() => { isComposingRef.current = false; }}
+            onPaste={handlePaste}
+            placeholder={dragOver ? '释放文件以上传' : `向 ${agentInfo.name} 发送消息...`}
             disabled={streaming}
           />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) {
+                void stageBufferFiles(Array.from(e.target.files));
+                e.target.value = '';
+              }
+            }}
+          />
           <Button
-            className="self-end"
-            disabled={!input.trim() || streaming}
-            onClick={sendMessage}
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-xl"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming}
+            title="上传文件"
           >
-            发送
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-xl"
+            disabled={(!input.trim() && attachments.length === 0) || streaming}
+            onClick={() => sendMessage()}
+          >
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </div>
