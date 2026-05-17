@@ -74,4 +74,15 @@ if (existsSync(agentsSrc)) {
   console.warn('[package-kernel] WARNING: No agents directory found at', agentsSrc);
 }
 
+// Step 4: Copy skill assets
+const skillsSrc = resolve(kernelRoot, 'skills');
+const skillsDest = resolve(buildDir, 'skills');
+
+if (existsSync(skillsSrc)) {
+  cpSync(skillsSrc, skillsDest, { recursive: true });
+  console.log('[package-kernel] Skills copied to:', skillsDest);
+} else {
+  console.warn('[package-kernel] WARNING: No skills directory found at', skillsSrc);
+}
+
 console.log('[package-kernel] Done! Kernel package at:', buildDir);

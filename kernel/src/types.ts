@@ -152,6 +152,16 @@ export interface AgentManifest {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Skill
+// ─────────────────────────────────────────────────────────────
+export interface SkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Session
 // ─────────────────────────────────────────────────────────────
 export interface SessionInfo {
@@ -174,7 +184,7 @@ export interface AttachmentInfo {
 }
 
 export type KernelRequest =
-  | { type: 'chat.send'; sessionId: string; agentId: string; message: string; attachments?: AttachmentInfo[] }
+  | { type: 'chat.send'; sessionId: string; agentId: string; message: string; attachments?: AttachmentInfo[]; skillId?: string }
   | { type: 'session.create'; agentId: string }
   | { type: 'session.list' }
   | { type: 'session.info'; sessionId: string }
@@ -182,6 +192,8 @@ export type KernelRequest =
   | { type: 'session.delete'; sessionId: string }
   | { type: 'agent.list' }
   | { type: 'agent.detail'; agentId: string }
+  | { type: 'skill.list' }
+  | { type: 'skill.detail'; skillId: string }
   | { type: 'approval.respond'; requestId: string; approved: boolean; autoApprove?: boolean }
   | { type: 'kernel.shutdown' };
 
@@ -202,6 +214,8 @@ export type KernelEvent =
   | { type: 'session.info'; sessionId: string; workspaceRoot: string }
   | { type: 'agent.list'; agents: AgentManifestEntry[] }
   | { type: 'agent.detail'; agent: AgentManifestEntry }
+  | { type: 'skill.list'; skills: SkillEntry[] }
+  | { type: 'skill.detail'; skill: SkillEntry & { content: string } }
   | { type: 'config.updated' }
   | { type: 'error'; sessionId?: string; message: string };
 
