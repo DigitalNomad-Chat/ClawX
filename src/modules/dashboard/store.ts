@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { hostApiFetch } from '@/lib/host-api';
 
 export interface TokenHistoryEntry {
-  timestamp: number;
+  date: string;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
