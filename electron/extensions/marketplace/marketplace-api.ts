@@ -3,8 +3,8 @@
  * Provides IPC endpoints for the frontend to browse and select agents
  */
 import { ipcMain, type WebContents, app } from 'electron';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { resolve, join, extname } from 'path';
 import { getKernelLauncher } from '../index.js';
 import { registerKernelLLMRoutes } from './kernel-llm-store.js';
 
@@ -115,8 +115,8 @@ export function registerMarketplaceRoutes(): void {
     }
   });
 
-  // Send a chat message to the kernel
-  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string) => {
+  // Stage file attachments for a session
+  ipcMain.handle('kernel:stageFiles', async (_event, sessionId: string, files: Array<{ fileName: string; mimeType: string; base64: string }>) => {
     try {
       const launcher = getKernelLauncher();
       if (!launcher) {
@@ -127,7 +127,59 @@ export function registerMarketplaceRoutes(): void {
         await launcher.start();
       }
 
-      await launcher.sendStream({ type: 'chat.send', sessionId, agentId, message } as Record<string, unknown>);
+      // Query session workspace root
+      const sessionInfo = await launcher.sendRequest(
+        { type: 'session.info', sessionId } as Record<string, unknown>,
+        10000
+      );
+      const infoEvent = sessionInfo.find((e: Record<string, unknown>) => e.type === 'session.info');
+      if (!infoEvent) {
+        return { success: false, error: 'Session not found' };
+      }
+
+      const workspaceRoot = (infoEvent as Record<string, unknown>).workspaceRoot as string;
+      const uploadsDir = join(workspaceRoot, 'uploads');
+      mkdirSync(uploadsDir, { recursive: true });
+
+      const staged: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }> = [];
+      for (const file of files) {
+        const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const ext = extname(file.fileName) || '.bin';
+        const stagedPath = join(uploadsDir, `${id}${ext}`);
+        const buffer = Buffer.from(file.base64, 'base64');
+        writeFileSync(stagedPath, buffer);
+        staged.push({
+          fileName: file.fileName,
+          stagedPath,
+          mimeType: file.mimeType,
+          fileSize: buffer.length,
+        });
+      }
+
+      return { success: true, staged };
+    } catch (err) {
+      console.error('[Marketplace] stageFiles error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // Send a chat message to the kernel
+  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string, attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>) => {
+    try {
+      const launcher = getKernelLauncher();
+      if (!launcher) {
+        return { success: false, error: 'Kernel launcher not initialized' };
+      }
+
+      if (!launcher.isRunning()) {
+        await launcher.start();
+      }
+
+      const payload: Record<string, unknown> = { type: 'chat.send', sessionId, agentId, message };
+      if (attachments && attachments.length > 0) {
+        payload.attachments = attachments;
+      }
+      await launcher.sendStream(payload);
       return { success: true };
     } catch (err) {
       console.error('[Marketplace] chat error:', err);
@@ -208,7 +260,7 @@ export function registerMarketplaceRoutes(): void {
   });
 
   // Respond to an approval request (from the ReAct permission checker)
-  ipcMain.handle('kernel:approvalRespond', async (_event, requestId: string, approved: boolean) => {
+  ipcMain.handle('kernel:approvalRespond', async (_event, requestId: string, approved: boolean, autoApprove?: boolean) => {
     try {
       const launcher = getKernelLauncher();
       if (!launcher) {
@@ -219,11 +271,27 @@ export function registerMarketplaceRoutes(): void {
         await launcher.start();
       }
 
-      await launcher.sendStream({ type: 'approval.respond', requestId, approved } as Record<string, unknown>);
+      const payload: Record<string, unknown> = { type: 'approval.respond', requestId, approved };
+      if (autoApprove) {
+        payload.autoApprove = true;
+      }
+
+      await launcher.sendStream(payload);
       return { success: true };
     } catch (err) {
       console.error('[Marketplace] approvalRespond error:', err);
       return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // Read a local file as base64 (for file attachment upload)
+  ipcMain.handle('fs:readFileBase64', async (_event, filePath: string) => {
+    try {
+      const buffer = readFileSync(filePath);
+      return buffer.toString('base64');
+    } catch (err) {
+      console.error('[Marketplace] fs:readFileBase64 error:', err);
+      throw err;
     }
   });
 

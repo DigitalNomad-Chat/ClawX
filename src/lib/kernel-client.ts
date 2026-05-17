@@ -31,6 +31,13 @@ export interface SessionInfo {
   messageCount: number;
 }
 
+export interface StagedAttachment {
+  fileName: string;
+  stagedPath: string;
+  mimeType: string;
+  fileSize: number;
+}
+
 type EventCallback = (event: KernelEvent) => void;
 
 class KernelClient {
@@ -75,9 +82,20 @@ class KernelClient {
   /**
    * Send a chat message to an agent
    */
-  async sendChat(sessionId: string, agentId: string, message: string): Promise<{ success: boolean; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message) as Promise<{
+  async sendChat(sessionId: string, agentId: string, message: string, attachments?: StagedAttachment[]): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message, attachments) as Promise<{
       success: boolean;
+      error?: string;
+    }>;
+  }
+
+  /**
+   * Stage file attachments for a session (saves to session workspace)
+   */
+  async stageFiles(sessionId: string, files: Array<{ fileName: string; mimeType: string; base64: string }>): Promise<{ success: boolean; staged?: StagedAttachment[]; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:stageFiles', sessionId, files) as Promise<{
+      success: boolean;
+      staged?: StagedAttachment[];
       error?: string;
     }>;
   }
