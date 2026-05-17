@@ -164,7 +164,7 @@ export function registerMarketplaceRoutes(): void {
   });
 
   // Send a chat message to the kernel
-  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string, attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>) => {
+  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string, attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>, skillId?: string) => {
     try {
       const launcher = getKernelLauncher();
       if (!launcher) {
@@ -178,6 +178,9 @@ export function registerMarketplaceRoutes(): void {
       const payload: Record<string, unknown> = { type: 'chat.send', sessionId, agentId, message };
       if (attachments && attachments.length > 0) {
         payload.attachments = attachments;
+      }
+      if (skillId) {
+        payload.skillId = skillId;
       }
       await launcher.sendStream(payload);
       return { success: true };
@@ -292,6 +295,74 @@ export function registerMarketplaceRoutes(): void {
     } catch (err) {
       console.error('[Marketplace] fs:readFileBase64 error:', err);
       throw err;
+    }
+  });
+
+  // Skill list — proxy to kernel
+  ipcMain.handle('kernel:skillList', async () => {
+    try {
+      const launcher = getKernelLauncher();
+      if (!launcher) {
+        return { success: false, error: 'Kernel launcher not initialized' };
+      }
+
+      if (!launcher.isRunning()) {
+        await launcher.start();
+      }
+
+      const events = await launcher.sendRequest(
+        { type: 'skill.list' } as Record<string, unknown>,
+        10000
+      );
+
+      const skillEvent = events.find((e: Record<string, unknown>) => e.type === 'skill.list');
+      if (skillEvent) {
+        return { success: true, skills: (skillEvent as Record<string, unknown>).skills };
+      }
+
+      const errorEvent = events.find((e: Record<string, unknown>) => e.type === 'error');
+      if (errorEvent) {
+        return { success: false, error: (errorEvent as Record<string, unknown>).message };
+      }
+
+      return { success: false, error: 'No response from kernel' };
+    } catch (err) {
+      console.error('[Marketplace] skillList error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // Skill detail — proxy to kernel
+  ipcMain.handle('kernel:skillDetail', async (_event, skillId: string) => {
+    try {
+      const launcher = getKernelLauncher();
+      if (!launcher) {
+        return { success: false, error: 'Kernel launcher not initialized' };
+      }
+
+      if (!launcher.isRunning()) {
+        await launcher.start();
+      }
+
+      const events = await launcher.sendRequest(
+        { type: 'skill.detail', skillId } as Record<string, unknown>,
+        10000
+      );
+
+      const skillEvent = events.find((e: Record<string, unknown>) => e.type === 'skill.detail');
+      if (skillEvent) {
+        return { success: true, skill: (skillEvent as Record<string, unknown>).skill };
+      }
+
+      const errorEvent = events.find((e: Record<string, unknown>) => e.type === 'error');
+      if (errorEvent) {
+        return { success: false, error: (errorEvent as Record<string, unknown>).message };
+      }
+
+      return { success: false, error: 'No response from kernel' };
+    } catch (err) {
+      console.error('[Marketplace] skillDetail error:', err);
+      return { success: false, error: (err as Error).message };
     }
   });
 

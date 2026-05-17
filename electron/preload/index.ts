@@ -153,6 +153,11 @@ const electronAPI = {
         'kernel:subscribe',
         'kernel:unsubscribe',
         'kernel:approvalRespond',
+        'kernel:stageFiles',
+        'kernel:skillList',
+        'kernel:skillDetail',
+        // File system
+        'fs:readFileBase64',
         // Kernel LLM configuration (independent)
         'kernel-llm:readConfig',
         'kernel-llm:addProvider',
