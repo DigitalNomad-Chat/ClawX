@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "categories": [
+    { "id": "all", "label": "全部", "icon": "Store" },
+    { "id": "engineering", "label": "工程", "icon": "Code" },
+    { "id": "marketing", "label": "营销", "icon": "Megaphone" },
+    { "id": "design", "label": "设计", "icon": "Palette" },
+    { "id": "product", "label": "产品", "icon": "Package" },
+    { "id": "business", "label": "商务", "icon": "Briefcase" },
+    { "id": "operations", "label": "运营", "icon": "Settings" },
+    { "id": "specialized", "label": "专项", "icon": "Star" },
+    { "id": "creative", "label": "创意", "icon": "Gamepad2" }
+  ],
+  "departmentMapping": {
+    "engineering": "engineering",
+    "marketing": "marketing",
+    "paid-media": "marketing",
+    "design": "design",
+    "product": "product",
+    "project-management": "product",
+    "sales": "business",
+    "finance": "business",
+    "hr": "business",
+    "legal": "business",
+    "supply-chain": "business",
+    "support": "operations",
+    "testing": "operations",
+    "specialized": "specialized",
+    "academic": "specialized",
+    "game-development": "creative",
+    "spatial-computing": "creative"
+  }
+}

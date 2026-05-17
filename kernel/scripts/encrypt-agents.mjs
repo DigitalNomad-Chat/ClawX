@@ -57,7 +57,7 @@ function loadAgentFromDirectory(agentDir) {
   }
 
   // Parse IDENTITY.md
-  const identity = { name: '', nickname: '', emoji: '', creature: '', vibe: '' };
+  const identity = { name: '', nickname: '', emoji: '', creature: '', vibe: '', department: '' };
   if (files['IDENTITY.md']) {
     const lines = files['IDENTITY.md'].split('\n');
     for (const line of lines) {
@@ -73,6 +73,8 @@ function loadAgentFromDirectory(agentDir) {
       if (vibeMatch) identity.vibe = vibeMatch[1];
       const emojiMatch = line.match(/^-\s*\*\*Emoji:\*\*\s*(.+)/);
       if (emojiMatch) identity.emoji = emojiMatch[1];
+      const deptMatch = line.match(/^-\s*\*\*Department:\*\*\s*(.+)/);
+      if (deptMatch) identity.department = deptMatch[1];
     }
   }
 
@@ -122,7 +124,7 @@ function main() {
 
     // Build manifest entry
     const description = extractDescription(files['SOUL.md'] || '');
-    const tags = extractTags(files['SOUL.md'] || '', files['AGENTS.md'] || '');
+    const tags = extractTags(files['SOUL.md'] || '', files['AGENTS.md'] || '', identity.department);
     const scenarios = extractScenarios(files['SOUL.md'] || '');
 
     manifest.agents.push({
@@ -136,6 +138,7 @@ function main() {
       tags,
       scenarios,
       version: '1.0.0',
+      department: identity.department || undefined,
     });
 
     console.log(`[Encrypt] ✓ ${agentId} encrypted`);
@@ -152,14 +155,41 @@ function extractDescription(soul) {
   return firstLine.replace(/^#+\s*/, '').slice(0, 100);
 }
 
-function extractTags(soul, agents) {
+const CATEGORY_MAP = {
+  engineering: '工程',
+  marketing: '营销',
+  'paid-media': '营销',
+  design: '设计',
+  product: '产品',
+  'project-management': '产品',
+  sales: '商务',
+  finance: '商务',
+  hr: '商务',
+  legal: '商务',
+  'supply-chain': '商务',
+  support: '运营',
+  testing: '运营',
+  specialized: '专项',
+  academic: '专项',
+  'game-development': '创意',
+  'spatial-computing': '创意',
+};
+
+function extractTags(soul, agents, department) {
   const tags = [];
-  if (soul.includes('管理')) tags.push('管理');
-  if (soul.includes('创作')) tags.push('创作');
-  if (soul.includes('运营')) tags.push('运营');
-  if (soul.includes('效率')) tags.push('效率');
-  if (soul.includes('文案')) tags.push('文案');
-  if (agents.includes('巡检') || soul.includes('巡检')) tags.push('巡检');
+  // Use department-based category mapping (preferred)
+  if (department && CATEGORY_MAP[department]) {
+    tags.push(CATEGORY_MAP[department]);
+  }
+  // Fallback to keyword matching for legacy agents without department
+  if (tags.length === 0) {
+    if (soul.includes('管理')) tags.push('管理');
+    if (soul.includes('创作')) tags.push('创作');
+    if (soul.includes('运营')) tags.push('运营');
+    if (soul.includes('效率')) tags.push('效率');
+    if (soul.includes('文案')) tags.push('文案');
+    if (agents.includes('巡检') || soul.includes('巡检')) tags.push('巡检');
+  }
   if (tags.length === 0) tags.push('通用');
   return tags;
 }

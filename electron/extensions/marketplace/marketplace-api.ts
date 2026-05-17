@@ -8,9 +8,6 @@ import { resolve } from 'path';
 import { getKernelLauncher } from '../index.js';
 import { registerKernelLLMRoutes } from './kernel-llm-store.js';
 
-/** Cached manifest to avoid repeated disk reads */
-let manifestCache: { agents: MarketplaceAgent[] } | null = null;
-
 function getManifestPath(): string {
   const isDev = !app.isPackaged;
   if (isDev) {
@@ -21,11 +18,9 @@ function getManifestPath(): string {
 }
 
 function readManifest(): { agents: MarketplaceAgent[] } {
-  if (manifestCache) return manifestCache;
   const path = getManifestPath();
   const data = readFileSync(path, 'utf8');
-  manifestCache = JSON.parse(data);
-  return manifestCache!;
+  return JSON.parse(data);
 }
 
 export interface MarketplaceAgent {
@@ -39,6 +34,7 @@ export interface MarketplaceAgent {
   tags: string[];
   scenarios: string[];
   version: string;
+  department?: string;
 }
 
 /** Per-webContents subscription state */

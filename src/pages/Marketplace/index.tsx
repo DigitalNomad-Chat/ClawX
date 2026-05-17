@@ -4,7 +4,10 @@
  */
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Store, Sparkles, Users, PenTool, Zap, Briefcase } from 'lucide-react';
+import {
+  Search, Store, Sparkles, Users, PenTool, Zap, Briefcase,
+  Code, Megaphone, Palette, Package, Settings, Star, Gamepad2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,14 +28,19 @@ interface AgentCardData {
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  管理: <Briefcase className="h-4 w-4" />,
-  创作: <PenTool className="h-4 w-4" />,
-  运营: <Sparkles className="h-4 w-4" />,
-  效率: <Zap className="h-4 w-4" />,
+  全部: <Store className="h-4 w-4" />,
+  工程: <Code className="h-4 w-4" />,
+  营销: <Megaphone className="h-4 w-4" />,
+  设计: <Palette className="h-4 w-4" />,
+  产品: <Package className="h-4 w-4" />,
+  商务: <Briefcase className="h-4 w-4" />,
+  运营: <Settings className="h-4 w-4" />,
+  专项: <Star className="h-4 w-4" />,
+  创意: <Gamepad2 className="h-4 w-4" />,
   通用: <Users className="h-4 w-4" />,
 };
 
-const CATEGORIES = ['全部', '管理', '创作', '运营', '效率'];
+const CATEGORIES = ['全部', '工程', '营销', '设计', '产品', '商务', '运营', '专项', '创意'];
 
 export function Marketplace() {
   const navigate = useNavigate();

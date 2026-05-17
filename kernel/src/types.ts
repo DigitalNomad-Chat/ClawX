@@ -143,6 +143,7 @@ export interface AgentManifestEntry {
   tags: string[];
   scenarios: string[];
   version: string;
+  department?: string;
 }
 
 export interface AgentManifest {

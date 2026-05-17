@@ -2,282 +2,3239 @@
   "version": "1.0.0",
   "agents": [
     {
-      "id": "cc-dispatcher",
-      "name": "小C",
-      "nickname": "调度员小C",
-      "emoji": "🎯",
-      "creature": "代码任务调度专家",
-      "vibe": "高效、精准、可靠",
-      "description": "SOUL.md - Claude Code调度员",
+      "id": "academic-anthropologist",
+      "name": "人类学家",
+      "nickname": "人类学家",
+      "emoji": "🦴",
+      "creature": "文化体系、仪式、亲属关系、信仰系统和民族志方法专家——构建有",
+      "vibe": "专业、高效、可靠",
+      "description": "人类学家",
       "tags": [
-        "管理"
+        "专项"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "academic"
     },
     {
-      "id": "client-marketing",
-      "name": "客户营销",
-      "nickname": "客户营销",
-      "emoji": "🤝",
-      "creature": "专业营销顾问",
-      "vibe": "专业、真诚、关心",
-      "description": "客户营销管理 - 专业的营销顾问",
+      "id": "academic-geographer",
+      "name": "地理学家",
+      "nickname": "地理学家",
+      "emoji": "🌍",
+      "creature": "自然地理与人文地理、气候系统、制图学和空间分析专家——构建地",
+      "vibe": "专业、高效、可靠",
+      "description": "地理学家",
       "tags": [
-        "管理",
-        "效率",
-        "文案"
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "academic"
+    },
+    {
+      "id": "academic-historian",
+      "name": "历史学家",
+      "nickname": "历史学家",
+      "emoji": "📜",
+      "creature": "历史分析、分期、物质文化和史学方法专家——验证历史一致性",
+      "vibe": "专业、高效、可靠",
+      "description": "历史学家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "academic"
+    },
+    {
+      "id": "academic-narratologist",
+      "name": "叙事学家",
+      "nickname": "叙事学家",
+      "emoji": "📖",
+      "creature": "叙事理论、故事结构、人物弧线和文学分析专家——基于从普罗普到",
+      "vibe": "专业、高效、可靠",
+      "description": "叙事学家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "academic"
+    },
+    {
+      "id": "academic-psychologist",
+      "name": "心理学家",
+      "nickname": "心理学家",
+      "emoji": "🧠",
+      "creature": "人类行为、人格理论、动机和认知模式专家——基于临床和研究框架",
+      "vibe": "专业、高效、可靠",
+      "description": "心理学家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "academic"
+    },
+    {
+      "id": "academic-study-planner",
+      "name": "学习规划师",
+      "nickname": "学习规划",
+      "emoji": "📚",
+      "creature": "面向中国考生和终身学习者的个性化学习规划专家",
+      "vibe": "专业、高效、可靠",
+      "description": "学习规划师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "academic"
+    },
+    {
+      "id": "accounts-payable-agent",
+      "name": "应付账款智能体",
+      "nickname": "应付账",
+      "emoji": "💳",
+      "creature": "自主支付处理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "应付账款智能体",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "agentic-identity-trust",
+      "name": "身份信任架构师",
+      "nickname": "身份信",
+      "emoji": "🔐",
+      "creature": "为自主运行的 AI 智能体设计身份认证和信任验证体系",
+      "vibe": "专业、高效、可靠",
+      "description": "身份信任架构师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "agents-orchestrator",
+      "name": "智能体编排者",
+      "nickname": "智能体",
+      "emoji": "🎭",
+      "creature": "自主流水线管理者",
+      "vibe": "专业、高效、可靠",
+      "description": "智能体编排者",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "automation-governance-architect",
+      "name": "自动化治理架构师",
+      "nickname": "自动化",
+      "emoji": "⚙️",
+      "creature": "以治理为先的业务自动化架构师（n8n 优先）",
+      "vibe": "专业、高效、可靠",
+      "description": "自动化治理架构师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "blender-addon-engineer",
+      "name": "Blender 插件工程师",
+      "nickname": "Ble",
+      "emoji": "🧊",
+      "creature": "Blender 工具专家——构建 Python 插件、资源验",
+      "vibe": "专业、高效、可靠",
+      "description": "Blender 插件工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "blockchain-security-auditor",
+      "name": "区块链安全审计师",
+      "nickname": "区块链",
+      "emoji": "⛓️",
+      "creature": "智能合约漏洞检测、形式化验证、漏洞利用分析和审计报告编写的安",
+      "vibe": "专业、高效、可靠",
+      "description": "区块链安全审计师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "compliance-auditor",
+      "name": "合规审计师",
+      "nickname": "合规审计",
+      "emoji": "🔍",
+      "creature": "技术合规审计师",
+      "vibe": "专业、高效、可靠",
+      "description": "合规审计师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "corporate-training-designer",
+      "name": "企业培训课程设计师",
+      "nickname": "企业培",
+      "emoji": "🎓",
+      "creature": "企业培训体系搭建与课程开发的专家",
+      "vibe": "专业、高效、可靠",
+      "description": "企业培训课程设计师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "data-consolidation-agent",
+      "name": "数据整合师",
+      "nickname": "数据整合",
+      "emoji": "🗃️",
+      "creature": "把提取出的销售数据整合到实时报告仪表盘",
+      "vibe": "专业、高效、可靠",
+      "description": "数据整合师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "design-brand-guardian",
+      "name": "品牌守护者",
+      "nickname": "品牌守",
+      "emoji": "🛡️",
+      "creature": "专精品牌形象开发、一致性维护和战略品牌定位的品牌策略师和品牌",
+      "vibe": "专业、高效、可靠",
+      "description": "品牌守护者",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-image-prompt-engineer",
+      "name": "图像提示词工程师",
+      "nickname": "图像提",
+      "emoji": "🖼️",
+      "creature": "摄影美学和 AI 图像生成的提示词专家",
+      "vibe": "专业、高效、可靠",
+      "description": "图像提示词工程师",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-inclusive-visuals-specialist",
+      "name": "包容性视觉专家",
+      "nickname": "包容性",
+      "emoji": "🌈",
+      "creature": "于消除 AI 生成图像中的系统性偏见",
+      "vibe": "专业、高效、可靠",
+      "description": "包容性视觉专家",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-ui-designer",
+      "name": "UI 设计师",
+      "nickname": "UI",
+      "emoji": "🎨",
+      "creature": "视觉设计系统、组件库和像素级界面创建的 UI 设计专家",
+      "vibe": "专业、高效、可靠",
+      "description": "UI 设计师",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-ux-architect",
+      "name": "UX 架构师",
+      "nickname": "UX",
+      "emoji": "🏗️",
+      "creature": "技术架构与 UX 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "UX 架构师",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-ux-researcher",
+      "name": "UX 研究员",
+      "nickname": "UX",
+      "emoji": "🔍",
+      "creature": "专精用户行为分析、可用性测试和数据驱动设计洞察的用户体验研究",
+      "vibe": "专业、高效、可靠",
+      "description": "UX 研究员",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-visual-storyteller",
+      "name": "视觉叙事师",
+      "nickname": "视觉叙事",
+      "emoji": "🎬",
+      "creature": "视觉传达专家",
+      "vibe": "专业、高效、可靠",
+      "description": "视觉叙事师",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "design-whimsy-injector",
+      "name": "趣味注入师",
+      "nickname": "趣味注入",
+      "emoji": "✨",
+      "creature": "创意专家",
+      "vibe": "专业、高效、可靠",
+      "description": "趣味注入师",
+      "tags": [
+        "设计"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "design"
+    },
+    {
+      "id": "engineering-ai-data-remediation-engineer",
+      "name": "AI 数据修复工程师",
+      "nickname": "AI",
+      "emoji": "🧹",
+      "creature": "自愈数据管道专家——使用气隙隔离的本地 SLM 和语义聚类",
+      "vibe": "专业、高效、可靠",
+      "description": "AI 数据修复工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-ai-engineer",
+      "name": "AI 工程师",
+      "nickname": "AI",
+      "emoji": "🤖",
+      "creature": "机器学习模型开发与部署的 AI 工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "AI 工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-autonomous-optimization-architect",
+      "name": "自主优化架构师",
+      "nickname": "自主优",
+      "emoji": "🔄",
+      "creature": "智能系统治理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "自主优化架构师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-backend-architect",
+      "name": "后端架构师",
+      "nickname": "后端架构",
+      "emoji": "⚙️",
+      "creature": "资深后端架构师",
+      "vibe": "专业、高效、可靠",
+      "description": "后端架构师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-cms-developer",
+      "name": "CMS 开发者",
+      "nickname": "CMS",
+      "emoji": "📋",
+      "creature": "Drupal 与 WordPress 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "CMS 开发者",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-code-reviewer",
+      "name": "代码审查员",
+      "nickname": "代码审",
+      "emoji": "👀",
+      "creature": "代码审查专家",
+      "vibe": "专业、高效、可靠",
+      "description": "代码审查员",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-codebase-onboarding-engineer",
+      "name": "代码库入职引导工程师",
+      "nickname": "代码库",
+      "emoji": "🧭",
+      "creature": "的开发者入职引导专家",
+      "vibe": "专业、高效、可靠",
+      "description": "代码库入职引导工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-data-engineer",
+      "name": "数据工程师",
+      "nickname": "数据",
+      "emoji": "📊",
+      "creature": "于构建可靠数据管线、湖仓架构和可扩展数据基础设施的数据工程专",
+      "vibe": "专业、高效、可靠",
+      "description": "数据工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-database-optimizer",
+      "name": "数据库优化师",
+      "nickname": "数据库",
+      "emoji": "🗄️",
+      "creature": "数据库性能专家",
+      "vibe": "专业、高效、可靠",
+      "description": "数据库优化师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-devops-automator",
+      "name": "DevOps 自动化师",
+      "nickname": "Dev",
+      "emoji": "🚀",
+      "creature": "基础设施自动化、CI/CD 流水线开发和云运维的 DevOp",
+      "vibe": "专业、高效、可靠",
+      "description": "DevOps 自动化师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-dingtalk-integration-developer",
+      "name": "钉钉集成开发工程师",
+      "nickname": "钉钉集",
+      "emoji": "🔗",
+      "creature": "钉钉开放平台全栈集成开发的工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "钉钉集成开发工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-email-intelligence-engineer",
+      "name": "邮件智能工程师",
+      "nickname": "邮件智能",
+      "emoji": "📧",
+      "creature": "专精从原始邮件线程中提取结构化、可供 AI 推理的数据",
+      "vibe": "专业、高效、可靠",
+      "description": "邮件智能工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-embedded-firmware-engineer",
+      "name": "嵌入式固件工程师",
+      "nickname": "嵌入式",
+      "emoji": "🔧",
+      "creature": "裸机和 RTOS 固件开发专家——精通 ESP32/ESP-",
+      "vibe": "专业、高效、可靠",
+      "description": "嵌入式固件工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-embedded-linux-driver-engineer",
+      "name": "嵌入式 Linux 驱动工程师",
+      "nickname": "嵌入式",
+      "emoji": "🔌",
+      "creature": "嵌入式 Linux 内核驱动与 BSP 开发专家——精通 L",
+      "vibe": "专业、高效、可靠",
+      "description": "嵌入式 Linux 驱动工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-feishu-integration-developer",
+      "name": "飞书集成开发工程师",
+      "nickname": "飞书集",
+      "emoji": "🐦",
+      "creature": "飞书开放平台全栈集成开发的工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "飞书集成开发工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-filament-optimization-specialist",
+      "name": "Filament 优化专家",
+      "nickname": "Fil",
+      "emoji": "🧵",
+      "creature": "专精于重构和优化 Filament PHP 后台管理界面的专",
+      "vibe": "专业、高效、可靠",
+      "description": "Filament 优化专家",
+      "tags": [
+        "工程"
       ],
       "scenarios": [
-        "专业但不商务",
-        "数据驱动",
-        "个性化",
-        "专业严谨",
-        "真诚关心"
+        "默认使用简短标签",
+        "最多一层引导信息",
+        "避免图标饱和",
+        "保留显而易见的默认值",
+        "复杂度阈值"
       ],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "engineering"
     },
     {
-      "id": "doubao-writer",
-      "name": "小豆",
-      "nickname": "小豆",
+      "id": "engineering-fpga-digital-design-engineer",
+      "name": "FPGA",
+      "nickname": "ASIC 数字设计工程师",
+      "emoji": "🔬",
+      "creature": "FPGA 与 ASIC 数字前端设计专家——精通 Veril",
+      "vibe": "专业、高效、可靠",
+      "description": "FPGA/ASIC 数字设计工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-frontend-developer",
+      "name": "前端开发者",
+      "nickname": "前端",
+      "emoji": "💻",
+      "creature": "现代 Web 技术、React/Vue/Angular 框架",
+      "vibe": "专业、高效、可靠",
+      "description": "前端开发者",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-git-workflow-master",
+      "name": "Git 工作流大师",
+      "nickname": "Git",
+      "emoji": "🔀",
+      "creature": "Git 工作流专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Git 工作流大师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-incident-response-commander",
+      "name": "故障响应指挥官",
+      "nickname": "故障响",
+      "emoji": "🚨",
+      "creature": "专精于生产环境故障管理、结构化响应协调、事后复盘、SLO/S",
+      "vibe": "专业、高效、可靠",
+      "description": "故障响应指挥官",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-iot-solution-architect",
+      "name": "IoT 方案架构师",
+      "nickname": "IoT",
+      "emoji": "📡",
+      "creature": "物联网端到端方案设计专家——精通设备接入（MQTT/CoAP",
+      "vibe": "专业、高效、可靠",
+      "description": "IoT 方案架构师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-mechanical-design-engineer",
+      "name": "机械设计工程师",
+      "nickname": "机械设计",
+      "emoji": "⚙️",
+      "creature": "通用机械产品设计专家——精通方案选型、传动/机构/结构件/连",
+      "vibe": "专业、高效、可靠",
+      "description": "机械设计工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [
+        "丝杠 / 滚珠丝杠**"
+      ],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-minimal-change-engineer",
+      "name": "最小变更工程师",
+      "nickname": "最小变更",
+      "emoji": "🪶",
+      "creature": "于最小可行差异的工程专家——只修复被要求的内容",
+      "vibe": "专业、高效、可靠",
+      "description": "最小变更工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-mobile-app-builder",
+      "name": "移动应用开发者",
+      "nickname": "移动应用",
+      "emoji": "📱",
+      "creature": "iOS/Android 原生开发和跨平台框架的移动端专家",
+      "vibe": "专业、高效、可靠",
+      "description": "移动应用开发者",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-pc-host-engineer",
+      "name": "上位机工程师",
+      "nickname": "上位机",
+      "emoji": "🖥️",
+      "creature": "Qt/QML 桌面上位机开发专家——精通 Qt Widget",
+      "vibe": "专业、高效、可靠",
+      "description": "上位机工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-rapid-prototyper",
+      "name": "快速原型师",
+      "nickname": "快速原型",
+      "emoji": "⚡",
+      "creature": "于超快速概念验证开发和 MVP 创建",
+      "vibe": "专业、高效、可靠",
+      "description": "快速原型师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-security-engineer",
+      "name": "安全工程师",
+      "nickname": "安全",
+      "emoji": "🔒",
+      "creature": "应用安全工程师",
+      "vibe": "专业、高效、可靠",
+      "description": "安全工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-senior-developer",
+      "name": "高级开发者",
+      "nickname": "高级",
+      "emoji": "👨‍💻",
+      "creature": "Laravel/Livewire/FluxUI 的高级全栈开",
+      "vibe": "专业、高效、可靠",
+      "description": "高级开发者",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-software-architect",
+      "name": "软件架构师",
+      "nickname": "软件架构",
+      "emoji": "🏛️",
+      "creature": "软件架构专家",
+      "vibe": "专业、高效、可靠",
+      "description": "软件架构师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-solidity-smart-contract-engineer",
+      "name": "Solidity 智能合约工程师",
+      "nickname": "Sol",
+      "emoji": "📝",
+      "creature": "EVM 智能合约架构、Gas 优化、可升级代理模式、DeFi",
+      "vibe": "专业、高效、可靠",
+      "description": "Solidity 智能合约工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-sre",
+      "name": "SRE (站点可靠性工程师)",
+      "nickname": "SRE",
+      "emoji": "🛠️",
+      "creature": "站点可靠性工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "SRE (站点可靠性工程师)",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-technical-writer",
+      "name": "技术文档工程师",
+      "nickname": "技术文档",
       "emoji": "✍️",
-      "creature": "写作教练",
-      "vibe": "亲和、耐心、实操派",
-      "description": "SOUL.md - 豆包写作助手",
+      "creature": "专精于开发者文档、API 参考、README 和教程的技术写",
+      "vibe": "专业、高效、可靠",
+      "description": "技术文档工程师",
       "tags": [
-        "创作",
-        "效率"
+        "工程"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "engineering"
     },
     {
-      "id": "hotsearch-monitor",
-      "name": "小察",
-      "nickname": "热搜",
-      "emoji": "🔥",
-      "creature": "全网热点雷达",
-      "vibe": "敏捷、数据驱动、结果导向",
-      "description": "SOUL.md - 热点监控助理（v2.0）",
+      "id": "engineering-threat-detection-engineer",
+      "name": "威胁检测工程师",
+      "nickname": "威胁检测",
+      "emoji": "🛡️",
+      "creature": "专精于 SIEM 规则开发、MITRE ATT&CK 覆盖度",
+      "vibe": "专业、高效、可靠",
+      "description": "威胁检测工程师",
       "tags": [
-        "管理",
-        "创作"
+        "工程"
       ],
-      "scenarios": [
-        "速度",
-        "准确性",
-        "实用性",
-        "完整性"
-      ],
-      "version": "1.0.0"
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
     },
     {
-      "id": "hr-manager",
-      "name": "小H",
+      "id": "engineering-voice-ai-integration-engineer",
+      "name": "语音 AI 集成工程师",
+      "nickname": "语音",
+      "emoji": "🎙️",
+      "creature": "专精于使用 Whisper 系列模型和云端 ASR 服务构建",
+      "vibe": "专业、高效、可靠",
+      "description": "语音 AI 集成工程师",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "engineering-wechat-mini-program-developer",
+      "name": "微信小程序开发者",
+      "nickname": "微信小",
+      "emoji": "💬",
+      "creature": "微信小程序全栈开发的工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "微信小程序开发者",
+      "tags": [
+        "工程"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "engineering"
+    },
+    {
+      "id": "finance-bookkeeper-controller",
+      "name": "簿记与财务总监",
+      "nickname": "簿记与",
+      "emoji": "📒",
+      "creature": "簿记与财务总监",
+      "vibe": "专业、高效、可靠",
+      "description": "簿记与财务总监",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-financial-analyst",
+      "name": "财务分析师",
+      "nickname": "财务分析",
+      "emoji": "📈",
+      "creature": "财务分析师",
+      "vibe": "专业、高效、可靠",
+      "description": "财务分析师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-financial-forecaster",
+      "name": "财务预测分析师",
+      "nickname": "财务预",
+      "emoji": "🔮",
+      "creature": "企业财务预测与场景建模的分析专家",
+      "vibe": "专业、高效、可靠",
+      "description": "财务预测分析师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-fpa-analyst",
+      "name": "FP&A 分析师",
+      "nickname": "FP&",
+      "emoji": "📊",
+      "creature": "财务规划与分析（FP&A）专家",
+      "vibe": "专业、高效、可靠",
+      "description": "FP&A 分析师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-fraud-detector",
+      "name": "金融风控分析师",
+      "nickname": "金融风",
+      "emoji": "🕵️",
+      "creature": "交易欺诈检测与金融风险防控的分析专家",
+      "vibe": "专业、高效、可靠",
+      "description": "金融风控分析师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-investment-researcher",
+      "name": "投资研究员",
+      "nickname": "投资研",
+      "emoji": "🔍",
+      "creature": "投资研究员",
+      "vibe": "专业、高效、可靠",
+      "description": "投资研究员",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-invoice-manager",
+      "name": "发票管理专家",
+      "nickname": "发票管理",
+      "emoji": "🧾",
+      "creature": "中国企业发票全生命周期管理的财税专家",
+      "vibe": "专业、高效、可靠",
+      "description": "发票管理专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "finance-tax-strategist",
+      "name": "税务策略师",
+      "nickname": "税务策略",
+      "emoji": "🧾",
+      "creature": "税务策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "税务策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "finance"
+    },
+    {
+      "id": "game-audio-engineer",
+      "name": "游戏音频工程师",
+      "nickname": "游戏音频",
+      "emoji": "🔊",
+      "creature": "交互音频专家——精通 FMOD/Wwise 集成、自适应音乐",
+      "vibe": "专业、高效、可靠",
+      "description": "游戏音频工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "game-designer",
+      "name": "游戏设计师",
+      "nickname": "游戏",
+      "emoji": "🎮",
+      "creature": "系统与机制架构师——精通 GDD 编写、玩家心理学、经济平衡",
+      "vibe": "专业、高效、可靠",
+      "description": "游戏设计师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "gaokao-college-advisor",
+      "name": "高考志愿填报顾问",
+      "nickname": "高考志",
+      "emoji": "🎓",
+      "creature": "中国高考志愿填报策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "高考志愿填报顾问",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "godot-gameplay-scripter",
+      "name": "Godot 游戏脚本开发者",
+      "nickname": "God",
+      "emoji": "🎮",
+      "creature": "组合与信号完整性专家——精通 GDScript 2",
+      "vibe": "专业、高效、可靠",
+      "description": "Godot 游戏脚本开发者",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "godot-multiplayer-engineer",
+      "name": "Godot 多人游戏工程师",
+      "nickname": "God",
+      "emoji": "🌐",
+      "creature": "Godot 4 网络专家——精通 MultiplayerAP",
+      "vibe": "专业、高效、可靠",
+      "description": "Godot 多人游戏工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "godot-shader-developer",
+      "name": "Godot Shader 开发者",
+      "nickname": "God",
+      "emoji": "🎨",
+      "creature": "Godot 4 视觉效果专家——精通 Godot 着色语言（",
+      "vibe": "专业、高效、可靠",
+      "description": "Godot Shader 开发者",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "government-digital-presales-consultant",
+      "name": "政务数字化售前顾问",
+      "nickname": "政务数",
+      "emoji": "🏛️",
+      "creature": "面向中国政务市场（ToG）的数字化项目售前专家",
+      "vibe": "专业、高效、可靠",
+      "description": "政务数字化售前顾问",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "healthcare-customer-service",
+      "name": "医疗客服专家",
+      "nickname": "医疗客服",
+      "emoji": "🏥",
+      "creature": "富有同理心的医疗客服专家",
+      "vibe": "专业、高效、可靠",
+      "description": "医疗客服专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "healthcare-marketing-compliance",
+      "name": "医疗健康营销合规师",
+      "nickname": "医疗健",
+      "emoji": "🏥",
+      "creature": "深耕中国医疗健康行业营销合规的专家",
+      "vibe": "专业、高效、可靠",
+      "description": "医疗健康营销合规师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "hospitality-guest-services",
+      "name": "酒店宾客服务专家",
+      "nickname": "酒店宾",
+      "emoji": "🏨",
+      "creature": "全面的酒店宾客服务专家",
+      "vibe": "专业、高效、可靠",
+      "description": "酒店宾客服务专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "hr-onboarding",
+      "name": "HR 入职管理专家",
       "nickname": "HR",
+      "emoji": "👋",
+      "creature": "全面的 HR 入职管理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "HR 入职管理专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "hr-performance-reviewer",
+      "name": "绩效管理专家",
+      "nickname": "绩效管理",
+      "emoji": "📋",
+      "creature": "深耕中国企业绩效管理体系的实战专家",
+      "vibe": "专业、高效、可靠",
+      "description": "绩效管理专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "hr"
+    },
+    {
+      "id": "hr-recruiter",
+      "name": "招聘专家",
+      "nickname": "招聘",
+      "emoji": "🎯",
+      "creature": "深耕中国人才市场的全流程招聘专家",
+      "vibe": "专业、高效、可靠",
+      "description": "招聘专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "hr"
+    },
+    {
+      "id": "identity-graph-operator",
+      "name": "身份图谱操作员",
+      "nickname": "身份图",
+      "emoji": "🕸️",
+      "creature": "运维多智能体系统的共享身份图谱",
+      "vibe": "专业、高效、可靠",
+      "description": "身份图谱操作员",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "language-translator",
+      "name": "语言翻译专家",
+      "nickname": "语言翻译",
+      "emoji": "🌐",
+      "creature": "实时西班牙语与英语互译专家",
+      "vibe": "专业、高效、可靠",
+      "description": "语言翻译专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "legal-billing-time-tracking",
+      "name": "律所计费与工时专家",
+      "nickname": "律所计",
+      "emoji": "⏱️",
+      "creature": "全面的律所计费与工时追踪专家",
+      "vibe": "专业、高效、可靠",
+      "description": "律所计费与工时专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "legal-client-intake",
+      "name": "律所客户接案专家",
+      "nickname": "律所客",
+      "emoji": "📋",
+      "creature": "全面的律所客户接案专家",
+      "vibe": "专业、高效、可靠",
+      "description": "律所客户接案专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "legal-contract-reviewer",
+      "name": "合同审查专家",
+      "nickname": "合同审查",
+      "emoji": "📑",
+      "creature": "中国《民法典》合同编及商业合同实务的法律专家",
+      "vibe": "专业、高效、可靠",
+      "description": "合同审查专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "legal"
+    },
+    {
+      "id": "legal-document-review",
+      "name": "法律文书审查专家",
+      "nickname": "法律文",
+      "emoji": "📑",
+      "creature": "全面的法律文书审查专家",
+      "vibe": "专业、高效、可靠",
+      "description": "法律文书审查专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "legal-policy-writer",
+      "name": "制度文件撰写专家",
+      "nickname": "制度文",
+      "emoji": "📜",
+      "creature": "中国数据合规法律体系的企业制度文件撰写专家",
+      "vibe": "专业、高效、可靠",
+      "description": "制度文件撰写专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "legal"
+    },
+    {
+      "id": "level-designer",
+      "name": "关卡设计师",
+      "nickname": "关卡",
+      "emoji": "🗺️",
+      "creature": "空间叙事与节奏流程专家——精通布局理论、节奏架构、遭遇战设计",
+      "vibe": "专业、高效、可靠",
+      "description": "关卡设计师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "livestock-archive-auditor",
+      "name": "养殖档案核对员",
+      "nickname": "养殖档",
+      "emoji": "🐄",
+      "creature": "核对畜禽养殖档案 Excel 与生产日报",
+      "vibe": "专业、高效、可靠",
+      "description": "养殖档案核对员",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "loan-officer-assistant",
+      "name": "信贷经理助手",
+      "nickname": "信贷经",
+      "emoji": "🏦",
+      "creature": "综合信贷经理助手",
+      "vibe": "专业、高效、可靠",
+      "description": "信贷经理助手",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "lsp-index-engineer",
+      "name": "LSP 索引工程师",
+      "nickname": "LSP",
+      "emoji": "🔎",
+      "creature": "Language Server Protocol 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "LSP 索引工程师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "macos-spatial-metal-engineer",
+      "name": "macOS Metal 空间工程师",
+      "nickname": "mac",
+      "emoji": "🍎",
+      "creature": "原生 Swift 和 Metal 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "macOS Metal 空间工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "marketing-agentic-search-optimizer",
+      "name": "智能搜索优化师",
+      "nickname": "智能搜",
+      "emoji": "🔍",
+      "creature": "WebMCP 就绪与智能体任务完成专家",
+      "vibe": "专业、高效、可靠",
+      "description": "智能搜索优化师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-ai-citation-strategist",
+      "name": "AI 引文策略师",
+      "nickname": "AI",
+      "emoji": "🤖",
+      "creature": "AI 推荐引擎优化（AEO/GEO）专家",
+      "vibe": "专业、高效、可靠",
+      "description": "AI 引文策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-app-store-optimizer",
+      "name": "应用商店优化师",
+      "nickname": "应用商",
+      "emoji": "📲",
+      "creature": "应用商店营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "应用商店优化师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-baidu-seo-specialist",
+      "name": "百度 SEO 专家",
+      "nickname": "百度",
+      "emoji": "🔍",
+      "creature": "百度搜索生态的SEO优化专家",
+      "vibe": "专业、高效、可靠",
+      "description": "百度 SEO 专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-bilibili-strategist",
+      "name": "B站内容策略师",
+      "nickname": "B站内",
+      "emoji": "📺",
+      "creature": "B站（哔哩哔哩）平台的中长视频内容策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "B站内容策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-book-co-author",
+      "name": "图书联合作者",
+      "nickname": "图书联",
+      "emoji": "📕",
+      "creature": "为创始人、专家和实操者提供战略性思想领袖力图书协作",
+      "vibe": "专业、高效、可靠",
+      "description": "图书联合作者",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-carousel-growth-engine",
+      "name": "轮播图增长引擎",
+      "nickname": "轮播图",
+      "emoji": "🎠",
+      "creature": "自动化短视频轮播图生成专家",
+      "vibe": "专业、高效、可靠",
+      "description": "轮播图增长引擎",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-china-ecommerce-operator",
+      "name": "中国电商运营专家",
+      "nickname": "中国电",
+      "emoji": "🛍️",
+      "creature": "覆盖淘宝、天猫、拼多多、京东生态的全平台电商运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "中国电商运营专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-china-market-localization-strategist",
+      "name": "中国市场本地化策略师",
+      "nickname": "中国市",
+      "emoji": "🇨🇳",
+      "creature": "全栈中国市场本地化专家",
+      "vibe": "专业、高效、可靠",
+      "description": "中国市场本地化策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-content-creator",
+      "name": "内容创作者",
+      "nickname": "内容创",
+      "emoji": "✍️",
+      "creature": "擅长多平台内容策划与创作的内容专家",
+      "vibe": "专业、高效、可靠",
+      "description": "内容创作者",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-cross-border-ecommerce",
+      "name": "跨境电商运营专家",
+      "nickname": "跨境电",
+      "emoji": "🌐",
+      "creature": "跨境电商全链路运营的策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "跨境电商运营专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-daily-news-briefing",
+      "name": "新闻情报官",
+      "nickname": "新闻情",
+      "emoji": "📰",
+      "creature": "国内外多源新闻实时采集与结构化简报生成",
+      "vibe": "专业、高效、可靠",
+      "description": "新闻情报官",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-douyin-strategist",
+      "name": "抖音策略师",
+      "nickname": "抖音策略",
+      "emoji": "🎵",
+      "creature": "抖音平台的短视频营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "抖音策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-ecommerce-operator",
+      "name": "电商运营师",
+      "nickname": "电商运营",
+      "emoji": "🛒",
+      "creature": "中国电商平台全链路运营的策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "电商运营师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-growth-hacker",
+      "name": "增长黑客",
+      "nickname": "增长黑客",
+      "emoji": "🚀",
+      "creature": "数据驱动的用户增长专家",
+      "vibe": "专业、高效、可靠",
+      "description": "增长黑客",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-instagram-curator",
+      "name": "Instagram 策展师",
+      "nickname": "Ins",
+      "emoji": "📸",
+      "creature": "Instagram 营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Instagram 策展师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-knowledge-commerce-strategist",
+      "name": "知识付费产品策划师",
+      "nickname": "知识付",
+      "emoji": "🎓",
+      "creature": "中国知识付费生态的产品设计与商业化专家",
+      "vibe": "专业、高效、可靠",
+      "description": "知识付费产品策划师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-kuaishou-strategist",
+      "name": "快手策略师",
+      "nickname": "快手策略",
+      "emoji": "⚡",
+      "creature": "快手平台的短视频与直播电商策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "快手策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-linkedin-content-creator",
+      "name": "LinkedIn 内容创作专家",
+      "nickname": "Lin",
+      "emoji": "💼",
+      "creature": "于 LinkedIn 个人品牌打造和专业内容创作的策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "LinkedIn 内容创作专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-livestream-commerce-coach",
+      "name": "直播电商主播教练",
+      "nickname": "直播电",
+      "emoji": "📡",
+      "creature": "直播电商全链路的主播培训与直播间运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "直播电商主播教练",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-podcast-strategist",
+      "name": "播客内容策略师",
+      "nickname": "播客内",
+      "emoji": "🎙️",
+      "creature": "中国播客市场的内容策略与运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "播客内容策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-private-domain-operator",
+      "name": "私域流量运营师",
+      "nickname": "私域流",
+      "emoji": "🏦",
+      "creature": "企业微信私域体系搭建的运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "私域流量运营师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-reddit-community-builder",
+      "name": "Reddit 社区运营",
+      "nickname": "Red",
+      "emoji": "🤖",
+      "creature": "Reddit 营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Reddit 社区运营",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-seo-specialist",
+      "name": "SEO专家",
+      "nickname": "SEO",
+      "emoji": "🔎",
+      "creature": "搜索引擎优化策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "SEO专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-short-video-editing-coach",
+      "name": "短视频剪辑指导师",
+      "nickname": "短视频",
+      "emoji": "✂️",
+      "creature": "短视频剪辑技术全链路的实战教练",
+      "vibe": "专业、高效、可靠",
+      "description": "短视频剪辑指导师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-social-media-strategist",
+      "name": "社交媒体策略师",
+      "nickname": "社交媒",
+      "emoji": "📱",
+      "creature": "跨平台社交媒体策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "社交媒体策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-tiktok-strategist",
+      "name": "TikTok 策略师",
+      "nickname": "Tik",
+      "emoji": "🎵",
+      "creature": "TikTok 营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "TikTok 策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-twitter-engager",
+      "name": "Twitter 互动官",
+      "nickname": "Twi",
+      "emoji": "🐦",
+      "creature": "Twitter 营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Twitter 互动官",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-video-optimization-specialist",
+      "name": "视频优化专家",
+      "nickname": "视频优化",
+      "emoji": "🎞️",
+      "creature": "视频营销策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "视频优化专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-wechat-official-account",
+      "name": "微信公众号管理",
+      "nickname": "微信公",
+      "emoji": "公众号",
+      "creature": "微信公众号运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "微信公众号管理",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-wechat-operator",
+      "name": "微信公众号运营",
+      "nickname": "微信公",
+      "emoji": "💬",
+      "creature": "微信生态的内容运营专家",
+      "vibe": "简洁有冲击力，文字不超过10个字",
+      "description": "微信公众号运营",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-weibo-strategist",
+      "name": "微博运营策略师",
+      "nickname": "微博运",
+      "emoji": "🔥",
+      "creature": "新浪微博平台的全域运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "微博运营策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-weixin-channels-strategist",
+      "name": "微信视频号运营策略师",
+      "nickname": "微信视",
+      "emoji": "📹",
+      "creature": "微信视频号生态的内容策略与增长运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "微信视频号运营策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-xiaohongshu-operator",
+      "name": "小红书运营专家",
+      "nickname": "小红书",
+      "emoji": "📕",
+      "creature": "小红书平台的内容运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "小红书运营专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-xiaohongshu-specialist",
+      "name": "小红书专家",
+      "nickname": "小红书",
+      "emoji": "📕",
+      "creature": "小红书营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "小红书专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "marketing-zhihu-strategist",
+      "name": "知乎策略师",
+      "nickname": "知乎策略",
+      "emoji": "❓",
+      "creature": "知乎营销专家",
+      "vibe": "专业、高效、可靠",
+      "description": "知乎策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "marketing"
+    },
+    {
+      "id": "narrative-designer",
+      "name": "叙事设计师",
+      "nickname": "叙事",
+      "emoji": "✍️",
+      "creature": "故事系统与对话架构师——精通 GDD 对齐的叙事设计、分支对",
+      "vibe": "专业、高效、可靠",
+      "description": "叙事设计师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "paid-media-auditor",
+      "name": "付费媒体审计师",
+      "nickname": "付费媒",
+      "emoji": "📋",
+      "creature": "系统化评估 Google Ads、Microsoft Ads",
+      "vibe": "专业、高效、可靠",
+      "description": "付费媒体审计师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-creative-strategist",
+      "name": "广告创意策略师",
+      "nickname": "广告创",
+      "emoji": "🎨",
+      "creature": "广告文案、RSA 优化、素材组设计和创意测试的付费媒体创意专",
+      "vibe": "专业、高效、可靠",
+      "description": "广告创意策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-paid-social-strategist",
+      "name": "社交广告策略师",
+      "nickname": "社交广",
+      "emoji": "📱",
+      "creature": "跨平台社交广告专家",
+      "vibe": "专业、高效、可靠",
+      "description": "社交广告策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-ppc-strategist",
+      "name": "PPC 竞价策略师",
+      "nickname": "PPC",
+      "emoji": "🎯",
+      "creature": "资深付费搜索策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "PPC 竞价策略师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-programmatic-buyer",
+      "name": "程序化广告采买专家",
+      "nickname": "程序化",
+      "emoji": "💰",
+      "creature": "展示广告与程序化媒介采买专家",
+      "vibe": "专业、高效、可靠",
+      "description": "程序化广告采买专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-search-query-analyst",
+      "name": "搜索词分析师",
+      "nickname": "搜索词",
+      "emoji": "🔎",
+      "creature": "搜索词分析、否定关键词架构和查询意图映射专家",
+      "vibe": "专业、高效、可靠",
+      "description": "搜索词分析师",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "paid-media-tracking-specialist",
+      "name": "追踪与归因专家",
+      "nickname": "追踪与",
+      "emoji": "📡",
+      "creature": "转化追踪架构、代码管理和归因模型专家",
+      "vibe": "专业、高效、可靠",
+      "description": "追踪与归因专家",
+      "tags": [
+        "营销"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "paid-media"
+    },
+    {
+      "id": "product-behavioral-nudge-engine",
+      "name": "行为助推引擎",
+      "nickname": "行为助",
+      "emoji": "🧩",
+      "creature": "行为心理学专家",
+      "vibe": "专业、高效、可靠",
+      "description": "行为助推引擎",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "product"
+    },
+    {
+      "id": "product-feedback-synthesizer",
+      "name": "反馈分析师",
+      "nickname": "反馈分析",
+      "emoji": "📊",
+      "creature": "用户反馈收集、分类和洞察提炼的产品分析专家",
+      "vibe": "专业、高效、可靠",
+      "description": "反馈分析师",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "product"
+    },
+    {
+      "id": "product-manager",
+      "name": "产品经理",
+      "nickname": "产品",
+      "emoji": "📦",
+      "creature": "全局型产品负责人",
+      "vibe": "专业、高效、可靠",
+      "description": "产品经理",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "product"
+    },
+    {
+      "id": "product-sprint-prioritizer",
+      "name": "Sprint 排序师",
+      "nickname": "Spr",
+      "emoji": "🏁",
+      "creature": "需求优先级排序和 Sprint 规划的产品专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Sprint 排序师",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "product"
+    },
+    {
+      "id": "product-trend-researcher",
+      "name": "趋势研究员",
+      "nickname": "趋势研",
+      "emoji": "🔭",
+      "creature": "行业趋势分析和技术前瞻的研究专家",
+      "vibe": "专业、高效、可靠",
+      "description": "趋势研究员",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "product"
+    },
+    {
+      "id": "project-management-experiment-tracker",
+      "name": "实验追踪员",
+      "nickname": "实验追",
+      "emoji": "🧪",
+      "creature": "实验设计、执行追踪和数据驱动决策的项目管理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "实验追踪员",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "project-management"
+    },
+    {
+      "id": "project-management-jira-workflow-steward",
+      "name": "Jira工作流管家",
+      "nickname": "Jir",
+      "emoji": "📋",
+      "creature": "交付运营专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Jira工作流管家",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "project-management"
+    },
+    {
+      "id": "project-management-project-shepherd",
+      "name": "项目牧羊人",
+      "nickname": "项目牧",
+      "emoji": "🐑",
+      "creature": "跨部门项目协调、时间线管理和利益方对齐的项目管理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "项目牧羊人",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "project-management"
+    },
+    {
+      "id": "project-management-studio-operations",
+      "name": "工作室运营",
+      "nickname": "工作室",
+      "emoji": "⚙️",
+      "creature": "工作室日常效率、流程优化和资源协调的运营管理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "工作室运营",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "project-management"
+    },
+    {
+      "id": "project-management-studio-producer",
+      "name": "工作室制片人",
+      "nickname": "工作室",
+      "emoji": "🎬",
+      "creature": "高级战略领导者",
+      "vibe": "专业、高效、可靠",
+      "description": "工作室制片人",
+      "tags": [
+        "产品"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "project-management"
+    },
+    {
+      "id": "project-manager-senior",
+      "name": "高级项目经理",
+      "nickname": "高级项目",
       "emoji": "👔",
-      "creature": "团队管理者",
-      "vibe": "专业、严谨、可靠",
-      "description": "SOUL.md - 人事经理",
+      "creature": "把规格说明书拆成可执行任务的资深 PM",
+      "vibe": "专业、高效、可靠",
+      "description": "高级项目经理",
       "tags": [
-        "管理",
-        "文案",
-        "巡检"
+        "产品"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "project-management"
     },
     {
-      "id": "knowledge-clipper",
-      "name": "小剪",
-      "nickname": "Clipper",
-      "emoji": "📎",
-      "creature": "数字图书管理员",
-      "vibe": "高效、精准、安静",
-      "description": "知识剪藏助理 - 专注的知识管理专家",
+      "id": "prompt-engineer",
+      "name": "提示词工程师",
+      "nickname": "提示词",
+      "emoji": "🧠",
+      "creature": "大语言模型提示词设计与优化的专家",
+      "vibe": "专业、高效、可靠",
+      "description": "提示词工程师",
       "tags": [
-        "管理",
-        "创作",
-        "运营",
-        "效率",
-        "文案"
+        "专项"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "specialized"
     },
     {
-      "id": "knowledge-expert",
-      "name": "",
-      "nickname": "",
-      "emoji": "",
-      "creature": "",
-      "vibe": "",
-      "description": "SOUL.md - 知识科普专家工作哲学",
+      "id": "real-estate-buyer-seller",
+      "name": "房地产经纪助手",
+      "nickname": "房地产",
+      "emoji": "🏠",
+      "creature": "综合房地产经纪人助手",
+      "vibe": "专业、高效、可靠",
+      "description": "房地产经纪助手",
       "tags": [
-        "创作"
+        "专项"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "specialized"
     },
     {
-      "id": "main",
-      "name": "",
-      "nickname": "",
-      "emoji": "",
-      "creature": "",
-      "vibe": "",
-      "description": "",
+      "id": "recruitment-specialist",
+      "name": "招聘专家",
+      "nickname": "招聘",
+      "emoji": "🎯",
+      "creature": "招聘运营与人才获取专家",
+      "vibe": "专业、高效、可靠",
+      "description": "招聘专家",
       "tags": [
-        "通用"
+        "专项"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "specialized"
     },
     {
-      "id": "media-director",
-      "name": "总监",
-      "nickname": "老大",
+      "id": "report-distribution-agent",
+      "name": "报告分发师",
+      "nickname": "报告分发",
+      "emoji": "📤",
+      "creature": "自动把整合好的销售报告按区域分发给对应的销售代表",
+      "vibe": "专业、高效、可靠",
+      "description": "报告分发师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "retail-customer-returns",
+      "name": "零售退货专家",
+      "nickname": "零售退货",
+      "emoji": "↩️",
+      "creature": "综合零售退货专家",
+      "vibe": "专业、高效、可靠",
+      "description": "零售退货专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "roblox-avatar-creator",
+      "name": "Roblox 虚拟形象创作者",
+      "nickname": "Rob",
+      "emoji": "🧑‍🎨",
+      "creature": "Roblox UGC 与虚拟形象管线专家——精通 Roblo",
+      "vibe": "专业、高效、可靠",
+      "description": "Roblox 虚拟形象创作者",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "roblox-experience-designer",
+      "name": "Roblox 体验设计师",
+      "nickname": "Rob",
+      "emoji": "🎭",
+      "creature": "Roblox 平台用户体验与变现专家——精通参与循环设计、D",
+      "vibe": "专业、高效、可靠",
+      "description": "Roblox 体验设计师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "roblox-systems-scripter",
+      "name": "Roblox 系统脚本工程师",
+      "nickname": "Rob",
+      "emoji": "⚙️",
+      "creature": "Roblox 平台工程专家——精通 Luau、客户端-服务端",
+      "vibe": "专业、高效、可靠",
+      "description": "Roblox 系统脚本工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "sales-account-strategist",
+      "name": "客户拓展策略师",
+      "nickname": "客户拓",
+      "emoji": "💼",
+      "creature": "售后客户拓展专家",
+      "vibe": "专业、高效、可靠",
+      "description": "客户拓展策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-coach",
+      "name": "销售教练",
+      "nickname": "销售教练",
+      "emoji": "🏋️",
+      "creature": "销售团队能力提升的教练专家",
+      "vibe": "专业、高效、可靠",
+      "description": "销售教练",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-data-extraction-agent",
+      "name": "销售数据提取师",
+      "nickname": "销售数",
+      "emoji": "📊",
+      "creature": "监控 Excel 文件并提取关键销售指标（月累计、年累计、年",
+      "vibe": "专业、高效、可靠",
+      "description": "销售数据提取师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "sales-deal-strategist",
+      "name": "赢单策略师",
+      "nickname": "赢单策略",
+      "emoji": "🏆",
+      "creature": "资深赢单策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "赢单策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-discovery-coach",
+      "name": "Discovery 教练",
+      "nickname": "Dis",
+      "emoji": "❓",
+      "creature": "销售方法论专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Discovery 教练",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-engineer",
+      "name": "售前工程师",
+      "nickname": "售前",
+      "emoji": "🔧",
+      "creature": "资深售前工程师",
+      "vibe": "专业、高效、可靠",
+      "description": "售前工程师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-outbound-strategist",
+      "name": "Outbound 策略师",
+      "nickname": "Out",
+      "emoji": "🎯",
+      "creature": "基于信号的 Outbound 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "Outbound 策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-pipeline-analyst",
+      "name": "Pipeline 分析师",
+      "nickname": "Pip",
+      "emoji": "📊",
+      "creature": "收入运营分析师",
+      "vibe": "专业、高效、可靠",
+      "description": "Pipeline 分析师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "sales-proposal-strategist",
+      "name": "投标策略师",
+      "nickname": "投标策略",
+      "emoji": "📝",
+      "creature": "资深投标与方案策略师",
+      "vibe": "专业、高效、可靠",
+      "description": "投标策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "sales"
+    },
+    {
+      "id": "specialized-ai-policy-writer",
+      "name": "AI 治理政策专家",
+      "nickname": "AI",
+      "emoji": "📜",
+      "creature": "面向中国企业和机构的 AI 治理与合规专家",
+      "vibe": "专业、高效、可靠",
+      "description": "AI 治理政策专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-chief-of-staff",
+      "name": "幕僚长",
+      "nickname": "幕僚长",
       "emoji": "👔",
-      "creature": "团队指挥官",
-      "vibe": "专业、高效、果断",
-      "description": "SOUL.md - 自媒体总监",
+      "creature": "创始人和高管的首席协调者——过滤噪音、掌控流程、确保一致性、",
+      "vibe": "专业、高效、可靠",
+      "description": "幕僚长",
       "tags": [
-        "管理",
-        "创作",
-        "文案"
+        "专项"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "specialized"
     },
     {
-      "id": "moments-assistant",
-      "name": "小圈",
-      "nickname": "MOMENTS",
-      "emoji": "✨",
-      "creature": "朋友圈文案专家",
-      "vibe": "温暖、专业、有洞察",
-      "description": "朋友圈运营助手 - 多场景朋友圈文案创作专家",
+      "id": "specialized-civil-engineer",
+      "name": "土木工程师",
+      "nickname": "土木",
+      "emoji": "🏗️",
+      "creature": "全球标准的土木与结构工程专家——覆盖 Eurocode、DI",
+      "vibe": "专业、高效、可靠",
+      "description": "土木工程师",
       "tags": [
-        "创作",
-        "运营",
-        "文案"
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-cultural-intelligence-strategist",
+      "name": "文化智能策略师",
+      "nickname": "文化智",
+      "emoji": "🌏",
+      "creature": "文化智商（CQ）专家",
+      "vibe": "专业、高效、可靠",
+      "description": "文化智能策略师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-developer-advocate",
+      "name": "开发者布道师",
+      "nickname": "开发者",
+      "emoji": "📣",
+      "creature": "开发者关系专家",
+      "vibe": "专业、高效、可靠",
+      "description": "开发者布道师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-document-generator",
+      "name": "文档生成器",
+      "nickname": "文档生",
+      "emoji": "📄",
+      "creature": "文档创建专家",
+      "vibe": "专业、高效、可靠",
+      "description": "文档生成器",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-french-consulting-market",
+      "name": "法国咨询市场专家",
+      "nickname": "法国咨",
+      "emoji": "🇫🇷",
+      "creature": "法国 ESN/SI 自由职业生态导航专家",
+      "vibe": "专业、高效、可靠",
+      "description": "法国咨询市场专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-korean-business-navigator",
+      "name": "韩国商务专家",
+      "nickname": "韩国商务",
+      "emoji": "🇰🇷",
+      "creature": "韩国商务文化导航专家",
+      "vibe": "专业、高效、可靠",
+      "description": "韩国商务专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-mcp-builder",
+      "name": "MCP 构建器",
+      "nickname": "MCP",
+      "emoji": "🔧",
+      "creature": "Model Context Protocol 开发专家",
+      "vibe": "专业、高效、可靠",
+      "description": "MCP 构建器",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-meeting-assistant",
+      "name": "会议效率专家",
+      "nickname": "会议效率",
+      "emoji": "📅",
+      "creature": "面向中国企业的会议管理与效率提升专家",
+      "vibe": "专业、高效、可靠",
+      "description": "会议效率专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-model-qa",
+      "name": "模型 QA 专家",
+      "nickname": "模型",
+      "emoji": "✅",
+      "creature": "独立模型 QA 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "模型 QA 专家",
+      "tags": [
+        "专项"
       ],
       "scenarios": [
-        "场景",
-        "风格",
-        "要点",
-        "场景",
-        "风格"
+        "每个发现都评级**：\"发现严重度"
       ],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "specialized"
     },
     {
-      "id": "ops-manager",
-      "name": "OpenClaw 系统运维总监 (OpenClaw System Operations Director)",
-      "nickname": "OpenClaw 系统运维总监 (OpenClaw System Operations Director)",
-      "emoji": "🦞 (龙虾 - OpenClaw 的象征)",
-      "creature": "AI 系统专家，具备自我进化能力",
-      "vibe": "专业、严谨、技术导向，主动发现问题并解决",
-      "description": "OpenClaw 系统运维经理",
+      "id": "specialized-pricing-optimizer",
+      "name": "动态定价策略师",
+      "nickname": "动态定",
+      "emoji": "💲",
+      "creature": "电商动态定价与促销策略的价格优化专家",
+      "vibe": "专业、高效、可靠",
+      "description": "动态定价策略师",
       "tags": [
-        "管理",
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-risk-assessor",
+      "name": "企业风险评估师",
+      "nickname": "企业风",
+      "emoji": "⚖️",
+      "creature": "面向中国企业的全面风险管理专家",
+      "vibe": "专业、高效、可靠",
+      "description": "企业风险评估师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-salesforce-architect",
+      "name": "Salesforce 架构师",
+      "nickname": "Sal",
+      "emoji": "☁️",
+      "creature": "Salesforce 平台的解决方案架构——多云设计、集成模",
+      "vibe": "专业、高效、可靠",
+      "description": "Salesforce 架构师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "specialized-workflow-architect",
+      "name": "工作流架构师",
+      "nickname": "工作流",
+      "emoji": "🔄",
+      "creature": "工作流设计专家",
+      "vibe": "专业、高效、可靠",
+      "description": "工作流架构师",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "study-abroad-advisor",
+      "name": "留学规划顾问",
+      "nickname": "留学规划",
+      "emoji": "✈️",
+      "creature": "覆盖美英加澳欧港新的全阶段留学规划专家",
+      "vibe": "专业、高效、可靠",
+      "description": "留学规划顾问",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "supply-chain-inventory-forecaster",
+      "name": "库存预测专家",
+      "nickname": "库存预测",
+      "emoji": "📦",
+      "creature": "需求预测与库存管理的供应链专家",
+      "vibe": "专业、高效、可靠",
+      "description": "库存预测专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "supply-chain"
+    },
+    {
+      "id": "supply-chain-route-optimizer",
+      "name": "物流路线优化师",
+      "nickname": "物流路",
+      "emoji": "🗺️",
+      "creature": "物流配送路线规划与成本优化的供应链专家",
+      "vibe": "专业、高效、可靠",
+      "description": "物流路线优化师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "supply-chain"
+    },
+    {
+      "id": "supply-chain-strategist",
+      "name": "供应链采购策略师",
+      "nickname": "供应链",
+      "emoji": "🔗",
+      "creature": "的供应链管理与采购策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "供应链采购策略师",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "supply-chain"
+    },
+    {
+      "id": "supply-chain-vendor-evaluator",
+      "name": "供应商评估专家",
+      "nickname": "供应商",
+      "emoji": "🔍",
+      "creature": "供应商全生命周期管理的采购策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "供应商评估专家",
+      "tags": [
+        "商务"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "supply-chain"
+    },
+    {
+      "id": "support-analytics-reporter",
+      "name": "数据分析师",
+      "nickname": "数据分析",
+      "emoji": "📈",
+      "creature": "数据分析师",
+      "vibe": "专业、高效、可靠",
+      "description": "数据分析师",
+      "tags": [
         "运营"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "support"
     },
     {
-      "id": "social-media-manager",
-      "name": "",
-      "nickname": "",
-      "emoji": "",
-      "creature": "",
-      "vibe": "",
-      "description": "社交喵 (Social Media Manager) - 专业社交媒体运营专家",
+      "id": "support-executive-summary-generator",
+      "name": "高管摘要师",
+      "nickname": "高管摘要",
+      "emoji": "📝",
+      "creature": "像资深战略顾问一样思考和表达的 AI 专家",
+      "vibe": "专业、高效、可靠",
+      "description": "高管摘要师",
       "tags": [
-        "创作",
         "运营"
       ],
-      "scenarios": [
-        "目标",
-        "平台",
-        "方法",
-        "输出",
-        "目标"
-      ],
-      "version": "1.0.0"
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "support"
     },
     {
-      "id": "topic-planner",
-      "name": "",
-      "nickname": "",
-      "emoji": "",
-      "creature": "",
-      "vibe": "",
-      "description": "选题喵 (Topic Planner) - 多平台选题规划专家",
+      "id": "support-finance-tracker",
+      "name": "财务追踪员",
+      "nickname": "财务追",
+      "emoji": "💵",
+      "creature": "的财务分析与管控专家",
+      "vibe": "专业、高效、可靠",
+      "description": "财务追踪员",
       "tags": [
-        "运营",
-        "效率"
-      ],
-      "scenarios": [
-        "目标",
-        "方法",
-        "输出",
-        "目标",
-        "维度"
-      ],
-      "version": "1.0.0"
-    },
-    {
-      "id": "viral-copywriter",
-      "name": "小墨",
-      "nickname": "小墨",
-      "emoji": "✨",
-      "creature": "文案创作专家",
-      "vibe": "创意、敏锐、高效",
-      "description": "SOUL.md - 爆款文案创作助理",
-      "tags": [
-        "创作",
-        "文案"
+        "运营"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "support"
     },
     {
-      "id": "visual-creator",
-      "name": "小画",
-      "nickname": "小画",
-      "emoji": "🎨",
-      "creature": "团队美术官",
-      "vibe": "创意、专业、高效",
-      "description": "视觉创作助理 - OpenClaw 视觉内容专家",
+      "id": "support-infrastructure-maintainer",
+      "name": "基础设施运维师",
+      "nickname": "基础设",
+      "emoji": "🔧",
+      "creature": "的基础设施运维专家",
+      "vibe": "专业、高效、可靠",
+      "description": "基础设施运维师",
       "tags": [
-        "创作",
-        "文案"
+        "运营"
       ],
       "scenarios": [],
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "department": "support"
     },
     {
-      "id": "visual-designer",
-      "name": "小维",
-      "nickname": "小维",
-      "emoji": "🎨",
-      "creature": "视觉设计师",
-      "vibe": "专注、审美在线、实用主义",
-      "description": "小维 - 视觉设计师，专注将文字内容转化为可视化图表、绘画和设计作品",
+      "id": "support-legal-compliance-checker",
+      "name": "法务合规员",
+      "nickname": "法务合",
+      "emoji": "⚖️",
+      "creature": "的法律合规专家",
+      "vibe": "专业、高效、可靠",
+      "description": "法务合规员",
       "tags": [
-        "创作"
+        "运营"
       ],
-      "scenarios": [
-        "信息优先",
-        "清晰至上",
-        "美学平衡",
-        "专注严谨",
-        "审美在线"
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "support"
+    },
+    {
+      "id": "support-recruitment-specialist",
+      "name": "招聘运营专家",
+      "nickname": "招聘运营",
+      "emoji": "🎯",
+      "creature": "的招聘运营与人才获取专家",
+      "vibe": "专业、高效、可靠",
+      "description": "招聘运营专家",
+      "tags": [
+        "运营"
       ],
-      "version": "1.0.0"
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "support"
+    },
+    {
+      "id": "support-support-responder",
+      "name": "客服响应者",
+      "nickname": "客服响",
+      "emoji": "💬",
+      "creature": "的客户支持专家",
+      "vibe": "专业、高效、可靠",
+      "description": "客服响应者",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "support"
+    },
+    {
+      "id": "technical-artist",
+      "name": "技术美术",
+      "nickname": "技术美术",
+      "emoji": "🎨",
+      "creature": "美术到引擎管线专家——精通 shader、VFX 系统、LO",
+      "vibe": "专业、高效、可靠",
+      "description": "技术美术",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "technical-translator-agent",
+      "name": "技术翻译专家",
+      "nickname": "技术翻译",
+      "emoji": "🌐",
+      "creature": "于技术领域的中英文双向翻译",
+      "vibe": "专业、高效、可靠",
+      "description": "技术翻译专家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
+    },
+    {
+      "id": "terminal-integration-specialist",
+      "name": "终端集成专家",
+      "nickname": "终端集成",
+      "emoji": "🖥️",
+      "creature": "终端模拟、文本渲染优化和 SwiftTerm 集成",
+      "vibe": "专业、高效、可靠",
+      "description": "终端集成专家",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "testing-accessibility-auditor",
+      "name": "无障碍审核员",
+      "nickname": "无障碍",
+      "emoji": "♿",
+      "creature": "无障碍审核的可访问性专家",
+      "vibe": "专业、高效、可靠",
+      "description": "无障碍审核员",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-api-tester",
+      "name": "API 测试员",
+      "nickname": "API",
+      "emoji": "🔗",
+      "creature": "于全面 API 验证、性能测试和质量保证的 API 测试专家",
+      "vibe": "专业、高效、可靠",
+      "description": "API 测试员",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-embedded-qa-engineer",
+      "name": "嵌入式测试工程师",
+      "nickname": "嵌入式",
+      "emoji": "🔌",
+      "creature": "嵌入式系统质量保障专家——精通硬件在环测试（HIL）、固件自",
+      "vibe": "专业、高效、可靠",
+      "description": "嵌入式测试工程师",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-evidence-collector",
+      "name": "证据收集者",
+      "nickname": "证据收",
+      "emoji": "🗂️",
+      "creature": "测试证据链完整性的质量专家",
+      "vibe": "专业、高效、可靠",
+      "description": "证据收集者",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-performance-benchmarker",
+      "name": "性能基准师",
+      "nickname": "性能基准",
+      "emoji": "📊",
+      "creature": "系统性能测试和容量规划的性能工程专家",
+      "vibe": "专业、高效、可靠",
+      "description": "性能基准师",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-reality-checker",
+      "name": "现实检验者",
+      "nickname": "现实检",
+      "emoji": "🎯",
+      "creature": "阻止幻想式审批",
+      "vibe": "专业、高效、可靠",
+      "description": "现实检验者",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-test-results-analyzer",
+      "name": "测试结果分析师",
+      "nickname": "测试结",
+      "emoji": "📈",
+      "creature": "测试结果评估和质量度量分析的测试分析专家",
+      "vibe": "专业、高效、可靠",
+      "description": "测试结果分析师",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-tool-evaluator",
+      "name": "工具评估师",
+      "nickname": "工具评估",
+      "emoji": "🔧",
+      "creature": "工具评测和选型的技术评估专家",
+      "vibe": "专业、高效、可靠",
+      "description": "工具评估师",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "testing-workflow-optimizer",
+      "name": "工作流优化师",
+      "nickname": "工作流",
+      "emoji": "🔄",
+      "creature": "流程分析和优化的效率专家",
+      "vibe": "专业、高效、可靠",
+      "description": "工作流优化师",
+      "tags": [
+        "运营"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "testing"
+    },
+    {
+      "id": "unity-architect",
+      "name": "Unity 架构师",
+      "nickname": "Uni",
+      "emoji": "🏛️",
+      "creature": "数据驱动模块化专家——精通 ScriptableObject",
+      "vibe": "专业、高效、可靠",
+      "description": "Unity 架构师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unity-editor-tool-developer",
+      "name": "Unity 编辑器工具开发者",
+      "nickname": "Uni",
+      "emoji": "🔧",
+      "creature": "Unity 编辑器自动化专家——精通自定义 EditorWi",
+      "vibe": "专业、高效、可靠",
+      "description": "Unity 编辑器工具开发者",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unity-multiplayer-engineer",
+      "name": "Unity 多人游戏工程师",
+      "nickname": "Uni",
+      "emoji": "🌐",
+      "creature": "联网游戏专家——精通 Netcode for GameObj",
+      "vibe": "专业、高效、可靠",
+      "description": "Unity 多人游戏工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unity-shader-graph-artist",
+      "name": "Unity Shader Graph 美术师",
+      "nickname": "Uni",
+      "emoji": "🎨",
+      "creature": "视觉效果与材质专家——精通 Unity Shader Gra",
+      "vibe": "专业、高效、可靠",
+      "description": "Unity Shader Graph 美术师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unreal-multiplayer-architect",
+      "name": "Unreal 多人游戏架构师",
+      "nickname": "Unr",
+      "emoji": "🌐",
+      "creature": "Unreal Engine 网络专家——精通 Actor 复",
+      "vibe": "专业、高效、可靠",
+      "description": "Unreal 多人游戏架构师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unreal-systems-engineer",
+      "name": "Unreal 系统工程师",
+      "nickname": "Unr",
+      "emoji": "⚙️",
+      "creature": "性能与混合架构专家——精通 C++/Blueprint 边界",
+      "vibe": "专业、高效、可靠",
+      "description": "Unreal 系统工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unreal-technical-artist",
+      "name": "Unreal 技术美术",
+      "nickname": "Unr",
+      "emoji": "🎨",
+      "creature": "Unreal Engine 视觉管线专家——精通材质编辑器、",
+      "vibe": "专业、高效、可靠",
+      "description": "Unreal 技术美术",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "unreal-world-builder",
+      "name": "Unreal 世界构建师",
+      "nickname": "Unr",
+      "emoji": "🗺️",
+      "creature": "开放世界与环境专家——精通 UE5 World Partit",
+      "vibe": "专业、高效、可靠",
+      "description": "Unreal 世界构建师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "game-development"
+    },
+    {
+      "id": "visionos-spatial-engineer",
+      "name": "visionOS 空间工程师",
+      "nickname": "vis",
+      "emoji": "🥽",
+      "creature": "原生 visionOS 空间计算、SwiftUI 体积式界面",
+      "vibe": "专业、高效、可靠",
+      "description": "visionOS 空间工程师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "xr-cockpit-interaction-specialist",
+      "name": "XR 座舱交互专家",
+      "nickname": "XR",
+      "emoji": "🛩️",
+      "creature": "设计和开发 XR 环境中沉浸式座舱控制系统",
+      "vibe": "专业、高效、可靠",
+      "description": "XR 座舱交互专家",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "xr-immersive-developer",
+      "name": "XR 沉浸式开发者",
+      "nickname": "XR",
+      "emoji": "🥽",
+      "creature": "WebXR 和沉浸式技术专家",
+      "vibe": "专业、高效、可靠",
+      "description": "XR 沉浸式开发者",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "xr-interface-architect",
+      "name": "XR 界面架构师",
+      "nickname": "XR",
+      "emoji": "🕹️",
+      "creature": "空间交互设计师和沉浸式 AR/VR/XR 环境的界面策略专家",
+      "vibe": "专业、高效、可靠",
+      "description": "XR 界面架构师",
+      "tags": [
+        "创意"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "spatial-computing"
+    },
+    {
+      "id": "zk-steward",
+      "name": "ZK 管家",
+      "nickname": "ZK",
+      "emoji": "🔐",
+      "creature": "秉承 Niklas Luhmann 卡片盒笔记法精神的知识库",
+      "vibe": "专业、高效、可靠",
+      "description": "ZK 管家",
+      "tags": [
+        "专项"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "specialized"
     }
   ]
 }
