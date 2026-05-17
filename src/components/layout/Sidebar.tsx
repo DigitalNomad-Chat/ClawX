@@ -68,7 +68,7 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       }
     >
       {({ isActive }) => (
-        <div className="flex items-center gap-2.5 w-full">
+        <div className={cn("flex items-center gap-2.5", collapsed ? "justify-center w-auto" : "w-full")}>
           <div className={cn("flex shrink-0 items-center justify-center", isActive ? "!text-foreground/80" : "text-muted-foreground")}>
             {icon}
           </div>
@@ -263,7 +263,7 @@ export function Sidebar() {
           {!sidebarCollapsed && <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>}
         </button>
 
-        {!sidebarCollapsed && !topNavCollapsed && topNavItems.map((item) => (
+        {!topNavCollapsed && topNavItems.map((item) => (
           <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
         ))}
       </nav>
@@ -382,30 +382,38 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Layer 3: Management tools (collapsible) */}
-      {!sidebarCollapsed && managementNavItems.length > 0 && (
-        <div className="px-2 pt-1.5 pb-1 shrink-0">
-          <button
-            onClick={toggleManagementTools}
-            className="flex w-full items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 dark:bg-card/30 border border-border/30 dark:border-border/25 text-sm font-medium text-muted-foreground/80 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/[0.04] transition-colors"
-          >
-            <Wrench className="h-4 w-4 shrink-0" />
-            <span className="flex-1 text-left">{t('sidebar.managementTools')}</span>
-            <ChevronRight
-              className={cn(
-                'h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-200',
-                managementToolsExpanded && 'rotate-90'
-              )}
-            />
-          </button>
-          {managementToolsExpanded && (
-            <nav className="flex flex-col gap-px mt-1">
-              {managementNavItems.map((item) => (
-                <NavItem key={item.to} {...item} collapsed={false} />
-              ))}
-            </nav>
-          )}
-        </div>
+      {/* Layer 3: Management tools */}
+      {managementNavItems.length > 0 && (
+        sidebarCollapsed ? (
+          <nav className="flex flex-col gap-0.5 px-2 mt-2">
+            {managementNavItems.map((item) => (
+              <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
+            ))}
+          </nav>
+        ) : (
+          <div className="px-2 pt-1.5 pb-1 shrink-0">
+            <button
+              onClick={toggleManagementTools}
+              className="flex w-full items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 dark:bg-card/30 border border-border/30 dark:border-border/25 text-sm font-medium text-muted-foreground/80 hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/[0.04] transition-colors"
+            >
+              <Wrench className="h-4 w-4 shrink-0" />
+              <span className="flex-1 text-left">{t('sidebar.managementTools')}</span>
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-200',
+                  managementToolsExpanded && 'rotate-90'
+                )}
+              />
+            </button>
+            {managementToolsExpanded && (
+              <nav className="flex flex-col gap-px mt-1">
+                {managementNavItems.map((item) => (
+                  <NavItem key={item.to} {...item} collapsed={false} />
+                ))}
+              </nav>
+            )}
+          </div>
+        )
       )}
 
       {/* Footer */}
@@ -425,7 +433,7 @@ export function Sidebar() {
             }
           >
           {({ isActive }) => (
-            <div className="flex items-center gap-2.5 w-full">
+            <div className={cn("flex items-center gap-2.5", sidebarCollapsed ? "justify-center w-auto" : "w-full")}>
               <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
                 <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
               </div>
