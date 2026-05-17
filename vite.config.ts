@@ -4,6 +4,7 @@ import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import { resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
+import { PORTS } from './electron/utils/config';
 
 function getExtensionPackages(): Set<string> {
   try {
@@ -89,7 +90,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'react-i18next', 'zustand', 'sonner', 'lucide-react'],
   },
   server: {
-    port: 5173,
+    port: PORTS.CLAWX_DEV,
   },
   build: {
     outDir: 'dist',

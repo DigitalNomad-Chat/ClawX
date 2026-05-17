@@ -8,7 +8,7 @@
  */
 export const PORTS = {
   /** ClawX GUI development server port */
-  CLAWX_DEV: 5173,
+  CLAWX_DEV: 5180,
   
   /** ClawX GUI production port (for reference) */
   CLAWX_GUI: 23333,
