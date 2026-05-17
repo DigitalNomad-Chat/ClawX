@@ -78,8 +78,9 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       const sessionId = req.sessionId as string;
       const agentId = req.agentId as string;
       const message = req.message as string;
+      const attachments = (req.attachments || []) as Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
 
-      yield* handleChatSend(sessionId, agentId, message);
+      yield* handleChatSend(sessionId, agentId, message, attachments);
       break;
     }
 
@@ -98,6 +99,17 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
 
     case 'session.list': {
       yield { type: 'session.list', sessions: sessions.listSessions() };
+      break;
+    }
+
+    case 'session.info': {
+      const id = req.sessionId as string;
+      const session = sessions.getSession(id);
+      if (session) {
+        yield { type: 'session.info', sessionId: id, workspaceRoot: session.workspaceRoot };
+      } else {
+        yield { type: 'error', message: `Session '${id}' not found` };
+      }
       break;
     }
 
@@ -122,8 +134,13 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
     case 'approval.respond': {
       const reqId = req.requestId as string;
       const approved = req.approved as boolean;
-      const ok = sessions.resolveApproval(reqId, approved);
-      if (!ok) {
+      const autoApprove = req.autoApprove as boolean | undefined;
+      const result = sessions.resolveApproval(reqId, approved);
+      if (autoApprove && result.ok && result.tool && result.sessionId) {
+        sessions.autoApproveTool(result.sessionId, result.tool);
+        console.log(`[Kernel] Auto-approved tool '${result.tool}' for session '${result.sessionId}'`);
+      }
+      if (!result.ok) {
         yield { type: 'error', message: `Approval request '${reqId}' not found or already resolved` };
       }
       break;
@@ -153,7 +170,8 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
 async function* handleChatSend(
   sessionId: string,
   agentId: string,
-  message: string
+  message: string,
+  attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>,
 ): AsyncGenerator<KernelEvent> {
   console.log(`[DEBUG handleChatSend] START sessionId=${sessionId}, agentId=${agentId}, msgLen=${message.length}`);
 
@@ -208,7 +226,14 @@ async function* handleChatSend(
       sessionId,
       messages,
       workspaceRoot: session.workspaceRoot,
-      requestApproval: (requestId, _tool, _input) => sessions.waitForApproval(requestId),
+      requestApproval: (requestId, tool, _input) => {
+        if (sessions.isToolAutoApproved(sessionId, tool)) {
+          console.log(`[Kernel] Tool '${tool}' is auto-approved for session '${sessionId}', skipping confirmation`);
+          return Promise.resolve(true);
+        }
+        return sessions.waitForApproval(requestId, tool, sessionId);
+      },
+      attachments,
     })) {
       console.log(`[DEBUG handleChatSend] ReAct yielded event: ${event.type}`);
       yield event;

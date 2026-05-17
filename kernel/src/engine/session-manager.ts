@@ -16,6 +16,7 @@ interface Session {
   updatedAt: number;
   totalTokens: number;
   active: boolean;
+  autoApprovedTools: Set<string>;
 }
 
 const COMPACTION_THRESHOLD = 80000; // Trigger compaction at 80K tokens
@@ -27,6 +28,7 @@ export class SessionManager {
   private idCounter = 0;
   private approvalResolvers = new Map<string, (approved: boolean) => void>();
   private approvalTimeouts = new Map<string, NodeJS.Timeout>();
+  private approvalRequests = new Map<string, { tool: string; sessionId: string }>();
 
   createSession(agentConfig: AgentConfig): string {
     const id = `session_${Date.now()}_${++this.idCounter}`;
@@ -56,6 +58,7 @@ export class SessionManager {
       updatedAt: Date.now(),
       totalTokens: 0,
       active: true,
+      autoApprovedTools: new Set(),
     };
 
     this.sessions.set(id, session);
@@ -145,18 +148,17 @@ export class SessionManager {
    * Wait for a user approval response.
    * Returns a Promise that resolves when the user approves/denies or times out.
    */
-  waitForApproval(requestId: string, timeoutMs = 300_000): Promise<boolean> {
+  waitForApproval(requestId: string, tool: string, sessionId: string, timeoutMs = 300_000): Promise<boolean> {
+    this.approvalRequests.set(requestId, { tool, sessionId });
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
-        this.approvalResolvers.delete(requestId);
-        this.approvalTimeouts.delete(requestId);
+        this.cleanupApproval(requestId);
         resolve(false); // timeout = denied
       }, timeoutMs);
 
       this.approvalResolvers.set(requestId, (approved: boolean) => {
         clearTimeout(timeout);
-        this.approvalResolvers.delete(requestId);
-        this.approvalTimeouts.delete(requestId);
+        this.cleanupApproval(requestId);
         resolve(approved);
       });
     });
@@ -164,11 +166,37 @@ export class SessionManager {
 
   /**
    * Resolve a pending approval request.
+   * Returns metadata about the resolved request so callers can apply auto-approve logic.
    */
-  resolveApproval(requestId: string, approved: boolean): boolean {
+  resolveApproval(requestId: string, approved: boolean): { ok: boolean; tool?: string; sessionId?: string } {
+    const meta = this.approvalRequests.get(requestId);
     const resolver = this.approvalResolvers.get(requestId);
-    if (!resolver) return false;
+    if (!resolver) return { ok: false };
     resolver(approved);
-    return true;
+    return { ok: true, tool: meta?.tool, sessionId: meta?.sessionId };
+  }
+
+  /**
+   * Mark a tool as auto-approved for the remainder of the session.
+   */
+  autoApproveTool(sessionId: string, toolName: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.autoApprovedTools.add(toolName);
+    }
+  }
+
+  /**
+   * Check whether a tool is already auto-approved in this session.
+   */
+  isToolAutoApproved(sessionId: string, toolName: string): boolean {
+    const session = this.sessions.get(sessionId);
+    return session?.autoApprovedTools.has(toolName) ?? false;
+  }
+
+  private cleanupApproval(requestId: string): void {
+    this.approvalResolvers.delete(requestId);
+    this.approvalTimeouts.delete(requestId);
+    this.approvalRequests.delete(requestId);
   }
 }

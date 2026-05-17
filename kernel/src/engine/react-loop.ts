@@ -13,8 +13,51 @@ import type { ToolRegistry } from '../tools/registry.js';
 import { buildSystemPrompt } from '../agent/prompt-builder.js';
 import { PermissionChecker } from '../security/permission-checker.js';
 import { auditToolInvoke, auditToolResult, auditPermission, auditApproval } from '../security/audit-logger.js';
+import { readFileSync } from 'fs';
 
 const DEFAULT_MAX_TURNS = 64;
+const MAX_ATTACHMENT_TEXT_SIZE = 100_000; // 100KB text limit
+const MAX_ATTACHMENT_IMAGE_SIZE = 5_000_000; // 5MB image limit
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function isTextMimeType(mimeType: string): boolean {
+  if (mimeType.startsWith('text/')) return true;
+  const textTypes = [
+    'application/json', 'application/xml', 'application/javascript',
+    'application/typescript', 'application/x-yaml', 'application/toml',
+  ];
+  return textTypes.includes(mimeType);
+}
+
+function buildAttachmentContext(
+  attachments: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>,
+): string {
+  const parts: string[] = [];
+  for (const att of attachments) {
+    if (att.mimeType.startsWith('image/')) {
+      parts.push(`[Attached image: ${att.fileName} (${att.mimeType}, ${formatSize(att.fileSize)})]`);
+    } else if (isTextMimeType(att.mimeType)) {
+      try {
+        let content = readFileSync(att.stagedPath, 'utf8');
+        if (content.length > MAX_ATTACHMENT_TEXT_SIZE) {
+          content = content.slice(0, MAX_ATTACHMENT_TEXT_SIZE)
+            + `\n\n[File truncated: ${att.fileName} exceeds ${MAX_ATTACHMENT_TEXT_SIZE} characters]`;
+        }
+        parts.push(`--- Attachment: ${att.fileName} ---\n${content}\n--- End of ${att.fileName} ---`);
+      } catch {
+        parts.push(`[Attached file: ${att.fileName} (${att.mimeType}, ${formatSize(att.fileSize)}) - could not read content]`);
+      }
+    } else {
+      parts.push(`[Attached file: ${att.fileName} (${att.mimeType}, ${formatSize(att.fileSize)})]`);
+    }
+  }
+  return parts.join('\n\n');
+}
 
 export interface ReActLoopOptions {
   provider: AIProvider;
@@ -27,6 +70,8 @@ export interface ReActLoopOptions {
   onEvent?: (event: KernelEvent) => void;
   /** Callback to request user approval for a mutating tool. Returns true if approved. */
   requestApproval?: (requestId: string, tool: string, input: unknown) => Promise<boolean>;
+  /** File attachments to include in the conversation context */
+  attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
 }
 
 /**
@@ -44,11 +89,28 @@ export async function* runReActLoop(
     messages,
     maxTurns = agentConfig.maxTurns ?? DEFAULT_MAX_TURNS,
     requestApproval,
+    attachments,
   } = options;
 
   const permissionChecker = new PermissionChecker();
 
-  console.log(`[DEBUG ReAct] START sessionId=${sessionId}, maxTurns=${maxTurns}, msgCount=${messages.length}`);
+  console.log(`[DEBUG ReAct] START sessionId=${sessionId}, maxTurns=${maxTurns}, msgCount=${messages.length}, attachments=${attachments?.length ?? 0}`);
+
+  // ── Inject attachment content into the last user message ──
+  if (attachments && attachments.length > 0) {
+    const attachmentContext = buildAttachmentContext(attachments);
+    // Find the last user message and append attachment context
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        messages[i] = {
+          ...messages[i],
+          content: `${messages[i].content}\n\n${attachmentContext}`,
+        };
+        console.log(`[DEBUG ReAct] Injected attachment context into user message at index ${i}`);
+        break;
+      }
+    }
+  }
 
   const systemPrompt = buildSystemPrompt(agentConfig);
   const availableTools = toolRegistry.filter(
@@ -102,7 +164,7 @@ export async function* runReActLoop(
 
     // 3. Execute tool calls
     for (const call of toolCalls) {
-      yield { type: 'tool.started', sessionId, tool: call.name };
+      yield { type: 'tool.started', sessionId, tool: call.name, input: call.input };
       const auditWorkspace = options.workspaceRoot || '';
       const agentId = agentConfig.id;
 

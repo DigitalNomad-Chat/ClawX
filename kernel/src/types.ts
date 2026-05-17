@@ -166,15 +166,23 @@ export interface SessionInfo {
 // ─────────────────────────────────────────────────────────────
 // Kernel Requests (Electron → Kernel)
 // ─────────────────────────────────────────────────────────────
+export interface AttachmentInfo {
+  fileName: string;
+  stagedPath: string;
+  mimeType: string;
+  fileSize: number;
+}
+
 export type KernelRequest =
-  | { type: 'chat.send'; sessionId: string; agentId: string; message: string }
+  | { type: 'chat.send'; sessionId: string; agentId: string; message: string; attachments?: AttachmentInfo[] }
   | { type: 'session.create'; agentId: string }
   | { type: 'session.list' }
+  | { type: 'session.info'; sessionId: string }
   | { type: 'session.switch'; sessionId: string }
   | { type: 'session.delete'; sessionId: string }
   | { type: 'agent.list' }
   | { type: 'agent.detail'; agentId: string }
-  | { type: 'approval.respond'; requestId: string; approved: boolean }
+  | { type: 'approval.respond'; requestId: string; approved: boolean; autoApprove?: boolean }
   | { type: 'kernel.shutdown' };
 
 // ─────────────────────────────────────────────────────────────
@@ -185,12 +193,13 @@ export type KernelEvent =
   | { type: 'delta.text'; sessionId: string; content: string }
   | { type: 'delta.thinking'; sessionId: string; content: string }
   | { type: 'delta.tool_call'; sessionId: string; tool: string; input: unknown }
-  | { type: 'tool.started'; sessionId: string; tool: string }
+  | { type: 'tool.started'; sessionId: string; tool: string; input?: unknown }
   | { type: 'tool.completed'; sessionId: string; tool: string; output: string }
   | { type: 'approval.request'; sessionId: string; requestId: string; tool: string; input: unknown }
   | { type: 'turn.complete'; sessionId: string; usage: TokenUsage }
   | { type: 'session.created'; sessionId: string }
   | { type: 'session.list'; sessions: SessionInfo[] }
+  | { type: 'session.info'; sessionId: string; workspaceRoot: string }
   | { type: 'agent.list'; agents: AgentManifestEntry[] }
   | { type: 'agent.detail'; agent: AgentManifestEntry }
   | { type: 'config.updated' }
