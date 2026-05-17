@@ -38,6 +38,13 @@ export interface StagedAttachment {
   fileSize: number;
 }
 
+export interface SkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+}
+
 type EventCallback = (event: KernelEvent) => void;
 
 class KernelClient {
@@ -82,9 +89,31 @@ class KernelClient {
   /**
    * Send a chat message to an agent
    */
-  async sendChat(sessionId: string, agentId: string, message: string, attachments?: StagedAttachment[]): Promise<{ success: boolean; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message, attachments) as Promise<{
+  async sendChat(sessionId: string, agentId: string, message: string, attachments?: StagedAttachment[], skillId?: string): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message, attachments, skillId) as Promise<{
       success: boolean;
+      error?: string;
+    }>;
+  }
+
+  /**
+   * List all available skills from the kernel
+   */
+  async listSkills(): Promise<{ success: boolean; skills?: SkillEntry[]; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:skillList') as Promise<{
+      success: boolean;
+      skills?: SkillEntry[];
+      error?: string;
+    }>;
+  }
+
+  /**
+   * Get details of a specific skill
+   */
+  async getSkill(skillId: string): Promise<{ success: boolean; skill?: SkillEntry & { content: string }; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:skillDetail', skillId) as Promise<{
+      success: boolean;
+      skill?: SkillEntry & { content: string };
       error?: string;
     }>;
   }

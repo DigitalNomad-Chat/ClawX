@@ -17,7 +17,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Wrench, Copy, Check,
   ChevronDown, ChevronRight, Send, Shield,
-  Paperclip, X, FileText, File,
+  Paperclip, X, FileText, Sparkles, Search,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -72,21 +72,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function getMimeTypeFromExt(ext: string): string {
-  const map: Record<string, string> = {
-    txt: 'text/plain', md: 'text/markdown', json: 'application/json',
-    xml: 'application/xml', csv: 'text/csv', html: 'text/html',
-    css: 'text/css', js: 'text/javascript', ts: 'text/typescript',
-    py: 'text/x-python', pdf: 'application/pdf',
-    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-    mp4: 'video/mp4', mp3: 'audio/mpeg', wav: 'audio/wav',
-    zip: 'application/zip', doc: 'application/msword',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  };
-  return map[ext] || 'application/octet-stream';
 }
 
 function readFileAsBase64(file: globalThis.File): Promise<string> {
@@ -417,6 +402,7 @@ function AutoResizeTextarea({
   onKeyDown,
   onCompositionStart,
   onCompositionEnd,
+  onPaste,
   placeholder,
   disabled,
 }: {
@@ -425,6 +411,7 @@ function AutoResizeTextarea({
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onCompositionStart?: (e: React.CompositionEvent<HTMLTextAreaElement>) => void;
   onCompositionEnd?: (e: React.CompositionEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   disabled?: boolean;
 }) {
@@ -445,6 +432,7 @@ function AutoResizeTextarea({
       onKeyDown={onKeyDown}
       onCompositionStart={onCompositionStart}
       onCompositionEnd={onCompositionEnd}
+      onPaste={onPaste}
       placeholder={placeholder}
       disabled={disabled}
       rows={1}
@@ -476,6 +464,10 @@ export function AgentChat() {
   } | null>(null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [skills, setSkills] = useState<Array<{ id: string; name: string; description: string; category: string }>>([]);
+  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const [skillSearch, setSkillSearch] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeToolRef = useRef<string | undefined>(undefined);
@@ -487,6 +479,21 @@ export function AgentChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load skills list
+  useEffect(() => {
+    async function loadSkills() {
+      try {
+        const result = await kernelClient.listSkills();
+        if (result.success && result.skills) {
+          setSkills(result.skills);
+        }
+      } catch (err) {
+        console.error('[AgentChat] Failed to load skills:', err);
+      }
+    }
+    void loadSkills();
+  }, []);
 
   // Subscribe/unsubscribe kernel events when sessionId changes
   useEffect(() => {
@@ -823,7 +830,7 @@ export function AgentChat() {
 
       setAttachments([]);
 
-      const result = await kernelClient.sendChat(sid, agentId, text, stagedAttachments);
+      const result = await kernelClient.sendChat(sid, agentId, text, stagedAttachments, selectedSkill || undefined);
 
       if (!result.success) {
         setStreaming(false);
@@ -842,46 +849,6 @@ export function AgentChat() {
   }
 
   // ── File attachment handlers ───────────────────────────────────────
-
-  const pickFiles = useCallback(async () => {
-    try {
-      const result = await window.electron.ipcRenderer.invoke('dialog:open', {
-        properties: ['openFile', 'multiSelections'],
-      }) as { canceled: boolean; filePaths?: string[] };
-      if (result.canceled || !result.filePaths?.length) return;
-
-      for (const filePath of result.filePaths) {
-        const fileName = filePath.split(/[\\/]/).pop() || 'file';
-        const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        const mimeType = getMimeTypeFromExt(ext);
-
-        try {
-          const base64 = await window.electron.ipcRenderer.invoke('fs:readFileBase64', filePath) as string;
-          setAttachments((prev) => [...prev, {
-            id: crypto.randomUUID(),
-            fileName,
-            mimeType,
-            fileSize: Math.round(base64.length * 0.75),
-            base64,
-            status: 'ready',
-          }]);
-        } catch (err) {
-          console.error('[AgentChat] Failed to read file:', err);
-          setAttachments((prev) => [...prev, {
-            id: crypto.randomUUID(),
-            fileName,
-            mimeType,
-            fileSize: 0,
-            base64: '',
-            status: 'error',
-            error: String(err),
-          }]);
-        }
-      }
-    } catch (err) {
-      console.error('[AgentChat] pickFiles error:', err);
-    }
-  }, []);
 
   const stageBufferFiles = useCallback(async (files: globalThis.File[]) => {
     for (const file of files) {
@@ -1147,6 +1114,101 @@ export function AgentChat() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+        {/* Skill selector */}
+        {skills.length > 0 && (
+          <div className="relative mb-2">
+            <button
+              onClick={() => setSkillMenuOpen((v) => !v)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                selectedSkill
+                  ? 'border-primary/40 bg-primary/5 text-primary'
+                  : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              <Sparkles className="h-3 w-3" />
+              {selectedSkill
+                ? skills.find((s) => s.id === selectedSkill)?.name || '技能'
+                : '选择技能'}
+              <ChevronDown className={cn('h-3 w-3 transition-transform', skillMenuOpen && 'rotate-180')} />
+            </button>
+            {skillMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setSkillMenuOpen(false)}
+                />
+                <div className="absolute bottom-full left-0 mb-1 z-50 w-72 rounded-lg border bg-background shadow-lg p-2 max-h-80 overflow-y-auto">
+                  {/* Search input */}
+                  <div className="sticky top-0 bg-background pb-1.5 mb-1">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={skillSearch}
+                        onChange={(e) => setSkillSearch(e.target.value)}
+                        placeholder="搜索技能..."
+                        className="w-full rounded-md border bg-muted/50 pl-7 pr-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary/30"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      {skillSearch && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSkillSearch(''); }}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2"
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedSkill(null); setSkillMenuOpen(false); setSkillSearch(''); }}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                      !selectedSkill ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                    )}
+                  >
+                    <span className="flex-1 text-left">无技能</span>
+                  </button>
+                  {(() => {
+                    const q = skillSearch.trim().toLowerCase();
+                    const filtered = q
+                      ? skills.filter((s) =>
+                          s.name.toLowerCase().includes(q) ||
+                          s.description.toLowerCase().includes(q) ||
+                          s.category.toLowerCase().includes(q)
+                        )
+                      : skills;
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="px-2.5 py-3 text-xs text-muted-foreground text-center">
+                          未找到匹配的技能
+                        </div>
+                      );
+                    }
+                    return filtered.map((skill) => (
+                      <button
+                        key={skill.id}
+                        onClick={() => { setSelectedSkill(skill.id); setSkillMenuOpen(false); setSkillSearch(''); }}
+                        className={cn(
+                          'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                          selectedSkill === skill.id ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                        )}
+                      >
+                        <div className="flex-1 text-left">
+                          <div className="font-medium">{skill.name}</div>
+                          <div className="text-[10px] text-muted-foreground line-clamp-1">{skill.description}</div>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">{skill.category}</span>
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </>
+            )}
           </div>
         )}
         <div className="flex items-end gap-2">
