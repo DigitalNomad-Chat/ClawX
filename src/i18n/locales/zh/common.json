@@ -14,7 +14,8 @@
         "collaboration": "协作大厅",
         "deleteSessionConfirm": "确定要删除对话 \"{{label}}\" 吗？",
         "openClawPage": "OpenClaw 页面",
-        "openClawDreams": "梦境"
+        "openClawDreams": "梦境",
+        "managementTools": "管理工具"
     },
     "actions": {
         "save": "保存",

@@ -14,7 +14,8 @@
         "collaboration": "Collaboration",
         "deleteSessionConfirm": "Are you sure you want to delete session \"{{label}}\"?",
         "openClawPage": "OpenClaw Page",
-        "openClawDreams": "Dreams"
+        "openClawDreams": "Dreams",
+        "managementTools": "Management Tools"
     },
     "actions": {
         "save": "Save",
