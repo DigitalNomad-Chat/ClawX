@@ -49,6 +49,40 @@ export function buildSystemPrompt(config: AgentConfig): string {
 }
 
 /**
+ * Format available skills as a prompt block
+ * All skills are listed with name + description so the LLM can self-select
+ */
+export interface SkillBrief {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+}
+
+export function formatSkillsBlock(skills: SkillBrief[]): string {
+  if (skills.length === 0) return '';
+  const lines: string[] = [
+    '',
+    '---',
+    '## Available Skills',
+    'You have access to the following specialized skills.',
+    'When a user request matches a skill description, load and apply that skill context to improve your response.',
+    '',
+    '<available_skills>',
+  ];
+  for (const s of skills) {
+    lines.push(`  <skill>`);
+    lines.push(`    <name>${s.name}</name>`);
+    lines.push(`    <id>${s.id}</id>`);
+    lines.push(`    <description>${s.description}</description>`);
+    lines.push(`    <category>${s.category}</category>`);
+    lines.push(`  </skill>`);
+  }
+  lines.push('</available_skills>');
+  return lines.join('\n');
+}
+
+/**
  * Build a context summary for a new session
  */
 export function buildSessionContext(config: AgentConfig): string {

@@ -10,15 +10,18 @@ import { runReActLoop } from './engine/react-loop.js';
 import { createDefaultToolRegistry } from './tools/index.js';
 import { createProvider } from './providers/provider-factory.js';
 import { loadAgentManifest, loadAgentOnDemand } from './agent/agent-loader.js';
+import { SkillRegistry } from './skills/skill-loader.js';
 import type { KernelEvent, KernelRequest, AIProviderConfig } from './types.js';
 
 // Determine paths
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AGENTS_DIR = process.env.KERNEL_AGENTS_DIR || resolve(__dirname, '../agents');
+const SKILLS_DIR = process.env.KERNEL_SKILLS_DIR || resolve(__dirname, './skills');
 
 // Global state
 const sessions = new SessionManager();
 const toolRegistry = createDefaultToolRegistry();
+const skillRegistry = new SkillRegistry(SKILLS_DIR);
 let providerConfig: AIProviderConfig | null = null;
 
 async function main() {
@@ -79,8 +82,9 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       const agentId = req.agentId as string;
       const message = req.message as string;
       const attachments = (req.attachments || []) as Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
+      const skillId = (req.skillId as string) || undefined;
 
-      yield* handleChatSend(sessionId, agentId, message, attachments);
+      yield* handleChatSend(sessionId, agentId, message, attachments, skillId);
       break;
     }
 
@@ -131,6 +135,37 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       break;
     }
 
+    case 'skill.list': {
+      const skills = skillRegistry.list().map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        category: s.category,
+      }));
+      yield { type: 'skill.list', skills };
+      break;
+    }
+
+    case 'skill.detail': {
+      const skillId = req.skillId as string;
+      const skill = skillRegistry.get(skillId);
+      if (skill) {
+        yield {
+          type: 'skill.detail',
+          skill: {
+            id: skill.id,
+            name: skill.name,
+            description: skill.description,
+            category: skill.category,
+            content: skill.content,
+          },
+        };
+      } else {
+        yield { type: 'error', message: `Skill '${skillId}' not found` };
+      }
+      break;
+    }
+
     case 'approval.respond': {
       const reqId = req.requestId as string;
       const approved = req.approved as boolean;
@@ -172,6 +207,7 @@ async function* handleChatSend(
   agentId: string,
   message: string,
   attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>,
+  skillId?: string,
 ): AsyncGenerator<KernelEvent> {
   console.log(`[DEBUG handleChatSend] START sessionId=${sessionId}, agentId=${agentId}, msgLen=${message.length}`);
 
@@ -213,6 +249,21 @@ async function* handleChatSend(
   sessions.addMessage(sessionId, { role: 'user', content: message });
   console.log(`[DEBUG handleChatSend] User message added`);
 
+  // Look up skill content if skillId provided (manual selection)
+  const skillContent = skillId ? skillRegistry.get(skillId)?.content : undefined;
+  if (skillId) {
+    console.log(`[DEBUG handleChatSend] Skill '${skillId}' resolved: ${skillContent ? `${skillContent.length} chars` : 'NOT FOUND'}`);
+  }
+
+  // Always inject all skills metadata so the LLM can auto-select
+  const allSkills = skillRegistry.list().map((s) => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    category: s.category,
+  }));
+  console.log(`[DEBUG handleChatSend] Injecting ${allSkills.length} skill metadata into system prompt`);
+
   // Run ReAct loop — pass session.messages directly so ReAct loop
   // pushes assistant/tool results into the live session history
   const messages = session.messages;
@@ -234,6 +285,8 @@ async function* handleChatSend(
         return sessions.waitForApproval(requestId, tool, sessionId);
       },
       attachments,
+      skillContent,
+      allSkills,
     })) {
       console.log(`[DEBUG handleChatSend] ReAct yielded event: ${event.type}`);
       yield event;

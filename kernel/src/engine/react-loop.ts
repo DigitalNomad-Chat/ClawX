@@ -10,7 +10,7 @@ import type {
   ToolCall,
 } from '../types.js';
 import type { ToolRegistry } from '../tools/registry.js';
-import { buildSystemPrompt } from '../agent/prompt-builder.js';
+import { buildSystemPrompt, formatSkillsBlock } from '../agent/prompt-builder.js';
 import { PermissionChecker } from '../security/permission-checker.js';
 import { auditToolInvoke, auditToolResult, auditPermission, auditApproval } from '../security/audit-logger.js';
 import { readFileSync } from 'fs';
@@ -72,6 +72,10 @@ export interface ReActLoopOptions {
   requestApproval?: (requestId: string, tool: string, input: unknown) => Promise<boolean>;
   /** File attachments to include in the conversation context */
   attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
+  /** Skill content to inject into the system prompt (manual selection) */
+  skillContent?: string;
+  /** All available skills metadata for auto-selection by the LLM */
+  allSkills?: Array<{ id: string; name: string; description: string; category: string }>;
 }
 
 /**
@@ -90,6 +94,8 @@ export async function* runReActLoop(
     maxTurns = agentConfig.maxTurns ?? DEFAULT_MAX_TURNS,
     requestApproval,
     attachments,
+    skillContent,
+    allSkills,
   } = options;
 
   const permissionChecker = new PermissionChecker();
@@ -112,7 +118,15 @@ export async function* runReActLoop(
     }
   }
 
-  const systemPrompt = buildSystemPrompt(agentConfig);
+  let systemPrompt = buildSystemPrompt(agentConfig);
+  // Inject manually selected skill content
+  if (skillContent) {
+    systemPrompt += `\n\n--- Skill Context ---\n${skillContent}\n--- End Skill Context ---`;
+  }
+  // Inject all available skills metadata so the LLM can self-select
+  if (allSkills && allSkills.length > 0) {
+    systemPrompt += formatSkillsBlock(allSkills);
+  }
   const availableTools = toolRegistry.filter(
     agentConfig.toolWhitelist,
     agentConfig.toolBlacklist
