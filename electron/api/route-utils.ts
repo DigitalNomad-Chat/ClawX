@@ -1,16 +1,24 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { PORTS } from '../utils/config';
 
 /**
- * Allowed CORS origins — only the Electron renderer (Vite dev or production)
- * and the OpenClaw Gateway are permitted to make cross-origin requests.
+ * Check whether an origin is a local loopback address.
+ *
+ * The Host API only listens on 127.0.0.1 and requires a per-session
+ * random Bearer token for every request, so the CORS policy is not
+ * the primary security boundary.  Accepting any localhost origin
+ * (regardless of port) keeps things simple when Vite auto-increments
+ * its dev-server port or when the Electron renderer is served from a
+ * non-default port.
  */
-const ALLOWED_ORIGINS = new Set([
-  `http://127.0.0.1:${PORTS.CLAWX_DEV}`,
-  `http://localhost:${PORTS.CLAWX_DEV}`,
-  `http://127.0.0.1:${PORTS.OPENCLAW_GATEWAY}`,
-  `http://localhost:${PORTS.OPENCLAW_GATEWAY}`,
-]);
+function isLocalhostOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+      && url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
 
 export async function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -44,10 +52,9 @@ export function requireJsonContentType(req: IncomingMessage): boolean {
 }
 
 export function setCorsHeaders(res: ServerResponse, origin?: string): void {
-  // Only reflect the Origin header back if it is in the allow-list.
-  // Omitting the header for unknown origins causes the browser to block
-  // the response — this is the intended behavior for untrusted callers.
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  // Accept any localhost origin — the per-session Bearer token already
+  // provides strong authentication; CORS is a secondary defence.
+  if (origin && isLocalhostOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
