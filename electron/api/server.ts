@@ -18,6 +18,7 @@ import { handleSessionRoutes } from './routes/sessions';
 import { handleCronRoutes } from './routes/cron';
 import { handleDiagnosticsRoutes } from './routes/diagnostics';
 import { sendJson, setCorsHeaders, requireJsonContentType } from './route-utils';
+import { moduleRouteHandlers } from '../modules/registry';
 
 type RouteHandler = (
   req: IncomingMessage,
@@ -44,7 +45,7 @@ const coreRouteHandlers: RouteHandler[] = [
 
 function buildRouteHandlers(): RouteHandler[] {
   const extensionHandlers = extensionRegistry.getRouteHandlers();
-  return [...coreRouteHandlers, ...extensionHandlers];
+  return [...coreRouteHandlers, ...moduleRouteHandlers, ...extensionHandlers];
 }
 
 /**
