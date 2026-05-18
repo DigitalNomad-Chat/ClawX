@@ -10,6 +10,7 @@ import type { HallParticipant, HallTaskCard } from './types';
 import {
   Plus,
   User,
+  Users,
   Loader2,
   CheckCircle2,
   WifiOff,
@@ -597,14 +598,25 @@ export function CollaborationPage() {
   );
 
   return (
-    <ModulePageLayout title={t('hall.messages', lang)} compact>
-      {error && (
-        <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
-          {error}
+    <ModulePageLayout>
+      <div className="flex h-full flex-col gap-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 shrink-0">
+          <Users className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">协作大厅</h1>
+            <p className="text-sm text-muted-foreground">多智能体协作与任务管理</p>
+          </div>
         </div>
-      )}
 
-      <div className="flex h-full gap-3">
+        {error && (
+          <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden">
+          <div className="flex h-full gap-3">
         {/* Left: Messages */}
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           <MessageStream
@@ -735,6 +747,8 @@ export function CollaborationPage() {
           </div>
         </div>
       </div>
+    </div>
+    </div>
 
       {/* Task Detail Drawer */}
       <TaskCardDetail
