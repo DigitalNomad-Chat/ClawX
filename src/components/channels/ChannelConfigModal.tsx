@@ -73,8 +73,10 @@ interface ChannelConfigModalProps {
 
 type ConfigPanel = 'credentials' | 'access' | 'connection' | 'advanced';
 
-const inputClasses = 'h-[44px] rounded-xl font-mono text-meta bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 shadow-sm transition-all text-foreground placeholder:text-foreground/40';
-const labelClasses = 'text-sm text-foreground/80 font-bold';
+const inputBaseClasses = 'h-11 rounded-xl bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus-visible:border-cyan-500/50 shadow-sm transition-all text-foreground placeholder:text-foreground/30';
+const inputTextClasses = 'text-sm font-sans';
+const inputCodeClasses = 'font-mono text-sm';
+const labelClasses = 'text-xs font-bold uppercase tracking-widest text-foreground/70';
 const outlineButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-foreground/80 hover:text-foreground';
 const primaryButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 shadow-none';
 
@@ -90,6 +92,20 @@ function getAllPanels(meta: ChannelMeta | null): ConfigPanel[] {
     if (!panels.includes(group.id)) panels.push(group.id);
   }
   return panels;
+}
+
+function getChannelBrandColor(type: ChannelType | null): string {
+  const colors: Record<string, string> = {
+    telegram: '#229ED9',
+    discord: '#5865F2',
+    whatsapp: '#25D366',
+    slack: '#4A154B',
+    feishu: '#3370FF',
+    dingtalk: '#0089FF',
+    wecom: '#07C160',
+    qqbot: '#12B7F5',
+  };
+  return type ? colors[type] || '#64748b' : '#64748b';
 }
 
 export function ChannelConfigModal({
@@ -127,6 +143,12 @@ export function ChannelConfigModal({
     errors: string[];
     warnings: string[];
   } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const meta: ChannelMeta | null = selectedType ? CHANNEL_META[selectedType] : null;
   const shouldUseCredentialValidation = selectedType !== 'feishu';
@@ -548,7 +570,10 @@ export function ChannelConfigModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      className={cn(
+        'fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300',
+        mounted ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/0'
+      )}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -556,13 +581,30 @@ export function ChannelConfigModal({
       }}
     >
       <Card
-        className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl border-0 shadow-2xl bg-surface-modal overflow-hidden"
+        className={cn(
+          'w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl border-0 shadow-2xl bg-surface-modal overflow-hidden transition-all duration-300 ease-out',
+          mounted ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-[0.96] translate-y-4'
+        )}
         onMouseDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <CardHeader className="flex flex-row items-start justify-between pb-2 shrink-0">
-          <div>
-            <CardTitle className="text-2xl font-serif font-normal tracking-tight">
+        <CardHeader className="relative flex flex-row items-start justify-between pb-4 shrink-0 overflow-hidden">
+          {/* 顶部品牌色光带 */}
+          <div
+            className="absolute top-0 left-0 right-0 h-[3px]"
+            style={{
+              background: selectedType
+                ? `linear-gradient(90deg, transparent, ${getChannelBrandColor(selectedType)}, transparent)`
+                : 'transparent'
+            }}
+          />
+          {/* 右上角辉光 */}
+          <div
+            className="absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-[0.08] blur-3xl pointer-events-none"
+            style={{ background: selectedType ? getChannelBrandColor(selectedType) : 'transparent' }}
+          />
+          <div className="relative z-10 pt-1">
+            <CardTitle className="text-xl font-bold tracking-tight text-foreground">
               {selectedType
                 ? isExistingConfig
                   ? t('dialog.updateTitle', { name: CHANNEL_NAMES[selectedType] })
@@ -579,7 +621,7 @@ export function ChannelConfigModal({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="rounded-full h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            className="relative z-10 rounded-full h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -673,11 +715,11 @@ export function ChannelConfigModal({
                 </div>
               )}
 
-              <div className="bg-surface-input p-4 rounded-2xl space-y-4 shadow-sm border border-black/10 dark:border-white/10">
+              <div className="bg-surface-input/50 p-5 rounded-2xl border border-black/5 dark:border-white/5 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className={labelClasses}>{t('dialog.howToConnect')}</p>
-                    <p className="text-meta text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {meta ? t(meta.description.replace('channels:', '')) : ''}
                     </p>
                   </div>
@@ -686,16 +728,21 @@ export function ChannelConfigModal({
                     className={cn(outlineButtonClasses, 'h-8 px-3 shrink-0')}
                     onClick={openDocs}
                   >
-                    <BookOpen className="h-3 w-3 mr-1" />
-                    {t('dialog.viewDocs')}
+                    <BookOpen className="h-3 w-3 mr-1.5" />
+                    Docs
                     <ExternalLink className="h-3 w-3 ml-1" />
                   </Button>
                 </div>
-                <ol className="list-decimal pl-5 text-meta text-muted-foreground leading-relaxed space-y-1.5">
+                <div className="relative pl-4 space-y-4 border-l-2 border-black/[0.06] dark:border-white/[0.08]">
                   {meta?.instructions.map((instruction, index) => (
-                    <li key={index}>{t(instruction)}</li>
+                    <div key={index} className="relative pl-4">
+                      <div className="absolute -left-[21px] top-0.5 h-5 w-5 rounded-full bg-surface-modal border-2 border-black/[0.08] dark:border-white/[0.12] flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                        {index + 1}
+                      </div>
+                      <p className="text-sm text-foreground/80 leading-relaxed">{t(instruction)}</p>
+                    </div>
                   ))}
-                </ol>
+                </div>
               </div>
 
               {showChannelName && (
@@ -707,7 +754,7 @@ export function ChannelConfigModal({
                     placeholder={t('dialog.channelNamePlaceholder', { name: meta?.name })}
                     value={channelName}
                     onChange={(event) => setChannelName(event.target.value)}
-                    className={inputClasses}
+                    className={cn(inputBaseClasses, inputTextClasses)}
                   />
                 </div>
               )}
@@ -725,7 +772,7 @@ export function ChannelConfigModal({
                       }
                     }}
                     placeholder={t('account.customIdPlaceholder')}
-                    className={cn(inputClasses, accountIdError && 'border-destructive/50 focus-visible:ring-destructive/30')}
+                    className={cn(inputBaseClasses, inputTextClasses, accountIdError && 'border-destructive/50 focus-visible:ring-destructive/30')}
                   />
                   {accountIdError ? (
                     <p className="text-xs text-destructive">{accountIdError}</p>
@@ -763,9 +810,18 @@ export function ChannelConfigModal({
               {/* Panel Tabs */}
               {availablePanels.length > 1 && (
                 <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as ConfigPanel)} className="w-full">
-                  <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${availablePanels.length}, 1fr)` }}>
+                  <TabsList className="w-full h-auto p-1.5 bg-black/[0.04] dark:bg-white/[0.05] rounded-2xl border border-black/5 dark:border-white/10 flex gap-1 relative">
                     {availablePanels.map((panel) => (
-                      <TabsTrigger key={panel} value={panel} className="text-xs sm:text-sm gap-1.5">
+                      <TabsTrigger
+                        key={panel}
+                        value={panel}
+                        className={cn(
+                          'flex-1 relative z-10 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold uppercase tracking-wider rounded-xl transition-colors duration-200',
+                          'text-muted-foreground hover:text-foreground data-[state=active]:text-white dark:data-[state=active]:text-black',
+                          'before:absolute before:inset-0 before:-z-10 before:rounded-xl before:bg-foreground before:opacity-0 before:scale-90 before:transition-all before:duration-300',
+                          'data-[state=active]:before:opacity-100 data-[state=active]:before:scale-100'
+                        )}
+                      >
                         {panel === 'credentials' && <KeyRound className="h-3.5 w-3.5 hidden sm:inline" />}
                         {panel === 'access' && <MessageSquareLock className="h-3.5 w-3.5 hidden sm:inline" />}
                         {panel === 'connection' && <Plug className="h-3.5 w-3.5 hidden sm:inline" />}
@@ -775,28 +831,32 @@ export function ChannelConfigModal({
                     ))}
                   </TabsList>
 
-                  <TabsContent value="credentials" className="mt-4 space-y-5">
-                    {meta?.configFields.map((field) => (
-                      <ConfigField
-                        key={field.key}
-                        field={field}
-                        value={configValues[field.key] || ''}
-                        onChange={(value) => updateConfigValue(field.key, value)}
-                        showSecret={showSecrets[field.key] || false}
-                        onToggleSecret={() => toggleSecretVisibility(field.key)}
-                      />
-                    ))}
+                  <TabsContent value="credentials" className="mt-6">
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-5">
+                      {meta?.configFields.map((field) => (
+                        <ConfigField
+                          key={field.key}
+                          field={field}
+                          value={configValues[field.key] || ''}
+                          onChange={(value) => updateConfigValue(field.key, value)}
+                          showSecret={showSecrets[field.key] || false}
+                          onToggleSecret={() => toggleSecretVisibility(field.key)}
+                        />
+                      ))}
+                    </div>
                   </TabsContent>
 
                   {meta?.settingsGroups?.map((group) => (
-                    <TabsContent key={group.id} value={group.id} className="mt-4">
-                      <SettingsGroupPanel
-                        group={group}
-                        settingsValues={settingsValues}
-                        showSecrets={showSecrets}
-                        onChange={updateSettingsValue}
-                        onToggleSecret={toggleSecretVisibility}
-                      />
+                    <TabsContent key={group.id} value={group.id} className="mt-6">
+                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <SettingsGroupPanel
+                          group={group}
+                          settingsValues={settingsValues}
+                          showSecrets={showSecrets}
+                          onChange={updateSettingsValue}
+                          onToggleSecret={toggleSecretVisibility}
+                        />
+                      </div>
                     </TabsContent>
                   ))}
                 </Tabs>
@@ -868,7 +928,18 @@ export function ChannelConfigModal({
 
               <Separator className="bg-black/10 dark:bg-white/10" />
 
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6 pb-2">
+                {/* 左侧状态区 */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className={cn(
+                    'h-2 w-2 rounded-full transition-all duration-300',
+                    isFormValid() ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-destructive'
+                  )} />
+                  <span className="font-mono uppercase tracking-wider">
+                    {isFormValid() ? 'Ready to Connect' : 'Required Fields Missing'}
+                  </span>
+                </div>
+                {/* 右侧按钮组 */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   {meta?.connectionType === 'token' && shouldUseCredentialValidation && activePanel === 'credentials' && (
                     <Button
@@ -895,7 +966,7 @@ export function ChannelConfigModal({
                       void handleConnect();
                     }}
                     disabled={connecting || !isFormValid() || (showAccountIdEditor && !accountIdInput.trim())}
-                    className={primaryButtonClasses}
+                    className={cn(primaryButtonClasses, 'bg-foreground hover:bg-foreground/90 text-background')}
                   >
                     {connecting ? (
                       <>
@@ -949,6 +1020,11 @@ function splitConfigValues(
   }
 
   return { creds, settings };
+}
+
+function isValidJson(str: string): boolean {
+  if (!str.trim()) return true;
+  try { JSON.parse(str); return true; } catch { return false; }
 }
 
 interface ConfigFieldProps {
@@ -1009,7 +1085,7 @@ function ConfigField({ field, value, onChange, showSecret, onToggleSecret }: Con
           placeholder={field.placeholder ? t(field.placeholder) : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={inputClasses}
+          className={cn(inputBaseClasses, inputCodeClasses)}
         />
         {isPassword && (
           <Button
@@ -1110,21 +1186,30 @@ function SettingsField({ field, value, onChange, showSecret, onToggleSecret }: S
   if (field.type === 'checkbox') {
     const boolValue = value === 'true' || (value as unknown) === true;
     return (
-      <div className="flex items-start justify-between p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10">
-        <div className="space-y-0.5 min-w-0">
-          <Label htmlFor={inputId} className="text-sm font-medium text-foreground cursor-pointer">
-            {t(field.label)}
-          </Label>
-          {field.description && (
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t(field.description)}
-            </p>
-          )}
+      <div className="group flex items-center justify-between p-4 rounded-2xl bg-surface-input/40 border border-black/5 dark:border-white/5 hover:bg-surface-input/80 transition-all duration-200">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className={cn(
+            'mt-0.5 h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors',
+            boolValue ? 'bg-cyan-500/10 text-cyan-600' : 'bg-black/[0.04] dark:bg-white/[0.06] text-muted-foreground'
+          )}>
+            <Settings2 className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <Label htmlFor={inputId} className="text-sm font-semibold text-foreground cursor-pointer block">
+              {t(field.label)}
+            </Label>
+            {field.description && (
+              <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                {t(field.description)}
+              </p>
+            )}
+          </div>
         </div>
         <Switch
           id={inputId}
           checked={boolValue}
           onCheckedChange={(checked) => onChange(String(checked))}
+          className="data-[state=checked]:bg-cyan-500 shrink-0 ml-4"
         />
       </div>
     );
@@ -1142,7 +1227,8 @@ function SettingsField({ field, value, onChange, showSecret, onToggleSecret }: S
             value={value}
             onChange={(event) => onChange(event.target.value)}
             className={cn(
-              inputClasses,
+              inputBaseClasses,
+              inputTextClasses,
               'h-[44px] px-3 appearance-none w-full pr-10'
             )}
           >
@@ -1170,31 +1256,49 @@ function SettingsField({ field, value, onChange, showSecret, onToggleSecret }: S
   if (field.type === 'textarea') {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Label htmlFor={inputId} className={labelClasses}>
-            {t(field.label)}
-          </Label>
-          {isJsonField && (
-            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
-              <Code2 className="h-3 w-3 mr-0.5" />
-              JSON
-            </Badge>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Label htmlFor={inputId} className={labelClasses}>
+              {t(field.label)}
+            </Label>
+            {isJsonField && (
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono bg-black/[0.06] dark:bg-white/[0.08] text-muted-foreground border-0">
+                <Code2 className="h-3 w-3 mr-0.5" />
+                JSON
+              </Badge>
+            )}
+          </div>
+          {isJsonField && value && (
+            <span className={cn(
+              'text-[10px] font-mono transition-colors',
+              isValidJson(value) ? 'text-green-500' : 'text-destructive'
+            )}>
+              {isValidJson(value) ? '● VALID' : '● INVALID'}
+            </span>
           )}
         </div>
-        <textarea
-          id={inputId}
-          placeholder={field.placeholder ? t(field.placeholder) : undefined}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          rows={isJsonField ? 5 : 4}
-          className={cn(
-            inputClasses,
-            'h-auto py-2.5 resize-none font-mono text-sm leading-relaxed',
-            isJsonField && 'border-dashed border-amber-500/30 dark:border-amber-400/20 bg-amber-50/[0.03] dark:bg-amber-400/[0.02]'
-          )}
-        />
+        <div className="relative group">
+          <textarea
+            id={inputId}
+            placeholder={field.placeholder ? t(field.placeholder) : undefined}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            rows={isJsonField ? 6 : 4}
+            className={cn(
+              inputBaseClasses,
+              inputCodeClasses,
+              'h-auto py-3 px-3.5 resize-none leading-relaxed w-full',
+              isJsonField && 'bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.08] dark:border-white/[0.08] focus-visible:bg-transparent'
+            )}
+            spellCheck={false}
+          />
+          <div className={cn(
+            'absolute bottom-0 left-4 right-4 h-[2px] rounded-full transition-all duration-300 opacity-0 group-focus-within:opacity-100',
+            isJsonField && isValidJson(value) ? 'bg-green-500/50' : 'bg-cyan-500/50'
+          )} />
+        </div>
         {field.description && (
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">
             {t(field.description)}
           </p>
         )}
@@ -1217,7 +1321,7 @@ function SettingsField({ field, value, onChange, showSecret, onToggleSecret }: S
           placeholder={field.placeholder ? t(field.placeholder) : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={cn(inputClasses, isNumber && 'font-mono')}
+          className={cn(inputBaseClasses, isPassword || isNumber ? inputCodeClasses : inputTextClasses)}
         />
         {isPassword && (
           <Button
