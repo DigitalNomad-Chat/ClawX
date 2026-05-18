@@ -129,11 +129,10 @@ function buildDreamingEnabledPatchRaw(enabled: boolean): string {
     },
   });
 }
-const PANEL_CLASS = 'border-black/10 bg-surface-modal shadow-sm dark:border-white/10';
-const INSET_CLASS = 'border-black/10 bg-surface-input dark:border-white/10';
-const QUIET_BUTTON_CLASS = 'border-black/10 bg-surface-input text-foreground/80 shadow-none hover:bg-black/5 hover:text-foreground dark:border-white/10 dark:hover:bg-white/5';
-const STATUS_BADGE_CLASS = 'border-black/10 bg-black/5 text-foreground/80 dark:border-white/10 dark:bg-white/10 dark:text-foreground/80';
-const SUCCESS_NOTICE_CLASS = 'border-black/10 bg-black/5 text-foreground/80 dark:border-white/10 dark:bg-white/10';
+const PANEL_CLASS = 'rounded-xl border bg-card shadow-sm';
+const INSET_CLASS = 'rounded-lg border bg-muted';
+const QUIET_BUTTON_CLASS = '';
+const STATUS_BADGE_CLASS = '';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value);
@@ -395,21 +394,14 @@ export function Dreams() {
   ];
 
   return (
-    <div data-testid="dreams-page" className="flex h-[calc(100vh-2.5rem)] min-h-0 flex-col overflow-hidden -m-6 bg-background">
-      <header className="flex shrink-0 items-center justify-between gap-4 px-10 pb-6 pt-8">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Moon className="h-6 w-6 text-foreground/70" />
-            <h1 className="truncate font-serif text-4xl font-normal tracking-tight text-foreground">{t('title')}</h1>
-            <Badge
-              data-testid="dreams-enabled-badge"
-              variant="outline"
-              className={cn('shrink-0', STATUS_BADGE_CLASS)}
-            >
-              {dreaming?.enabled ? t('common:status.enabled') : t('common:status.disabled')}
-            </Badge>
+    <div data-testid="dreams-page" className="flex h-full flex-col gap-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Moon className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">{t('title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
-          <p className="mt-2 text-subtitle font-medium text-foreground/60">{t('subtitle')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button
@@ -418,7 +410,7 @@ export function Dreams() {
             size="sm"
             onClick={() => void setDreamingEnabled(!dreaming?.enabled)}
             disabled={!dreamsReady || busy || loading}
-            className={dreaming?.enabled ? QUIET_BUTTON_CLASS : undefined}
+            className={dreaming?.enabled ? undefined : undefined}
           >
             {runningToggle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Power className="mr-2 h-4 w-4" />}
             {dreaming?.enabled ? t('actions.disable') : t('actions.enable')}
@@ -429,28 +421,26 @@ export function Dreams() {
             size="sm"
             onClick={() => void refreshAll({ force: true })}
             disabled={!dreamsReady}
-            className={QUIET_BUTTON_CLASS}
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             {t('common:actions.refresh')}
           </Button>
           <Button
             data-testid="dreams-open-full-ui"
-            variant="secondary"
+            variant="outline"
             size="sm"
             onClick={() => void openFullDreams()}
             disabled={openingFullUi || !gatewayRunning}
-            className="border border-black/10 bg-card text-foreground shadow-sm hover:bg-black/5 dark:border-white/10 dark:bg-card dark:hover:bg-white/5"
           >
             {openingFullUi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
             {t('openFullUi')}
           </Button>
         </div>
-      </header>
+      </div>
 
-      <main className="min-h-0 flex-1 overflow-auto px-10 pb-10">
+      <div className="flex-1 overflow-y-auto">
         {!dreamsReady && (
-          <div className="mb-4 rounded-lg border border-black/10 bg-surface-input px-4 py-3 text-sm text-foreground/70 dark:border-white/10">
+          <div className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
             {t('gatewayNotReady')}
           </div>
         )}
@@ -462,7 +452,7 @@ export function Dreams() {
         )}
 
         {lastActionMessage && (
-          <div data-testid="dreams-action-message" className={cn('mb-4 rounded-lg border px-4 py-3 text-sm', SUCCESS_NOTICE_CLASS)}>
+          <div data-testid="dreams-action-message" className={cn('mb-4 rounded-lg border bg-muted px-4 py-3 text-sm')}>
             {lastActionMessage}
           </div>
         )}
@@ -471,10 +461,10 @@ export function Dreams() {
           {metrics.map((metric) => {
             const Icon = metric.icon;
             return (
-              <Card key={metric.label} className={PANEL_CLASS}>
+              <Card key={metric.label} className="rounded-xl border bg-card shadow-sm">
                 <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-input">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
                   </div>
                   <div className="min-w-0">
                     <div className="text-2xl font-semibold tabular-nums">{metric.value}</div>
@@ -642,7 +632,7 @@ export function Dreams() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
 
       <ConfirmDialog
         open={pendingConfirmation != null}

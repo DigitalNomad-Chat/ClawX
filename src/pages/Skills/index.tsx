@@ -14,6 +14,7 @@ import {
   RefreshCw,
   FolderOpen,
   Copy,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,28 +130,28 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
         />
       </Suspense>
       <SheetContent
-        className="w-full sm:max-w-[450px] p-0 flex flex-col border-l border-black/10 dark:border-white/10 bg-surface-modal shadow-[0_0_40px_rgba(0,0,0,0.2)]"
+        className="w-full sm:max-w-[450px] p-0 flex flex-col border-l bg-card shadow-lg"
         side="right"
       >
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-8 py-10">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 flex items-center justify-center rounded-full bg-white dark:bg-accent border border-black/5 dark:border-white/5 shrink-0 mb-4 relative shadow-sm">
+            <div className="w-16 h-16 flex items-center justify-center rounded-xl bg-primary/10 border shrink-0 mb-4 relative shadow-sm">
               <span className="text-3xl">{skill.icon || '🔧'}</span>
               {skill.isCore && (
-                <div className="absolute -bottom-1 -right-1 bg-surface-modal rounded-full p-1 shadow-sm border border-black/5 dark:border-white/5">
+                <div className="absolute -bottom-1 -right-1 bg-card rounded-full p-1 shadow-sm border">
                   <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
                 </div>
               )}
             </div>
-            <h2 className="text-3xl font-serif text-foreground font-normal mb-3 text-center tracking-tight">
+            <h2 className="text-2xl font-bold text-foreground mb-3 text-center">
               {skill.name}
             </h2>
             <div data-skill-detail-meta-row="1" className="flex items-center justify-center flex-wrap gap-2.5 mb-6 opacity-80">
-              <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-tiny font-medium px-3 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] border-0 shadow-none text-foreground/70 transition-colors">
+              <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs font-medium px-3 py-0.5 rounded-md border-0 shadow-none">
                 v{skill.version}
               </Badge>
-              <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-tiny font-medium px-3 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] border-0 shadow-none text-foreground/70 transition-colors">
+              <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs font-medium px-3 py-0.5 rounded-md border-0 shadow-none">
                 {skill.isCore ? t('detail.coreSystem') : skill.isBundled ? t('detail.bundled') : t('detail.userInstalled')}
               </Badge>
               {detailMetaComponents.map((DetailMetaComponent, index) => (
@@ -167,9 +168,9 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
 
           <div className="space-y-7 px-1">
             <div className="space-y-2">
-              <h3 className="text-meta font-bold text-foreground/80">{t('detail.source')}</h3>
+              <h3 className="text-sm font-bold text-foreground/80">{t('detail.source')}</h3>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-tiny font-medium px-3 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] border-0 shadow-none text-foreground/70">
+                <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-mono text-xs font-medium px-3 py-0.5 rounded-md border-0 shadow-none">
                   {resolveSkillSourceLabel(skill, t)}
                 </Badge>
               </div>
@@ -177,12 +178,12 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
                 <Input
                   value={skill.baseDir || t('detail.pathUnavailable')}
                   readOnly
-                  className="h-[38px] font-mono text-xs bg-surface-input border-black/10 dark:border-white/10 rounded-xl text-foreground/70"
+                  className="h-[38px] font-mono text-xs bg-muted border rounded-lg text-foreground/70"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-[38px] w-[38px] border-black/10 dark:border-white/10"
+                  className="h-[38px] w-[38px]"
                   disabled={!skill.baseDir}
                   onClick={handleCopyPath}
                   title={t('detail.copyPath')}
@@ -192,7 +193,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-[38px] w-[38px] border-black/10 dark:border-white/10"
+                  className="h-[38px] w-[38px]"
                   disabled={!skill.baseDir}
                   onClick={() => onOpenFolder?.(skill)}
                   title={t('detail.openActualFolder')}
@@ -205,7 +206,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
             {/* File Sections — read-only preview of skill content */}
             {skill.baseDir && (
               <div className="space-y-3">
-                <h3 className="text-meta font-bold text-foreground/80">
+                <h3 className="text-sm font-semibold text-foreground">
                   {t('detail.sections.title', { defaultValue: '内容' })}
                 </h3>
                 <SkillFileSections
@@ -222,7 +223,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
             <div className="pt-8 pb-4 flex items-center justify-center w-full px-2 max-w-[340px] mx-auto">
               <Button
                 variant="outline"
-                className="w-full h-[42px] text-meta rounded-full font-semibold shadow-sm bg-transparent border-black/20 dark:border-white/20 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-foreground/80 hover:text-foreground"
+                className="w-full"
                 onClick={() => {
                   if (!skill.isBundled && onUninstall && skill.slug) {
                     onUninstall(skill.slug);
@@ -499,32 +500,29 @@ export function Skills() {
   }
 
   return (
-    <div data-testid="skills-page" className="flex flex-col -m-6 dark:bg-background h-[calc(100vh-2.5rem)] overflow-hidden">
-      <div className="w-full max-w-5xl mx-auto flex flex-col h-full p-10 pt-16">
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between mb-6 shrink-0 gap-4">
+    <div data-testid="skills-page" className="flex h-full flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Wrench className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight">
-              {t('title')}
-            </h1>
-            <p className="text-subtitle text-foreground/70 font-medium">
-              {t('subtitle')}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 md:mt-2">
-            {hasInstalledSkills && (
-              <button
-                onClick={handleOpenSkillsFolder}
-                className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0 text-meta font-medium px-4 h-8 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center text-foreground/80 hover:text-foreground"
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                {t('openFolder')}
-              </button>
-            )}
+            <h1 className="text-2xl font-bold">{t('title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          {hasInstalledSkills && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenSkillsFolder}
+            >
+              <FolderOpen className="h-4 w-4 mr-2" />
+              {t('openFolder')}
+            </Button>
+          )}
+        </div>
+      </div>
 
         {/* Gateway Status Banner */}
         {showGatewayBanner && gatewayBannerState !== 'none' && (
@@ -556,15 +554,15 @@ export function Skills() {
         )}
 
         {/* Sub Navigation and Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-black/10 dark:border-white/10 pb-4 mb-4 shrink-0 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border pb-4 mb-4 shrink-0 gap-4">
           <div className="flex items-center flex-wrap gap-4 text-sm">
-            <div className="relative group flex items-center bg-black/5 dark:bg-white/5 rounded-full px-3 py-1.5 focus-within:bg-black/10 transition-colors border border-transparent focus-within:border-black/10 dark:focus-within:border-white/10 mr-2">
+            <div className="relative group flex items-center bg-muted rounded-lg px-3 py-1.5 transition-colors border mr-2">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input
                 placeholder={t('search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="ml-2 bg-transparent outline-none w-28 md:w-40 font-normal placeholder:text-foreground/50 text-meta text-foreground"
+                className="ml-2 bg-transparent outline-none w-28 md:w-40 font-normal placeholder:text-foreground/50 text-sm text-foreground"
               />
               {searchQuery && (
                 <button
@@ -604,7 +602,7 @@ export function Skills() {
               variant="outline"
               size="sm"
               onClick={() => bulkToggleVisible(true)}
-              className="h-8 text-meta font-medium rounded-md px-3 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none"
+              className="h-8 text-sm font-medium rounded-md px-3"
             >
               {t('actions.enableVisible')}
             </Button>
@@ -612,7 +610,7 @@ export function Skills() {
               variant="outline"
               size="sm"
               onClick={() => bulkToggleVisible(false)}
-              className="h-8 text-meta font-medium rounded-md px-3 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none"
+              className="h-8 text-sm font-medium rounded-md px-3"
             >
               {t('actions.disableVisible')}
             </Button>
@@ -623,7 +621,7 @@ export function Skills() {
                 setInstallQuery('');
                 setInstallSheetOpen(true);
               }}
-              className="h-8 text-meta font-medium rounded-md px-3 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none"
+              className="h-8 text-sm font-medium rounded-md px-3"
             >
               {t('actions.installSkill')}
             </Button>
@@ -634,7 +632,7 @@ export function Skills() {
                 void fetchSkills();
               }}
               disabled={!gatewayRunning}
-              className="h-8 w-8 ml-1 rounded-md border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 ml-1 rounded-md border bg-transparent hover:bg-muted shadow-none text-muted-foreground hover:text-foreground"
               title={t('refresh')}
             >
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
@@ -665,11 +663,11 @@ export function Skills() {
               filteredSkills.map((skill) => (
                 <div
                   key={skill.id}
-                  className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
+                  className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-muted transition-colors cursor-pointer border-b last:border-0"
                   onClick={() => setSelectedSkill(skill)}
                 >
                   <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
-                    <div className="h-10 w-10 shrink-0 flex items-center justify-center text-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
+                    <div className="h-10 w-10 shrink-0 flex items-center justify-center text-2xl bg-primary/10 rounded-xl overflow-hidden">
                       {skill.icon || '🧩'}
                     </div>
                     <div className="flex flex-col overflow-hidden">
@@ -681,7 +679,7 @@ export function Skills() {
                           <Puzzle className="h-3 w-3 text-blue-500/70" />
                         ) : null}
                         {skill.slug && skill.slug !== skill.name ? (
-                          <span className="text-tiny font-mono px-1.5 py-0.5 rounded border border-black/10 dark:border-white/10 text-muted-foreground">
+                          <span className="text-xs font-mono px-1.5 py-0.5 rounded border border text-muted-foreground">
                             {skill.slug}
                           </span>
                         ) : null}
@@ -689,8 +687,8 @@ export function Skills() {
                       <p className="text-sm text-muted-foreground line-clamp-1 pr-6 leading-relaxed">
                         {skill.description}
                       </p>
-                      <div className="mt-1 flex items-center gap-2 text-tiny text-foreground/55 min-w-0">
-                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap px-1.5 py-0 h-5 text-2xs font-medium bg-black/5 dark:bg-white/10 border-0 shadow-none">
+                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground/55 min-w-0">
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap px-1.5 py-0 h-5 text-2xs font-medium border-0 shadow-none">
                           {resolveSkillSourceLabel(skill, t)}
                         </Badge>
                         <span className="truncate font-mono min-w-0">
@@ -701,7 +699,7 @@ export function Skills() {
                   </div>
                   <div className="flex items-center gap-6 shrink-0" onClick={e => e.stopPropagation()}>
                     {skill.version && (
-                      <span className="text-meta font-mono text-muted-foreground">
+                      <span className="text-sm font-mono text-muted-foreground">
                         v{skill.version}
                       </span>
                     )}
@@ -716,24 +714,23 @@ export function Skills() {
             )}
           </div>
         </div>
-      </div>
 
       <Sheet open={installSheetOpen} onOpenChange={setInstallSheetOpen}>
         <SheetContent
-          className="w-full sm:max-w-[560px] p-0 flex flex-col border-l border-black/10 dark:border-white/10 bg-surface-modal shadow-[0_0_40px_rgba(0,0,0,0.2)]"
+          className="w-full sm:max-w-[560px] p-0 flex flex-col border-l bg-card shadow-lg"
           side="right"
         >
-          <div className="px-7 py-6 border-b border-black/10 dark:border-white/10">
-            <h2 className="text-2xl font-serif text-foreground font-normal tracking-tight">{t('marketplace.installDialogTitle')}</h2>
-            <p className="mt-1 text-meta text-foreground/70">{t('marketplace.installDialogSubtitle')}</p>
+          <div className="px-7 py-6 border-b">
+            <h2 className="text-xl font-bold text-foreground">{t('marketplace.installDialogTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('marketplace.installDialogSubtitle')}</p>
             <div className="mt-4 flex flex-col md:flex-row gap-2">
-              <div className="relative flex items-center bg-black/5 dark:bg-white/5 rounded-xl px-3 py-2 border border-black/10 dark:border-white/10 flex-1">
+              <div className="relative flex items-center bg-muted rounded-lg px-3 py-2 border flex-1">
                 <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <Input
                   placeholder={t('searchMarketplace')}
                   value={installQuery}
                   onChange={(e) => setInstallQuery(e.target.value)}
-                  className="ml-2 h-auto border-0 bg-transparent p-0 shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-meta"
+                  className="ml-2 h-auto border-0 bg-transparent p-0 shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
                 />
                 {installQuery && (
                   <button
@@ -748,7 +745,7 @@ export function Skills() {
               <Button
                 variant="outline"
                 disabled
-                className="h-10 rounded-xl border-black/10 dark:border-white/10 bg-transparent text-muted-foreground"
+                className="h-10 rounded-lg text-muted-foreground"
               >
                 {t('marketplace.sourceLabel')}: {t('marketplace.sourceClawHub')}
               </Button>
@@ -783,11 +780,11 @@ export function Skills() {
                   return (
                     <div
                       key={skill.slug}
-                      className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
+                      className="group flex flex-row items-center justify-between py-3.5 px-3 rounded-xl hover:bg-muted transition-colors cursor-pointer border-b last:border-0"
                       onClick={() => invokeIpc('shell:openExternal', `https://clawhub.ai/s/${skill.slug}`)}
                     >
                       <div className="flex items-start gap-4 flex-1 overflow-hidden pr-4">
-                        <div className="h-10 w-10 shrink-0 flex items-center justify-center text-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-xl overflow-hidden">
+                        <div className="h-10 w-10 shrink-0 flex items-center justify-center text-xl bg-primary/10 rounded-xl overflow-hidden">
                           📦
                         </div>
                         <div className="flex flex-col overflow-hidden">
@@ -804,7 +801,7 @@ export function Skills() {
                       </div>
                       <div className="flex items-center gap-4 shrink-0" onClick={e => e.stopPropagation()}>
                         {skill.version && (
-                          <span className="text-meta font-mono text-muted-foreground mr-2">
+                          <span className="text-sm font-mono text-muted-foreground mr-2">
                             v{skill.version}
                           </span>
                         )}
@@ -824,7 +821,7 @@ export function Skills() {
                             size="sm"
                             onClick={() => handleInstall(skill.slug)}
                             disabled={isInstallLoading}
-                            className="h-8 px-4 rounded-full shadow-none font-medium text-xs"
+                            className="h-8 px-4 shadow-none font-medium text-xs"
                           >
                             {isInstallLoading ? <LoadingSpinner size="sm" /> : t('marketplace.install', 'Install')}
                           </Button>
