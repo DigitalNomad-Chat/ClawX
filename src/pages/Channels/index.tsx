@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, MessageSquare } from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, MessageSquare, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -518,7 +518,7 @@ export function Channels() {
 
   return (
     <div data-testid="channels-page" className="flex flex-col -m-6 dark:bg-background h-[calc(100vh-2.5rem)] overflow-hidden">
-      <div className="w-full max-w-5xl mx-auto flex flex-col h-full p-10 pt-16">
+      <div className="w-full max-w-7xl mx-auto flex flex-col h-full px-6 py-8">
         <div className="flex flex-col md:flex-row md:items-start justify-between mb-8 shrink-0 gap-4">
           <div className="flex items-center gap-3">
             <Radio className="h-6 w-6 text-primary" />
@@ -545,7 +545,7 @@ export function Channels() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 pb-10 min-h-0 -mr-2">
+        <div className="flex-1 overflow-y-auto pb-6 min-h-0">
           {gatewayStatus.state !== 'running' && (
             <div className="mb-8 p-4 rounded-xl border border-yellow-500/50 bg-yellow-500/10 flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -707,22 +707,56 @@ export function Channels() {
                         return (
                           <div
                             key={`${group.channelType}-${account.accountId}`}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 px-3 py-2"
+                            className="rounded-lg border border-border/50 bg-muted/40 px-3 py-2.5 space-y-2"
                           >
-                            <div className="min-w-0 flex-1">
+                            {/* 第一行：名称 + 操作按钮 */}
+                            <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium truncate">{displayName}</p>
-                              {account.lastError && (
-                                <p className="text-xs text-destructive mt-0.5">{account.lastError}</p>
-                              )}
-                              {!account.lastError && account.statusReason && account.status === 'degraded' && (
-                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">
-                                  {t(`health.reasons.${account.statusReason}`)}
-                                </p>
-                              )}
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  onClick={() => {
+                                    void (async () => {
+                                      try {
+                                        const accountParam = `?accountId=${encodeURIComponent(account.accountId)}`;
+                                        const result = await hostApiFetch<{ success: boolean; values?: Record<string, string> }>(
+                                          `/api/channels/config/${encodeURIComponent(group.channelType)}${accountParam}`
+                                        );
+                                        setInitialConfigValuesForModal(result.success ? (result.values || {}) : undefined);
+                                      } catch {
+                                        setInitialConfigValuesForModal(undefined);
+                                      }
+                                      setSelectedChannelType(group.channelType as ChannelType);
+                                      setSelectedAccountId(account.accountId);
+                                      setAllowExistingConfigInModal(true);
+                                      setAllowEditAccountIdInModal(false);
+                                      setExistingAccountIdsForModal([]);
+                                      setShowConfigModal(true);
+                                    })();
+                                  }}
+                                  title={t('account.edit')}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeleteTarget({ channelType: group.channelType, accountId: account.accountId })}
+                                  title={t('account.delete')}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+
+                            {/* 第二行：Agent 绑定 */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground shrink-0">{t('account.bindAgentLabel')}</span>
                               <select
-                                className="h-7 rounded-md border border-input bg-background px-1.5 text-xs"
+                                className="h-7 rounded-md border border-input bg-background px-2 text-xs min-w-0 flex-1"
                                 value={account.agentId || ''}
                                 onChange={(event) => {
                                   void handleBindAgent(group.channelType, account.accountId, event.target.value);
@@ -733,43 +767,16 @@ export function Channels() {
                                   <option key={agent.id} value={agent.id}>{agent.name}</option>
                                 ))}
                               </select>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                onClick={() => {
-                                  void (async () => {
-                                    try {
-                                      const accountParam = `?accountId=${encodeURIComponent(account.accountId)}`;
-                                      const result = await hostApiFetch<{ success: boolean; values?: Record<string, string> }>(
-                                        `/api/channels/config/${encodeURIComponent(group.channelType)}${accountParam}`
-                                      );
-                                      setInitialConfigValuesForModal(result.success ? (result.values || {}) : undefined);
-                                    } catch {
-                                      setInitialConfigValuesForModal(undefined);
-                                    }
-                                    setSelectedChannelType(group.channelType as ChannelType);
-                                    setSelectedAccountId(account.accountId);
-                                    setAllowExistingConfigInModal(true);
-                                    setAllowEditAccountIdInModal(false);
-                                    setExistingAccountIdsForModal([]);
-                                    setShowConfigModal(true);
-                                  })();
-                                }}
-                                title={t('account.edit')}
-                              >
-                                <span className="text-xs">{t('account.edit')}</span>
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setDeleteTarget({ channelType: group.channelType, accountId: account.accountId })}
-                                title={t('account.delete')}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
                             </div>
+
+                            {account.lastError && (
+                              <p className="text-xs text-destructive">{account.lastError}</p>
+                            )}
+                            {!account.lastError && account.statusReason && account.status === 'degraded' && (
+                              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                                {t(`health.reasons.${account.statusReason}`)}
+                              </p>
+                            )}
                           </div>
                         );
                       })}
