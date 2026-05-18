@@ -8,7 +8,7 @@ import { PORTS } from './electron/utils/config';
 
 function getExtensionPackages(): Set<string> {
   try {
-    const manifestPath = resolve(__dirname, 'clawx-extensions.json');
+    const manifestPath = resolve(__dirname, 'clawdock-extensions.json');
     if (!existsSync(manifestPath)) return new Set();
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
     const allIds: string[] = [
@@ -90,7 +90,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'react-i18next', 'zustand', 'sonner', 'lucide-react'],
   },
   server: {
-    port: PORTS.CLAWX_DEV,
+    port: PORTS.CLAWDOCK_DEV,
   },
   build: {
     outDir: 'dist',

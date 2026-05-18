@@ -29,7 +29,7 @@ const DEFAULT_ACCOUNT_ID = 'default';
 // Channels whose top-level schema (additionalProperties:false) does NOT
 // include `defaultAccount`.  We still use the multi-account `accounts`
 // map, but strip `defaultAccount` before persisting to avoid plugin
-// schema validation errors.  ClawX falls back to DEFAULT_ACCOUNT_ID
+// schema validation errors.  ClawDock falls back to DEFAULT_ACCOUNT_ID
 // when `defaultAccount` is absent.
 const CHANNELS_OMIT_DEFAULT_ACCOUNT_KEY = new Set(['dingtalk']);
 const CHANNEL_TOP_LEVEL_KEYS_TO_KEEP = new Set(['accounts', 'defaultAccount', 'enabled']);

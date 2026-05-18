@@ -78,8 +78,8 @@ const ActivationPage: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">ClawX 激活</h1>
-          <p className="text-gray-400">请输入您的授权码以激活 ClawX</p>
+          <h1 className="text-2xl font-bold mb-2">ClawDock 激活</h1>
+          <p className="text-gray-400">请输入您的授权码以激活 ClawDock</p>
         </div>
 
         <div className="bg-gray-800 rounded-lg p-4">

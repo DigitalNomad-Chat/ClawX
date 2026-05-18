@@ -1,8 +1,8 @@
 /**
- * Kernel LLM Config Store — Independent LLM configuration for the ClawX Kernel
+ * Kernel LLM Config Store — Independent LLM configuration for the ClawDock Kernel
  * Completely separate from OpenClaw's provider system.
  *
- * Storage: electron-store (name: 'clawx-kernel-llm')
+ * Storage: electron-store (name: 'clawdock-kernel-llm')
  */
 import { ipcMain } from 'electron';
 
@@ -179,7 +179,7 @@ async function createStore() {
   return new Store<{
     config: KernelLLMConfig;
   }>({
-    name: 'clawx-kernel-llm',
+    name: 'clawdock-kernel-llm',
     defaults: {
       config: {
         version: 1,
@@ -535,10 +535,10 @@ function maskApiKey(key: string): string {
  * - Only accounts with a non-empty API key
  */
 export async function discoverOpenClawProviders(): Promise<OpenClawProviderSummary[]> {
-  const { getClawXProviderStore } = await import('../../services/providers/store-instance.js');
+  const { getClawDockProviderStore } = await import('../../services/providers/store-instance.js');
   const { getProviderSecret } = await import('../../services/secrets/secret-store.js');
 
-  const store = await getClawXProviderStore();
+  const store = await getClawDockProviderStore();
   const accounts = (store.get('providerAccounts') ?? {}) as Record<string, import('../../shared/providers/types.js').ProviderAccount>;
 
   const summaries: OpenClawProviderSummary[] = [];

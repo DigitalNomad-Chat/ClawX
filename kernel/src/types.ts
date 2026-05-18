@@ -1,5 +1,5 @@
 /**
- * ClawX Kernel - Core Type Definitions
+ * ClawDock Kernel - Core Type Definitions
  * Defines the complete WebSocket communication protocol, Agent configuration model,
  * and event types between Electron Main Process and Kernel Process.
  */

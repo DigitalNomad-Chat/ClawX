@@ -21,7 +21,7 @@ const kernelRoot = resolve(__dirname, '..');
 const projectRoot = resolve(kernelRoot, '..');
 const buildDir = resolve(projectRoot, 'build', 'kernel');
 
-console.log('[package-kernel] Building ClawX kernel...');
+console.log('[package-kernel] Building ClawDock kernel...');
 
 // Step 1: Clean build directory
 if (existsSync(buildDir)) {

@@ -1,8 +1,8 @@
 {
-  "name": "clawx-kernel",
+  "name": "clawdock-kernel",
   "version": "0.1.0",
   "private": true,
-  "description": "ClawX Independent Kernel - Agent execution engine",
+  "description": "ClawDock Independent Kernel - Agent execution engine",
   "main": "dist/main.js",
   "type": "module",
   "scripts": {

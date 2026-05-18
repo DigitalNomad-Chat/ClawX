@@ -82,7 +82,7 @@ if (command === 'encode-key') {
   generateObfuscatedKeyCode();
   rl.close();
 } else {
-  console.log('=== ClawX 授权码生成工具 ===\n');
+  console.log('=== ClawDock 授权码生成工具 ===\n');
 
   rl.question('请输入用户机器码 (如: CLAWX-XXXX-XXXX-XXXX): ', (machineCode) => {
     if (!machineCode || machineCode.trim().length < 16) {

@@ -5,7 +5,7 @@
  *
  * Evaluates current consumption vs budget and decides whether to allow
  * further execution. Currently uses estimated consumption (message length
- * × model coefficient) because ClawX Gateway does not expose precise
+ * × model coefficient) because ClawDock Gateway does not expose precise
  * token-usage APIs.
  */
 import { getPolicy, getTaskAllocation } from "./budget-store";

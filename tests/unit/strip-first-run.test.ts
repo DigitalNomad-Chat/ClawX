@@ -3,7 +3,7 @@ import { join } from 'path';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 const { testHome } = vi.hoisted(() => ({
-  testHome: `/tmp/clawx-openclaw-workspace-${Math.random().toString(36).slice(2)}`,
+  testHome: `/tmp/clawdock-openclaw-workspace-${Math.random().toString(36).slice(2)}`,
 }));
 
 vi.mock('os', async () => {
@@ -19,8 +19,8 @@ vi.mock('os', async () => {
 });
 
 import {
-  ensureClawXContext,
-  mergeClawXSection,
+  ensureClawDockContext,
+  mergeClawDockSection,
   removeChatFirstBootstrapFiles,
   stripFirstRunSection,
 } from '../../electron/utils/openclaw-workspace';
@@ -132,9 +132,9 @@ describe('stripFirstRunSection', () => {
 
   it('still changes AGENTS content when only First Run is removed', () => {
     const section = [
-      '## ClawX Environment',
+      '## ClawDock Environment',
       '',
-      'You are ClawX.',
+      'You are ClawDock.',
     ].join('\n');
     const original = [
       '# AGENTS.md',
@@ -147,22 +147,22 @@ describe('stripFirstRunSection', () => {
       '',
       'Read SOUL.md first.',
       '',
-      '<!-- clawx:begin -->',
-      '## ClawX Environment',
+      '<!-- clawdock:begin -->',
+      '## ClawDock Environment',
       '',
-      'You are ClawX.',
-      '<!-- clawx:end -->',
+      'You are ClawDock.',
+      '<!-- clawdock:end -->',
       '',
     ].join('\n');
 
     const stripped = stripFirstRunSection(original);
-    const merged = mergeClawXSection(stripped, section);
+    const merged = mergeClawDockSection(stripped, section);
 
     expect(merged).not.toBe(original);
     expect(merged).not.toContain('## First Run');
     expect(merged).toContain('## Session Startup');
-    expect(merged).toContain('<!-- clawx:begin -->');
-    expect(merged).toContain('<!-- clawx:end -->');
+    expect(merged).toContain('<!-- clawdock:begin -->');
+    expect(merged).toContain('<!-- clawdock:end -->');
   });
 });
 
@@ -205,7 +205,7 @@ describe('removeChatFirstBootstrapFiles', () => {
   });
 });
 
-describe('ensureClawXContext', () => {
+describe('ensureClawDockContext', () => {
   it('does not wait for missing files in non-default agent workspaces', async () => {
     const openclawDir = join(testHome, '.openclaw');
     const defaultWorkspace = join(openclawDir, 'workspace-main');
@@ -226,13 +226,13 @@ describe('ensureClawXContext', () => {
     );
 
     const result = await Promise.race([
-      ensureClawXContext().then(() => 'done'),
+      ensureClawDockContext().then(() => 'done'),
       new Promise((resolve) => setTimeout(() => resolve('timeout'), 200)),
     ]);
 
     expect(result).toBe('done');
-    await expect(readFile(join(defaultWorkspace, 'AGENTS.md'), 'utf-8')).resolves.toContain('## ClawX Environment');
-    await expect(readFile(join(defaultWorkspace, 'TOOLS.md'), 'utf-8')).resolves.toContain('## ClawX Tool Notes');
+    await expect(readFile(join(defaultWorkspace, 'AGENTS.md'), 'utf-8')).resolves.toContain('## ClawDock Environment');
+    await expect(readFile(join(defaultWorkspace, 'TOOLS.md'), 'utf-8')).resolves.toContain('## ClawDock Tool Notes');
     await expect(access(join(agentWorkspace, 'AGENTS.md'))).rejects.toThrow();
     await expect(access(join(agentWorkspace, 'TOOLS.md'))).rejects.toThrow();
   });
@@ -252,7 +252,7 @@ describe('ensureClawXContext', () => {
     );
 
     const result = await Promise.race([
-      ensureClawXContext().then(() => 'done'),
+      ensureClawDockContext().then(() => 'done'),
       new Promise((resolve) => setTimeout(() => resolve('timeout'), 200)),
     ]);
 

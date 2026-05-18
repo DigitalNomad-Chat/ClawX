@@ -17,7 +17,7 @@ export {
 } from './types';
 
 /**
- * ClawX Independent Kernel Extensions
+ * ClawDock Independent Kernel Extensions
  * Additional registration for standalone kernel mode extensions.
  */
 import { KernelLauncher } from './kernel/kernel-launcher.js';
@@ -29,7 +29,7 @@ let kernelLauncher: KernelLauncher | null = null;
  * Register all independent kernel extensions. Called during Main Process startup.
  */
 export function registerExtensions(): void {
-  console.log('[Extensions] Registering ClawX Independent Kernel extensions...');
+  console.log('[Extensions] Registering ClawDock Independent Kernel extensions...');
 
   kernelLauncher = new KernelLauncher({
     onConnect: () => {

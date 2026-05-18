@@ -1,5 +1,5 @@
 /**
- * ClawX Kernel Entry Point
+ * ClawDock Kernel Entry Point
  * Assembles all components: WS Server, Session Manager, ReAct Engine, Tool Registry, Agent Loader
  */
 import { resolve } from 'path';
@@ -25,7 +25,7 @@ const skillRegistry = new SkillRegistry(SKILLS_DIR);
 let providerConfig: AIProviderConfig | null = null;
 
 async function main() {
-  console.log('[Kernel] Starting ClawX Independent Kernel...');
+  console.log('[Kernel] Starting ClawDock Independent Kernel...');
 
   // 加载 manifest.json 并预加载所有 Agent 配置到内存缓存
   try {

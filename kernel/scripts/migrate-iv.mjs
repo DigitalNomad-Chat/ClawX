@@ -15,7 +15,7 @@ const OLD_IV = Buffer.from('clawx-kernel12'); // 14 bytes (wrong length from pre
 const NEW_IV = Buffer.from('clawx-kernel'); // 12 bytes — AES-GCM standard
 
 function deriveKey() {
-  const envKey = process.env.CLAWX_KERNEL_KEY;
+  const envKey = process.env.CLAWDOCK_KERNEL_KEY;
   if (envKey) {
     return Buffer.from(envKey.padEnd(32, '0').slice(0, 32));
   }

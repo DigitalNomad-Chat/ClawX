@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ──────────────────────────────────────────────────────────────────────────
- * ClawX design tokens — CSS variable layer
+ * ClawDock design tokens — CSS variable layer
  * ──────────────────────────────────────────────────────────────────────────
  *
  * This file is the *CSS variable layer only*. HSL channel triplets are
@@ -16,7 +16,7 @@
  *      / ...). The standard shadcn/ui palette — do not rename or remove,
  *      Radix-driven components read these directly.
  *
- *   2. ClawX surface tokens (--surface-modal / --surface-input /
+ *   2. ClawDock surface tokens (--surface-modal / --surface-input /
  *      --surface-sidebar). Three light-mode "clean white" layers.
  *      In dark mode each one is redirected to an existing
  *      shadcn token (--card / --muted / --background).
@@ -55,7 +55,7 @@
     --ring: 210 100% 63%;
     --radius: 0.75rem;
 
-    /* ── ClawX clean surfaces (light) ──────────────────────────── */
+    /* ── ClawDock clean surfaces (light) ──────────────────────────── */
     --surface-modal: 0 0% 100%;
     --surface-input: 220 14% 97%;
     --surface-sidebar: 220 14% 98%;
@@ -144,12 +144,12 @@
 
 /* ── Monaco diff editor background alignment ──────────────────── */
 
-:root:not(.dark) .clawx-diff-editor .monaco-diff-editor,
-:root:not(.dark) .clawx-diff-editor .monaco-editor,
-:root:not(.dark) .clawx-diff-editor .monaco-editor-background,
-:root:not(.dark) .clawx-diff-editor .monaco-editor .margin,
-:root:not(.dark) .clawx-diff-editor .monaco-editor .gutter,
-:root:not(.dark) .clawx-diff-editor .diffOverview {
+:root:not(.dark) .clawdock-diff-editor .monaco-diff-editor,
+:root:not(.dark) .clawdock-diff-editor .monaco-editor,
+:root:not(.dark) .clawdock-diff-editor .monaco-editor-background,
+:root:not(.dark) .clawdock-diff-editor .monaco-editor .margin,
+:root:not(.dark) .clawdock-diff-editor .monaco-editor .gutter,
+:root:not(.dark) .clawdock-diff-editor .diffOverview {
   background-color: hsl(var(--background)) !important;
 }
 

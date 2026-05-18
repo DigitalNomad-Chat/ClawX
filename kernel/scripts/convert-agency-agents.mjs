@@ -1,6 +1,6 @@
 /**
  * Agent Configuration Conversion Tool
- * Converts agency-agents-zh single-file .md agents into ClawX multi-file directory structure
+ * Converts agency-agents-zh single-file .md agents into ClawDock multi-file directory structure
  * Usage: node scripts/convert-agency-agents.mjs
  */
 import {

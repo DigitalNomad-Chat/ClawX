@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 const ALGORITHM = 'aes-256-gcm';
 
 function deriveKey() {
-  const envKey = process.env.CLAWX_KERNEL_KEY;
+  const envKey = process.env.CLAWDOCK_KERNEL_KEY;
   if (envKey) {
     return Buffer.from(envKey.padEnd(32, '0').slice(0, 32));
   }

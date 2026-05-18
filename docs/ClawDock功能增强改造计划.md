@@ -1,22 +1,22 @@
-# ClawX 功能增强改造计划
+# ClawDock 功能增强改造计划
 
 ## 背景与目标
 
 ### 背景
-ClawX 是 OpenClaw 的桌面端界面应用，当前已具备 Chat、Models、Agents、Channels、Skills、Cron、Marketplace 等核心功能。
+ClawDock 是 OpenClaw 的桌面端界面应用，当前已具备 Chat、Models、Agents、Channels、Skills、Cron、Marketplace 等核心功能。
 
 我们参考了两个项目的优秀功能：
 1. **openclaw-control-center**: 具备完善的"协作大厅"、"群聊"、"记忆管理"、"文档中心"、"任务看板"（含今日与下一批排程）功能
 2. **OpenClaw Desktop 0.3.0**: 具备"仪表盘"（Activity/Charts）和"智能体看板"（MultiAgentView）功能
 
 ### 核心挑战
-ClawX 是活跃开源项目，上游（ValueCell-ai/ClawX）持续更新。改造必须满足：
+ClawDock 是活跃开源项目，上游（ValueCell-ai/ClawDock）持续更新。改造必须满足：
 - **独立模块**能与核心代码低耦合共存
 - **上游更新时**能快速 merge，独立模块不受影响或少受影响
 - **功能完整性**达到生产可用级别
 
 ### 目标
-将以下 7 大功能模块以增强形式整合到 ClawX：
+将以下 7 大功能模块以增强形式整合到 ClawDock：
 | 优先级 | 功能模块 | 来源参考 | 核心能力 |
 |--------|----------|----------|----------|
 | P0 | 仪表盘 (Dashboard) | Desktop 0.3.0 | 系统状态概览、Token 使用图表、活跃会话统计 |
@@ -35,7 +35,7 @@ ClawX 是活跃开源项目，上游（ValueCell-ai/ClawX）持续更新。改�
 所有新增功能模块统一放在 `src/modules/`（前端）和 `electron/modules/`（后端）目录下，与核心代码完全隔离。
 
 ```
-ClawX/
+ClawDock/
 ├── src/
 │   ├── ... (现有核心代码, 尽量不动)
 │   └── modules/
@@ -82,17 +82,17 @@ ClawX/
 ## 核心技术决策
 
 ### 决策 1: 数据持久化方式
-**方案**: 复用 Control Center 的 JSON 文件存储模式，但统一放到 ClawX 的 `userData` 目录下。
+**方案**: 复用 Control Center 的 JSON 文件存储模式，但统一放到 ClawDock 的 `userData` 目录下。
 
 理由：
 - Control Center 的 JSON 存储已非常成熟（带原子写入、校验、归一化）
-- ClawX 本身是桌面应用，无需引入 SQLite/数据库增加复杂度
+- ClawDock 本身是桌面应用，无需引入 SQLite/数据库增加复杂度
 - 与现有 `electron-store` 风格一致
 
 路径: `{app.getPath('userData')}/modules/[module-name]/`
 
 ### 决策 2: UI 组件库策略
-**方案**: 严格复用 ClawX 现有组件体系（shadcn/ui + Tailwind + Lucide React）。
+**方案**: 严格复用 ClawDock 现有组件体系（shadcn/ui + Tailwind + Lucide React）。
 
 理由：
 - 保持视觉一致性
@@ -103,7 +103,7 @@ ClawX/
 **方案**: 在现有 Host API Server 中增加模块路由，不另起服务。
 
 理由：
-- ClawX 已有完善的 HTTP API 层（`electron/api/server.ts`）
+- ClawDock 已有完善的 HTTP API 层（`electron/api/server.ts`）
 - 复用现有 CORS、Auth、错误处理中间件
 - 前端已通过 `hostApiFetch` 统一调用
 
@@ -111,7 +111,7 @@ ClawX/
 **方案**: 模块通过现有 Gateway Manager 与 OpenClaw Gateway 通信。
 
 理由：
-- Control Center 直接操作 `openclaw` CLI，但 ClawX 已封装了 Gateway HTTP/WebSocket 层
+- Control Center 直接操作 `openclaw` CLI，但 ClawDock 已封装了 Gateway HTTP/WebSocket 层
 - 复用 `electron/gateway/manager.ts` 的 `gatewayManager.httpProxy` 和 `wsClient`
 
 ---
@@ -204,9 +204,9 @@ Control Center 协作大厅是一个极其复杂的子系统，核心文件规�
 | `hall-speaker-policy.ts` | ~200 行 | 讨论轮次策略 |
 | `hall-runtime-dispatch.ts` | ~400 行 | Gateway 运行时派发 |
 
-**ClawX 与 Control Center 的关键差异：**
+**ClawDock 与 Control Center 的关键差异：**
 
-| 差异点 | Control Center | ClawX | 适配策略 |
+| 差异点 | Control Center | ClawDock | 适配策略 |
 |--------|---------------|-------|----------|
 | Gateway 通信 | ToolClient (直接调用 openclaw CLI) | GatewayManager (WS RPC + HTTP 代理) | 重写 dispatch 层，使用 `rpc()` |
 | 实时流 | 自建 SSE Server | HostEventBus (IPC + SSE fallback) | 复用 HostEventBus，新命名空间 `collab:*` |
@@ -216,7 +216,7 @@ Control Center 协作大厅是一个极其复杂的子系统，核心文件规�
 #### 核心设计决策
 
 **决策 1：编排器简化策略**
-Control Center 的 orchestrator（1400 行）实现了全自动闭环。在 ClawX 中：
+Control Center 的 orchestrator（1400 行）实现了全自动闭环。在 ClawDock 中：
 - **保留**：讨论轮次跟踪（`discussionCycle`）、阶段状态机（`stage`）、执行项列表（`plannedExecutionItems`）
 - **简化**：不实现自动 Agent 调用。用户手动点击"指派执行"后，通过 Gateway RPC 触发 `agent.run`，前端轮询更新状态
 - **保留**：`@handoff` 消息识别，自动推进 `currentExecutionItem` 到下一项
@@ -226,7 +226,7 @@ Control Center 的 orchestrator（1400 行）实现了全自动闭环。在 Claw
 不复建 SSE Server，后端写操作通过 `HostEventBus.emit('collab:invalidate', {...})` 推送变更事件，前端通过 `subscribeHostEvent('collab:invalidate', handler)` 接收。
 
 **决策 3：Participant 来源**
-从 ClawX 的 `listAgentsSnapshot()` 动态生成，Semantic role 通过名称关键词推断（移植 `hall-role-resolver.ts`，50 行），Human 用户固定为 `participantId = "human"`。
+从 ClawDock 的 `listAgentsSnapshot()` 动态生成，Semantic role 通过名称关键词推断（移植 `hall-role-resolver.ts`，50 行），Human 用户固定为 `participantId = "human"`。
 
 #### 功能规格
 - **大厅视图**: 共享时间线，所有 Agent 在一个线程中回复
@@ -507,7 +507,7 @@ src/modules/collaboration/
 ### 策略 3: Git 工作流建议
 建议采用以下分支策略：
 ```
-main (跟踪上游 ClawX)
+main (跟踪上游 ClawDock)
   └── feature/modules-enhancement (本改造的开发分支)
         ├── module/dashboard
         ├── module/collaboration
@@ -589,8 +589,8 @@ main (跟踪上游 ClawX)
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
-| Control Center 代码与 ClawX 运行时差异大 | 高 | 只移植数据模型和逻辑，Gateway 通信层完全重写适配 ClawX 的 `gatewayManager` |
-| 上游 ClawX 大版本更新破坏扩展点 | 中 | 扩展点修改最小化 + Patch 脚本自动化 + 详细注释 |
+| Control Center 代码与 ClawDock 运行时差异大 | 高 | 只移植数据模型和逻辑，Gateway 通信层完全重写适配 ClawDock 的 `gatewayManager` |
+| 上游 ClawDock 大版本更新破坏扩展点 | 中 | 扩展点修改最小化 + Patch 脚本自动化 + 详细注释 |
 | 模块间循环依赖 | 中 | 通过事件总线解耦，禁止模块间直接 import store |
 | 性能问题（大量消息/任务） | 中 | 虚拟列表、分页加载、本地缓存、按需 SSE 订阅 |
 | 数据迁移（后续版本） | 低 | JSON 存储带 schemaVersion 字段，支持版本升级函数 |
@@ -599,7 +599,7 @@ main (跟踪上游 ClawX)
 
 ## 关键文件索引
 
-### ClawX 现有核心文件（挂载点）
+### ClawDock 现有核心文件（挂载点）
 - `src/App.tsx` — 路由挂载点
 - `src/components/layout/Sidebar.tsx` — 导航挂载点
 - `src/components/layout/MainLayout.tsx` — 布局

@@ -1,8 +1,8 @@
-# ClawX 授权验证系统实施计划
+# ClawDock 授权验证系统实施计划
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 ClawX 实现基于 C++ N-API 的离线授权验证系统，包含机器指纹采集、RSA 签名验证、本地加密存储、代码混淆与反调试。
+**Goal:** 为 ClawDock 实现基于 C++ N-API 的离线授权验证系统，包含机器指纹采集、RSA 签名验证、本地加密存储、代码混淆与反调试。
 
 **Architecture:** 核心验证逻辑下沉到 C++ N-API 原生模块（跨平台 Windows/macOS），主进程通过 `electron-store` 加密存储授权状态，渲染进程提供激活 UI，构建时进行 JS 重度混淆。
 
@@ -13,7 +13,7 @@
 ## 文件结构总览
 
 ```
-ClawX/
+ClawDock/
 ├── native/                             # C++ N-API 模块 [新增]
 │   ├── binding.gyp
 │   ├── package.json
@@ -69,7 +69,7 @@ ClawX/
 
 ```json
 {
-  "name": "@clawx/license",
+  "name": "@clawdock/license",
   "version": "1.0.0",
   "private": true,
   "gypfile": true,
@@ -150,7 +150,7 @@ NODE_API_MODULE(license, InitAll)
 
 - [ ] **Step 4: 安装依赖**
 
-Run: `cd /Volumes/KINGSTON/CodeVault/GitHub/ClawX/native && pnpm install`
+Run: `cd /Volumes/KINGSTON/CodeVault/GitHub/ClawDock/native && pnpm install`
 Expected: node-addon-api 安装成功
 
 - [ ] **Step 5: Commit**
@@ -900,7 +900,7 @@ interface LicensePayload {
 }
 
 function deriveStorageKey(machineFingerprint: string): string {
-  const salt = 'ClawX-Fixed-Salt-v1';
+  const salt = 'ClawDock-Fixed-Salt-v1';
   return crypto.pbkdf2Sync(machineFingerprint + salt, salt, 100000, 32, 'sha256').toString('hex');
 }
 
@@ -1058,7 +1058,7 @@ export function createActivationWindow(machineCode: string = '') {
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    title: 'ClawX 激活',
+    title: 'ClawDock 激活',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -1280,8 +1280,8 @@ const ActivationPage: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-8">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">ClawX 激活</h1>
-          <p className="text-gray-400">请输入您的授权码以激活 ClawX</p>
+          <h1 className="text-2xl font-bold mb-2">ClawDock 激活</h1>
+          <p className="text-gray-400">请输入您的授权码以激活 ClawDock</p>
         </div>
 
         <div className="bg-gray-800 rounded-lg p-4">
@@ -1698,7 +1698,7 @@ if (command === 'encode-key') {
   generateObfuscatedKeyCode();
   rl.close();
 } else {
-  console.log('=== ClawX 授权码生成工具 ===\n');
+  console.log('=== ClawDock 授权码生成工具 ===\n');
 
   rl.question('请输入用户机器码 (如: CLAWX-XXXX-XXXX-XXXX): ', (machineCode) => {
     if (!machineCode || !machineCode.startsWith('CLAWX-')) {
@@ -1762,7 +1762,7 @@ openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 echo ""
 echo "密钥对已生成："
 echo "  私钥: keys/private.pem (绝不可泄露、不可提交到 git)"
-echo "  公钥: keys/public.pem (需嵌入 ClawX 客户端)"
+echo "  公钥: keys/public.pem (需嵌入 ClawDock 客户端)"
 echo ""
 
 # 生成 C++ 可用的编码公钥

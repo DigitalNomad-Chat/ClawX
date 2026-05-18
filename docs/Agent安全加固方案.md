@@ -1,4 +1,4 @@
-# ClawX 独立内核 Agent 安全加固方案
+# ClawDock 独立内核 Agent 安全加固方案
 
 > 制定日期：2026-04-22
 > 参考项目：OpenHarness (Anthropic 官方 Agent 框架)
@@ -8,7 +8,7 @@
 
 ## 一、当前风险态势
 
-经过代码审计，ClawX 内核当前的 Agent 工具链**完全没有沙箱边界**：
+经过代码审计，ClawDock 内核当前的 Agent 工具链**完全没有沙箱边界**：
 
 | 工具 | 当前行为 | 风险等级 |
 |------|---------|---------|
@@ -27,7 +27,7 @@
 
 ## 二、OpenHarness 安全模型借鉴
 
-OpenHarness 采用了**四层纵深防御**架构，以下是可以直接借鉴到 ClawX 的设计模式：
+OpenHarness 采用了**四层纵深防御**架构，以下是可以直接借鉴到 ClawDock 的设计模式：
 
 ### 2.1 权限模式（Permission Mode）
 
@@ -38,7 +38,7 @@ class PermissionMode(str, Enum):
     FULL_AUTO = "full_auto"  # 全自动：允许所有（显式配置后）
 ```
 
-**借鉴点：** ClawX 应在 Agent 配置中增加 `permissionMode` 字段，默认 `default`。
+**借鉴点：** ClawDock 应在 Agent 配置中增加 `permissionMode` 字段，默认 `default`。
 
 ### 2.2 权限检查器（PermissionChecker）
 
@@ -62,7 +62,7 @@ OpenHarness 的每个 Agent/用户拥有独立工作空间 `~/.ohmo`，包含：
 
 **文件工具的路径解析规则：** 所有相对路径都基于 `context.cwd`（即工作空间根目录），Agent 默认只能在自身工作空间内操作。
 
-**借鉴点：** ClawX 应为每个 Agent Session 分配独立工作目录，文件工具的所有相对路径以此为根。
+**借鉴点：** ClawDock 应为每个 Agent Session 分配独立工作目录，文件工具的所有相对路径以此为根。
 
 ### 2.4 OS 级沙箱（Sandbox Runtime）
 
@@ -72,17 +72,17 @@ OpenHarness 集成了 `@anthropic-ai/sandbox-runtime`（`srt` CLI），通过 OS
 - **网络**: 允许/拒绝域名列表
 - **文件系统**: 允许读/写路径列表、拒绝读/写路径列表
 
-**借鉴点：** ClawX 的 `bash` 工具应优先通过 `sandbox-exec` / `bwrap` 执行命令，失败时回退或拒绝（根据配置）。
+**借鉴点：** ClawDock 的 `bash` 工具应优先通过 `sandbox-exec` / `bwrap` 执行命令，失败时回退或拒绝（根据配置）。
 
 ### 2.5 只读工具自声明
 
 OpenHarness 的 `BaseTool` 基类要求每个工具实现 `is_read_only()` 方法，使得权限系统可以**自动放行**所有只读操作（如 `read_file`, `glob`, `grep`, `web_fetch`），只对变异操作施加限制。
 
-**借鉴点：** ClawX 的 `ToolDefinition` 增加 `isReadOnly: boolean` 字段。
+**借鉴点：** ClawDock 的 `ToolDefinition` 增加 `isReadOnly: boolean` 字段。
 
 ---
 
-## 三、ClawX 分层防御架构设计
+## 三、ClawDock 分层防御架构设计
 
 ```
 +---------------------------------------------------------+
@@ -141,7 +141,7 @@ interface Session {
 
 目录结构：
 ```
-<appData>/ClawX/agents-workspace/<agentId>/<sessionId>/
+<appData>/ClawDock/agents-workspace/<agentId>/<sessionId>/
 +-- memory/          # Agent 持久化记忆
 +-- uploads/         # 用户上传附件
 +-- output/          # Agent 生成文件
@@ -269,11 +269,11 @@ export interface AgentConfig {
 
 1. **Agent 工作空间模板化**：像 Harness 的 `SOUL.md`、`USER.md` 模板一样，每个 Agent 的 `workspaceRoot` 初始化时可自动生成 `README.md`（Agent 自我说明）和 `rules.md`（该 Agent 的行为边界），既提升用户体验，也强化安全边界意识。
 
-2. **`ToolExecutionContext` 传递模式**：Harness 在每个工具调用时注入 `cwd` 和 `metadata`。ClawX 可以扩展此模式，将 `workspaceRoot`、`sessionId`、`permissionChecker` 都注入 `execute` 的第三个参数，避免全局状态。
+2. **`ToolExecutionContext` 传递模式**：Harness 在每个工具调用时注入 `cwd` 和 `metadata`。ClawDock 可以扩展此模式，将 `workspaceRoot`、`sessionId`、`permissionChecker` 都注入 `execute` 的第三个参数，避免全局状态。
 
-3. **配置热更新**：Harness 支持运行时修改 `settings.json` 无需重启。ClawX 内核的 `kernel.updateConfig` 已实现类似能力，可以扩展为 Agent 配置热重载（如动态调整 `permissionMode`）。
+3. **配置热更新**：Harness 支持运行时修改 `settings.json` 无需重启。ClawDock 内核的 `kernel.updateConfig` 已实现类似能力，可以扩展为 Agent 配置热重载（如动态调整 `permissionMode`）。
 
-4. **权限规则持久化学习**：Harness 的 `permission_updates` 机制允许用户在审批时选择「始终允许类似操作」，系统会自动生成新的 path/command 规则。ClawX 未来可以借鉴，减少重复确认。
+4. **权限规则持久化学习**：Harness 的 `permission_updates` 机制允许用户在审批时选择「始终允许类似操作」，系统会自动生成新的 path/command 规则。ClawDock 未来可以借鉴，减少重复确认。
 
 ---
 

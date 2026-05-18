@@ -21,7 +21,7 @@ function createWindow() {
     height: 700,
     minWidth: 800,
     minHeight: 600,
-    title: 'ClawX License Admin',
+    title: 'ClawDock License Admin',
     show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
@@ -93,7 +93,7 @@ ipcMain.handle('license:export', async () => {
   try {
     const records = loadDatabase(PROJECT_ROOT);
     const result = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: `clawx-licenses-${new Date().toISOString().split('T')[0]}.json`,
+      defaultPath: `clawdock-licenses-${new Date().toISOString().split('T')[0]}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (!result.canceled && result.filePath) {

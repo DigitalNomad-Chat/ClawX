@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development to implement this plan.
 
-**Goal:** 将 openclaw-control-center 的文档中心（Docs）和记忆增强（Memory+）模块移植到 ClawX Electron 桌面客户端中，使 ClawX 具备管理 Markdown 文档和监控记忆系统健康状态的能力。
+**Goal:** 将 openclaw-control-center 的文档中心（Docs）和记忆增强（Memory+）模块移植到 ClawDock Electron 桌面客户端中，使 ClawDock 具备管理 Markdown 文档和监控记忆系统健康状态的能力。
 
-**架构：** 采用 ClawX 双面模块注册系统，后端通过 IPC Host API 暴露文件操作和状态查询接口，前端使用 React + Zustand 渲染。共享基础设施（工作区解析、文件服务、通用组件）提取到 `_shared/` 目录供两个模块复用。
+**架构：** 采用 ClawDock 双面模块注册系统，后端通过 IPC Host API 暴露文件操作和状态查询接口，前端使用 React + Zustand 渲染。共享基础设施（工作区解析、文件服务、通用组件）提取到 `_shared/` 目录供两个模块复用。
 
 **Tech Stack:** Electron 40+, React 19, TypeScript, Zustand, Tailwind CSS, shadcn/ui, node:fs/promises, IPC via hostApiFetch
 
@@ -1754,7 +1754,7 @@ git commit -m "feat(memory): add MemoryPage and module registration"
 
 ### 测试清单
 
-- [ ] 启动 ClawX 开发模式 (`pnpm dev`)，确认无编译错误
+- [ ] 启动 ClawDock 开发模式 (`pnpm dev`)，确认无编译错误
 - [ ] 确认侧边栏出现"文档中心"和"记忆增强"导航项
 - [ ] 访问 `/documents`，确认文件列表加载正常
 - [ ] 点击文件，确认 Markdown 编辑器显示内容

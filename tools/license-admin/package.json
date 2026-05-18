@@ -1,7 +1,7 @@
 {
-  "name": "clawx-license-admin",
+  "name": "clawdock-license-admin",
   "version": "1.0.0",
-  "description": "ClawX License Admin - Authorization code generator",
+  "description": "ClawDock License Admin - Authorization code generator",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,8 +15,8 @@
     "electron-builder": "^26.8.1"
   },
   "build": {
-    "appId": "app.clawx.license-admin",
-    "productName": "ClawX License Admin",
+    "appId": "app.clawdock.license-admin",
+    "productName": "ClawDock License Admin",
     "directories": {
       "output": "dist"
     },

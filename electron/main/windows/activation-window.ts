@@ -22,7 +22,7 @@ export function createActivationWindow(machineCode: string = '') {
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    title: 'ClawX 激活',
+    title: 'ClawDock 激活',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

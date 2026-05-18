@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync } from 'fs';
 
 const require = createRequire(import.meta.url);
 
@@ -24,7 +24,7 @@ function getElectronApp() {
     return (require('electron') as typeof import('electron')).app;
   }
 
-  const fallbackUserData = process.env.CLAWX_USER_DATA_DIR?.trim() || join(homedir(), '.clawx');
+  const fallbackUserData = process.env.CLAWDOCK_USER_DATA_DIR?.trim() || join(homedir(), '.clawdock');
   const fallbackAppPath = process.cwd();
   const fallbackApp: ElectronAppLike = {
     isPackaged: false,
@@ -35,6 +35,23 @@ function getElectronApp() {
     getAppPath: () => fallbackAppPath,
   };
   return fallbackApp;
+}
+
+/**
+ * Migrate legacy user data from ~/.clawx to ~/.clawdock on first launch.
+ * Only runs when the old directory exists and the new one does not.
+ */
+export function migrateLegacyUserData(): void {
+  const oldDir = join(homedir(), '.clawx');
+  const newDir = join(homedir(), '.clawdock');
+  if (existsSync(oldDir) && !existsSync(newDir)) {
+    try {
+      renameSync(oldDir, newDir);
+      console.log(`[ClawDock] Migrated legacy user data: ${oldDir} -> ${newDir}`);
+    } catch (err) {
+      console.warn(`[ClawDock] Failed to migrate legacy user data from ${oldDir}:`, err);
+    }
+  }
 }
 
 /**
@@ -62,21 +79,21 @@ export function getOpenClawSkillsDir(): string {
 }
 
 /**
- * Get ClawX config directory
+ * Get ClawDock config directory
  */
-export function getClawXConfigDir(): string {
-  return join(homedir(), '.clawx');
+export function getClawDockConfigDir(): string {
+  return join(homedir(), '.clawdock');
 }
 
 /**
- * Get ClawX logs directory
+ * Get ClawDock logs directory
  */
 export function getLogsDir(): string {
   return join(getElectronApp().getPath('userData'), 'logs');
 }
 
 /**
- * Get ClawX data directory
+ * Get ClawDock data directory
  */
 export function getDataDir(): string {
   return getElectronApp().getPath('userData');

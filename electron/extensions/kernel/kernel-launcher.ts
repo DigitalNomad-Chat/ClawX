@@ -196,7 +196,7 @@ export class KernelLauncher {
           KERNEL_AGENTS_DIR: agentsDir,
           NODE_ENV: 'production',
         } as Record<string, string>,
-        serviceName: 'ClawX Kernel',
+        serviceName: 'ClawDock Kernel',
       });
 
       this.child = child;

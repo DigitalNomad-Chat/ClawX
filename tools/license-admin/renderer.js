@@ -1,4 +1,4 @@
-// renderer.js - ClawX License Admin frontend logic
+// renderer.js - ClawDock License Admin frontend logic
 
 const api = window.licenseAdminAPI;
 

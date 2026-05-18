@@ -11,9 +11,9 @@ import '@testing-library/jest-dom';
 // Individual test files can override with their own vi.mock('electron', ...).
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn().mockReturnValue('/tmp/clawx-test'),
+    getPath: vi.fn().mockReturnValue('/tmp/clawdock-test'),
     getVersion: vi.fn().mockReturnValue('0.0.0-test'),
-    getName: vi.fn().mockReturnValue('clawx-test'),
+    getName: vi.fn().mockReturnValue('clawdock-test'),
     isPackaged: false,
     isReady: vi.fn().mockResolvedValue(true),
     on: vi.fn(),

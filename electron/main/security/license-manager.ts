@@ -37,7 +37,7 @@ interface LicensePayload {
 }
 
 function deriveStorageKey(machineFingerprint: string): string {
-  const salt = 'ClawX-Fixed-Salt-v1';
+  const salt = 'ClawDock-Fixed-Salt-v1';
   return crypto.pbkdf2Sync(machineFingerprint + salt, salt, 100000, 32, 'sha256').toString('hex');
 }
 

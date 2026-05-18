@@ -8,7 +8,7 @@
 
 ## 1. Background
 
-ClawX is a fork of [ValueCell-ai/ClawX](https://github.com/ValueCell-ai/ClawX) that tracks upstream via `upstream` remote. The upstream project frequently updates UI components (recent commits heavily modify Chat and navigation), making direct component-level modifications risky for merge compatibility.
+ClawDock is a fork of [ValueCell-ai/ClawDock](https://github.com/ValueCell-ai/ClawDock) that tracks upstream via `upstream` remote. The upstream project frequently updates UI components (recent commits heavily modify Chat and navigation), making direct component-level modifications risky for merge compatibility.
 
 The current UI uses default shadcn/ui styling with minimal visual identity. This design introduces a NiceAI-inspired visual layer that:
 

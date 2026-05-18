@@ -12,7 +12,7 @@ openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 echo ""
 echo "密钥对已生成："
 echo "  私钥: keys/private.pem (绝不可泄露、不可提交到 git)"
-echo "  公钥: keys/public.pem (需嵌入 ClawX 客户端)"
+echo "  公钥: keys/public.pem (需嵌入 ClawDock 客户端)"
 echo ""
 
 echo "生成 C++ 编码公钥..."
