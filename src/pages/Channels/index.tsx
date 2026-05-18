@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -519,22 +519,25 @@ export function Channels() {
   return (
     <div data-testid="channels-page" className="flex flex-col -m-6 dark:bg-background h-[calc(100vh-2.5rem)] overflow-hidden">
       <div className="w-full max-w-5xl mx-auto flex flex-col h-full p-10 pt-16">
-        <div className="flex flex-col md:flex-row md:items-start justify-between mb-12 shrink-0 gap-4">
-          <div>
-            <h1 className="text-5xl md:text-6xl font-serif text-foreground mb-3 font-normal tracking-tight">
-              {t('title')}
-            </h1>
-            <p className="text-subtitle text-foreground/70 font-medium">
-              {t('subtitle')}
-            </p>
+        <div className="flex flex-col md:flex-row md:items-start justify-between mb-8 shrink-0 gap-4">
+          <div className="flex items-center gap-3">
+            <Radio className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {t('title')}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t('subtitle')}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 md:mt-2">
+          <div className="flex items-center gap-3 md:mt-1">
             <Button
               variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={gatewayStatus.state !== 'running'}
-              className="h-9 text-meta font-medium rounded-full px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-foreground/80 hover:text-foreground transition-colors"
             >
               <RefreshCw className={cn('h-3.5 w-3.5 mr-2', isUsingStableValue && 'animate-spin')} />
               {t('refresh')}
@@ -643,105 +646,83 @@ export function Channels() {
 
           {configuredGroups.length > 0 && (
             <div className="mb-12">
-              <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight">
-                {t('configured')}
-              </h2>
-              <div className="space-y-4">
+              <div className="flex items-center gap-2 text-muted-foreground mb-4">
+                <MessageSquare className="h-4 w-4" />
+                <h2 className="text-sm font-medium">{t('configured')}</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {configuredGroups.map((group) => (
-                  <div key={group.channelType} className="rounded-2xl border border-black/10 dark:border-white/10 p-4 bg-transparent">
-                    <div className="flex items-center justify-between gap-2 mb-3">
+                  <div
+                    key={group.channelType}
+                    className={cn(
+                      'group relative flex flex-col rounded-xl border bg-card p-5 transition-all',
+                      'hover:shadow-md hover:border-primary/30'
+                    )}
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-[40px] w-[40px] shrink-0 flex items-center justify-center text-foreground bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-full shadow-sm">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-2xl">
                           <ChannelLogo type={group.channelType as ChannelType} />
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="text-base font-semibold text-foreground truncate">
-                            {CHANNEL_NAMES[group.channelType as ChannelType] || group.channelType}
-                          </h3>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{group.channelType}</span>
-                            <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
-                            <span className="flex items-center gap-1">
-                              <span
-                                className={cn(
-                                  'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-                                  group.status === 'connected' && 'bg-green-500',
-                                  group.status === 'connecting' && 'bg-sky-500 animate-pulse',
-                                  group.status === 'degraded' && 'bg-yellow-500',
-                                  group.status === 'error' && 'bg-red-500',
-                                  group.status === 'disconnected' && 'bg-gray-400',
-                                )}
-                              />
-                              {statusLabel(group.status)}
-                            </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold truncate">
+                              {CHANNEL_NAMES[group.channelType as ChannelType] || group.channelType}
+                            </h3>
+                            <span
+                              className={cn(
+                                'inline-block h-2 w-2 rounded-full shrink-0',
+                                group.status === 'connected' && 'bg-green-500',
+                                group.status === 'connecting' && 'bg-sky-500 animate-pulse',
+                                group.status === 'degraded' && 'bg-yellow-500',
+                                group.status === 'error' && 'bg-red-500',
+                                group.status === 'disconnected' && 'bg-gray-400',
+                              )}
+                            />
                           </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {statusLabel(group.status)} · {group.accounts.length} 个账号
+                          </p>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs rounded-full"
-                          onClick={() => {
-                            const shouldUseGeneratedAccountId = !usesPluginManagedQrAccounts(group.channelType);
-                            const nextAccountId = shouldUseGeneratedAccountId
-                              ? createNewAccountId(
-                                group.channelType,
-                                group.accounts.map((item) => item.accountId),
-                              )
-                              : undefined;
-                            setSelectedChannelType(group.channelType as ChannelType);
-                            setSelectedAccountId(nextAccountId);
-                            setAllowExistingConfigInModal(false);
-                            setAllowEditAccountIdInModal(shouldUseGeneratedAccountId);
-                            setExistingAccountIdsForModal(group.accounts.map((item) => item.accountId));
-                            setInitialConfigValuesForModal(undefined);
-                            setShowConfigModal(true);
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" />
-                          {t('account.add')}
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteTarget({ channelType: group.channelType })}
-                          title={t('account.deleteChannel')}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={() => setDeleteTarget({ channelType: group.channelType })}
+                        title={t('account.deleteChannel')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Accounts List */}
+                    <div className="mt-4 space-y-2 flex-1">
                       {group.accounts.map((account) => {
                         const displayName =
                           account.accountId === 'default' && account.name === account.accountId
                             ? t('account.mainAccount')
                             : account.name;
                         return (
-                        <div key={`${group.channelType}-${account.accountId}`} className="rounded-xl bg-black/5 dark:bg-white/5 px-3 py-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="text-meta font-medium text-foreground truncate">{displayName}</p>
-                              </div>
+                          <div
+                            key={`${group.channelType}-${account.accountId}`}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/40 px-3 py-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{displayName}</p>
                               {account.lastError && (
-                                <div className="text-xs text-destructive mt-1">{account.lastError}</div>
+                                <p className="text-xs text-destructive mt-0.5">{account.lastError}</p>
                               )}
                               {!account.lastError && account.statusReason && account.status === 'degraded' && (
-                                <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">
                                   {t(`health.reasons.${account.statusReason}`)}
-                                </div>
+                                </p>
                               )}
                             </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{t('account.bindAgentLabel')}</span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <select
-                                className="h-8 rounded-lg border border-black/10 dark:border-white/10 bg-background px-2 text-xs"
+                                className="h-7 rounded-md border border-input bg-background px-1.5 text-xs"
                                 value={account.agentId || ''}
                                 onChange={(event) => {
                                   void handleBindAgent(group.channelType, account.accountId, event.target.value);
@@ -754,30 +735,30 @@ export function Channels() {
                               </select>
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-8 text-xs rounded-full"
-                                  onClick={() => {
-                                    void (async () => {
-                                      try {
-                                        const accountParam = `?accountId=${encodeURIComponent(account.accountId)}`;
-                                        const result = await hostApiFetch<{ success: boolean; values?: Record<string, string> }>(
-                                          `/api/channels/config/${encodeURIComponent(group.channelType)}${accountParam}`
-                                        );
-                                        setInitialConfigValuesForModal(result.success ? (result.values || {}) : undefined);
-                                      } catch {
-                                        // Fall back to modal-side loading when prefetch fails.
-                                        setInitialConfigValuesForModal(undefined);
-                                      }
-                                      setSelectedChannelType(group.channelType as ChannelType);
-                                      setSelectedAccountId(account.accountId);
-                                      setAllowExistingConfigInModal(true);
-                                      setAllowEditAccountIdInModal(false);
-                                      setExistingAccountIdsForModal([]);
-                                      setShowConfigModal(true);
-                                    })();
-                                  }}
-                                >
-                                {t('account.edit')}
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      const accountParam = `?accountId=${encodeURIComponent(account.accountId)}`;
+                                      const result = await hostApiFetch<{ success: boolean; values?: Record<string, string> }>(
+                                        `/api/channels/config/${encodeURIComponent(group.channelType)}${accountParam}`
+                                      );
+                                      setInitialConfigValuesForModal(result.success ? (result.values || {}) : undefined);
+                                    } catch {
+                                      setInitialConfigValuesForModal(undefined);
+                                    }
+                                    setSelectedChannelType(group.channelType as ChannelType);
+                                    setSelectedAccountId(account.accountId);
+                                    setAllowExistingConfigInModal(true);
+                                    setAllowEditAccountIdInModal(false);
+                                    setExistingAccountIdsForModal([]);
+                                    setShowConfigModal(true);
+                                  })();
+                                }}
+                                title={t('account.edit')}
+                              >
+                                <span className="text-xs">{t('account.edit')}</span>
                               </Button>
                               <Button
                                 size="icon"
@@ -786,13 +767,39 @@ export function Channels() {
                                 onClick={() => setDeleteTarget({ channelType: group.channelType, accountId: account.accountId })}
                                 title={t('account.delete')}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </div>
-                        </div>
                         );
                       })}
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const shouldUseGeneratedAccountId = !usesPluginManagedQrAccounts(group.channelType);
+                          const nextAccountId = shouldUseGeneratedAccountId
+                            ? createNewAccountId(
+                              group.channelType,
+                              group.accounts.map((item) => item.accountId),
+                            )
+                            : undefined;
+                          setSelectedChannelType(group.channelType as ChannelType);
+                          setSelectedAccountId(nextAccountId);
+                          setAllowExistingConfigInModal(false);
+                          setAllowEditAccountIdInModal(shouldUseGeneratedAccountId);
+                          setExistingAccountIdsForModal(group.accounts.map((item) => item.accountId));
+                          setInitialConfigValuesForModal(undefined);
+                          setShowConfigModal(true);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        {t('account.add')}
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -800,51 +807,65 @@ export function Channels() {
             </div>
           )}
 
-          <div className="mb-8">
-            <h2 className="text-3xl font-serif text-foreground mb-6 font-normal tracking-tight">
-              {t('supportedChannels')}
-            </h2>
+          {unsupportedGroups.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 text-muted-foreground mb-4">
+                <Plus className="h-4 w-4" />
+                <h2 className="text-sm font-medium">{t('supportedChannels')}</h2>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              {unsupportedGroups.map((type) => {
-                const meta = CHANNEL_META[type];
-                return (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setSelectedChannelType(type);
-                      setSelectedAccountId(undefined);
-                      setAllowExistingConfigInModal(true);
-                      setAllowEditAccountIdInModal(false);
-                      setExistingAccountIdsForModal([]);
-                      setInitialConfigValuesForModal(undefined);
-                      setShowConfigModal(true);
-                    }}
-                    className={cn(
-                      'group flex items-start gap-4 p-4 rounded-2xl transition-all text-left border relative overflow-hidden bg-transparent border-transparent hover:bg-black/5 dark:hover:bg-white/5'
-                    )}
-                  >
-                    <div className="h-[46px] w-[46px] shrink-0 flex items-center justify-center text-foreground bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-full shadow-sm mb-3">
-                      <ChannelLogo type={type} />
-                    </div>
-                    <div className="flex flex-col flex-1 min-w-0 py-0.5 mt-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-foreground truncate">{meta.name}</h3>
-                        {meta.isPlugin && (
-                          <Badge variant="secondary" className="font-mono text-2xs font-medium px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] border-0 shadow-none text-foreground/70">
-                            {t('pluginBadge')}
-                          </Badge>
-                        )}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {unsupportedGroups.map((type) => {
+                  const meta = CHANNEL_META[type];
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setSelectedChannelType(type);
+                        setSelectedAccountId(undefined);
+                        setAllowExistingConfigInModal(true);
+                        setAllowEditAccountIdInModal(false);
+                        setExistingAccountIdsForModal([]);
+                        setInitialConfigValuesForModal(undefined);
+                        setShowConfigModal(true);
+                      }}
+                      className={cn(
+                        'group flex flex-col rounded-xl border bg-card p-5 transition-all text-left',
+                        'hover:shadow-md hover:border-primary/30 cursor-pointer'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-2xl">
+                          <ChannelLogo type={type} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold truncate">{meta.name}</h3>
+                            {meta.isPlugin && (
+                              <Badge variant="secondary" className="text-xs">
+                                {t('pluginBadge')}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {t(meta.description.replace('channels:', ''))}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 leading-[1.5]">
-                        {t(meta.description.replace('channels:', ''))}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="mt-auto pt-4 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {meta.connectionType === 'qr' ? t('dialog.qrCode') : t('dialog.token')}
+                        </span>
+                        <span className="text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                          {t('dialog.configureTitle', { name: meta.name })}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
