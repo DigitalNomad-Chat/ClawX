@@ -3,7 +3,7 @@
  * Navigation sidebar with menu items.
  * No longer fixed - sits inside the flex layout below the title bar.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Network,
@@ -155,6 +155,9 @@ export function Sidebar() {
   const { t } = useTranslation(['common', 'chat']);
   const [sessionToDelete, setSessionToDelete] = useState<{ key: string; label: string } | null>(null);
   const [topNavCollapsed, setTopNavCollapsed] = useState(false);
+  // Agent-level session pagination: which agents have expanded to show all sessions
+  const [expandedSessionAgents, setExpandedSessionAgents] = useState<Set<string>>(new Set());
+  const hasAutoExpandedRef = useRef(false);
 
   const expandedAgentGroups = useSettingsStore((s) => s.expandedAgentGroups);
   const toggleAgentGroup = useSettingsStore((s) => s.toggleAgentGroup);
@@ -173,6 +176,30 @@ export function Sidebar() {
     () => groupSessionsByAgent(sessions, sessionLastActivity, agentNameById),
     [sessions, sessionLastActivity, agentNameById],
   );
+
+  // Auto-collapse agents with no activity in the past week on first load.
+  // Only affects agents the user has never manually expanded/collapsed.
+  useEffect(() => {
+    if (hasAutoExpandedRef.current || agentGroups.length === 0) return;
+    hasAutoExpandedRef.current = true;
+
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const oneWeekAgo = Date.now() - ONE_WEEK_MS;
+
+    agentGroups.forEach((group) => {
+      // Respect user's manual choice — skip if already set
+      if (expandedAgentGroups[group.agentId] !== undefined) return;
+
+      const lastActivity = Math.max(
+        ...group.sessions.map((s) => sessionLastActivity[s.key] || 0),
+        0,
+      );
+      // Expand agents active within the last week; leave others collapsed
+      if (lastActivity >= oneWeekAgo) {
+        toggleAgentGroup(group.agentId);
+      }
+    });
+  }, [agentGroups, expandedAgentGroups, sessionLastActivity, toggleAgentGroup]);
 
   const hiddenRoutes = rendererExtensionRegistry.getHiddenRoutes();
   const extraNavItems = rendererExtensionRegistry.getExtraNavItems();
@@ -329,44 +356,70 @@ export function Sidebar() {
                 {/* Group sessions — indented children */}
                 {isExpanded && (
                   <div className="px-1.5 pb-1.5 space-y-px">
-                    {group.sessions.map((s) => {
-                      const isSessionActive = isOnChat && currentSessionKey === s.key;
+                    {(() => {
+                      const VISIBLE_COUNT = 3;
+                      const showAll = expandedSessionAgents.has(group.agentId);
+                      const visibleSessions = showAll
+                        ? group.sessions
+                        : group.sessions.slice(0, VISIBLE_COUNT);
+                      const hasMore = group.sessions.length > VISIBLE_COUNT;
                       return (
-                        <div key={s.key} className="group relative flex items-center">
-                          <button
-                            data-session-item
-                            data-active={isSessionActive || undefined}
-                            onClick={() => { switchSession(s.key); navigate('/'); }}
-                            className={cn(
-                              'w-full text-left rounded-md px-3 py-1.5 text-meta transition-all duration-150 pr-7',
-                              'border-l-2',
-                              isSessionActive
-                                ? 'bg-primary/10 dark:bg-primary/15 text-foreground font-medium border-l-primary'
-                                : 'text-foreground/75 border-l-transparent hover:bg-muted/50 dark:hover:bg-white/[0.04] hover:border-l-muted-foreground/25',
-                            )}
-                          >
-                            <span className="truncate block">{getSessionLabel(s.key, s.displayName, s.label)}</span>
-                          </button>
-                          <button
-                            aria-label="Delete session"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSessionToDelete({
-                                key: s.key,
-                                label: getSessionLabel(s.key, s.displayName, s.label),
-                              });
-                            }}
-                            className={cn(
-                              'absolute right-1.5 flex items-center justify-center rounded p-0.5 transition-opacity duration-150',
-                              'opacity-0 group-hover:opacity-100',
-                              'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10',
-                            )}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
+                        <>
+                          {visibleSessions.map((s) => {
+                            const isSessionActive = isOnChat && currentSessionKey === s.key;
+                            return (
+                              <div key={s.key} className="group relative flex items-center">
+                                <button
+                                  data-session-item
+                                  data-active={isSessionActive || undefined}
+                                  onClick={() => { switchSession(s.key); navigate('/'); }}
+                                  className={cn(
+                                    'w-full text-left rounded-md px-3 py-1.5 text-meta transition-all duration-150 pr-7',
+                                    'border-l-2',
+                                    isSessionActive
+                                      ? 'bg-primary/10 dark:bg-primary/15 text-foreground font-medium border-l-primary'
+                                      : 'text-foreground/75 border-l-transparent hover:bg-muted/50 dark:hover:bg-white/[0.04] hover:border-l-muted-foreground/25',
+                                  )}
+                                >
+                                  <span className="truncate block">{getSessionLabel(s.key, s.displayName, s.label)}</span>
+                                </button>
+                                <button
+                                  aria-label="Delete session"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSessionToDelete({
+                                      key: s.key,
+                                      label: getSessionLabel(s.key, s.displayName, s.label),
+                                    });
+                                  }}
+                                  className={cn(
+                                    'absolute right-1.5 flex items-center justify-center rounded p-0.5 transition-opacity duration-150',
+                                    'opacity-0 group-hover:opacity-100',
+                                    'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10',
+                                  )}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {hasMore && !showAll && (
+                            <button
+                              onClick={() =>
+                                setExpandedSessionAgents((prev) => {
+                                  const next = new Set(prev);
+                                  next.add(group.agentId);
+                                  return next;
+                                })
+                              }
+                              className="w-full text-left rounded-md px-3 py-1 text-[11px] text-muted-foreground/70 hover:text-foreground hover:bg-muted/40 dark:hover:bg-white/[0.04] transition-colors"
+                            >
+                              加载更多 ({group.sessions.length - VISIBLE_COUNT})
+                            </button>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 )}
               </div>

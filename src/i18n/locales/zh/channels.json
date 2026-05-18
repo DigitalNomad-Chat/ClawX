@@ -399,7 +399,217 @@
                 "获取 App ID 和 Client Secret",
                 "在下方填写凭证信息"
             ]
+        },
+        "slack": {
+            "description": "通过 Bot API 连接 Slack",
+            "docsUrl": "https://docs.openclaw.ai/channels/slack",
+            "fields": {
+                "botToken": {
+                    "label": "Bot Token",
+                    "placeholder": "xoxb-..."
+                },
+                "signingSecret": {
+                    "label": "Signing Secret",
+                    "placeholder": "您的 Slack 应用签名密钥"
+                },
+                "appToken": {
+                    "label": "App Token（可选）",
+                    "placeholder": "xapp-...（Socket Mode 需要）"
+                }
+            },
+            "instructions": [
+                "前往 Slack API → 创建新应用 → 从头开始",
+                "在 OAuth 与权限中，添加机器人令牌作用域：chat:write、im:history、channels:history、groups:history",
+                "将应用安装到工作区并复制 Bot User OAuth Token",
+                "在基本信息中复制 Signing Secret，可选地复制 App-Level Token"
+            ]
         }
     },
-    "viewDocs": "查看文档"
+    "viewDocs": "查看文档",
+    "settings": {
+        "credentials": "凭据设置",
+        "access": "访问策略",
+        "connection": "连接模式",
+        "advanced": "高级配置"
+    },
+    "fields": {
+        "dmPolicy": {
+            "label": "私信策略 (dmPolicy)",
+            "pairing": "pairing（配对模式）",
+            "allowlist": "allowlist（白名单模式）",
+            "open": "open（开放模式）",
+            "disabled": "disabled（禁用私信）"
+        },
+        "groupPolicy": {
+            "label": "群组策略 (groupPolicy)",
+            "allowlist": "allowlist（白名单模式）",
+            "open": "open（开放模式）",
+            "disabled": "disabled（禁用群组）"
+        },
+        "allowFrom": {
+            "label": "私信白名单 (allowFrom)",
+            "placeholder": "每行一个用户 ID，留空或包含 * 表示允许所有人",
+            "description": "仅在 allowlist 模式下生效。使用 * 表示允许所有用户。"
+        },
+        "groupAllowFrom": {
+            "label": "群组白名单 (groupAllowFrom)",
+            "placeholder": "每行一个群组 ID"
+        },
+        "requireMention": {
+            "label": "群组需要 @机器人 (requireMention)"
+        },
+        "connectionMode": {
+            "label": "连接模式 (connectionMode)",
+            "websocket": "websocket（推荐）",
+            "webhook": "webhook"
+        },
+        "webhookPath": {
+            "label": "Webhook 路径 (webhookPath)",
+            "placeholder": "/webhooks/events"
+        },
+        "webhookPort": {
+            "label": "Webhook 端口 (webhookPort)",
+            "placeholder": "例如 3000"
+        },
+        "websocketUrl": {
+            "label": "WebSocket URL (websocketUrl)",
+            "placeholder": "可选，默认使用插件内置地址"
+        },
+        "proxy": {
+            "label": "代理地址 (proxy)",
+            "placeholder": "例如 http://127.0.0.1:7890"
+        },
+        "streaming": {
+            "label": "启用流式输出 (streaming)"
+        },
+        "blockStreaming": {
+            "label": "启用块级流式输出 (blockStreaming)"
+        },
+        "renderMode": {
+            "label": "渲染模式 (renderMode)",
+            "auto": "auto（自动选择）",
+            "raw": "raw（纯文本）",
+            "card": "card（卡片，推荐用于流式）"
+        },
+        "mediaMaxMb": {
+            "label": "媒体大小上限 MB (mediaMaxMb)",
+            "placeholder": "例如 30"
+        },
+        "includeAttachments": {
+            "label": "包含附件 (includeAttachments)"
+        },
+        "showThinking": {
+            "label": "显示思考中状态 (showThinking)"
+        },
+        "debug": {
+            "label": "调试日志 (debug)"
+        },
+        "messageType": {
+            "label": "回复类型 (messageType)",
+            "markdown": "markdown",
+            "card": "card"
+        },
+        "mediaUrlAllowlist": {
+            "label": "媒体 URL 白名单 (mediaUrlAllowlist)",
+            "placeholder": "每行一个域名或 URL 前缀"
+        },
+        "systemPrompt": {
+            "label": "系统提示词 (systemPrompt)",
+            "placeholder": "可选，覆盖默认系统提示词"
+        },
+        "markdownSupport": {
+            "label": "启用 Markdown 支持 (markdownSupport)"
+        },
+        "domain": {
+            "label": "API 域名 (domain)",
+            "feishu": "feishu（国内版）",
+            "lark": "lark（国际版）"
+        },
+        "groups": {
+            "label": "群组精细配置 (groups)",
+            "placeholder": "JSON 格式，例如 {\"oc_xxx\":{\"requireMention\":true,\"groupPolicy\":\"allowlist\"}}"
+        },
+        "groupCommandMentionBypass": {
+            "label": "群聊命令绕过 @策略 (groupCommandMentionBypass)",
+            "single_bot": "single_bot（仅单机器人时绕过）",
+            "never": "never（从不绕过）",
+            "always": "always（总是绕过）"
+        },
+        "typingIndicator": {
+            "label": "输入状态指示器 (typingIndicator)"
+        },
+        "network": {
+            "label": "网络参数 (network)",
+            "placeholder": "JSON 格式，例如 {\"autoSelectFamily\":true,\"dnsResultOrder\":\"verbatim\"}"
+        },
+        "encryptKey": {
+            "label": "加密密钥 (encryptKey)",
+            "placeholder": "Webhook 事件加密的密钥"
+        },
+        "verificationToken": {
+            "label": "验证 Token (verificationToken)",
+            "placeholder": "Webhook 验证 Token"
+        },
+        "dynamicAgentCreation": {
+            "label": "动态 Agent 创建 (dynamicAgentCreation)",
+            "placeholder": "JSON 格式，例如 {\"enabled\":true,\"workspaceTemplate\":\"ws-feishu\",\"maxAgents\":10}"
+        },
+        "replyToMode": {
+            "label": "回复模式 (replyToMode)"
+        },
+        "defaultTo": {
+            "label": "默认路由目标 (defaultTo)"
+        },
+        "sendThinkingMessage": {
+            "label": "发送思考中消息 (sendThinkingMessage)"
+        },
+        "imageServerBaseUrl": {
+            "label": "图片服务基础 URL (imageServerBaseUrl)",
+            "placeholder": "例如 https://your-image-server.com"
+        },
+        "mode": {
+            "label": "工作模式 (mode)"
+        },
+        "textChunkLimit": {
+            "label": "文本分块限制 (textChunkLimit)",
+            "placeholder": "例如 4000"
+        },
+        "chunkMode": {
+            "label": "分块模式 (chunkMode)"
+        },
+        "maxConnectionAttempts": {
+            "label": "最大连接重试次数 (maxConnectionAttempts)",
+            "placeholder": "例如 5"
+        },
+        "initialReconnectDelay": {
+            "label": "初始重连延迟 ms (initialReconnectDelay)",
+            "placeholder": "例如 1000"
+        },
+        "maxReconnectDelay": {
+            "label": "最大重连延迟 ms (maxReconnectDelay)",
+            "placeholder": "例如 30000"
+        },
+        "reconnectJitter": {
+            "label": "重连抖动 ms (reconnectJitter)",
+            "placeholder": "例如 500"
+        },
+        "maxReconnectCycles": {
+            "label": "最大重连周期 (maxReconnectCycles)",
+            "placeholder": "例如 3"
+        },
+        "useConnectionManager": {
+            "label": "使用连接管理器 (useConnectionManager)"
+        },
+        "cardTemplateId": {
+            "label": "卡片模板 ID (cardTemplateId)",
+            "placeholder": "例如 tpl_xxx"
+        },
+        "cardTemplateKey": {
+            "label": "卡片模板密钥 (cardTemplateKey)",
+            "placeholder": "模板密钥"
+        },
+        "proactivePermissionHint": {
+            "label": "主动权限提示 (proactivePermissionHint)"
+        }
+    }
 }

@@ -190,6 +190,7 @@ export type KernelRequest =
   | { type: 'session.info'; sessionId: string }
   | { type: 'session.switch'; sessionId: string }
   | { type: 'session.delete'; sessionId: string }
+  | { type: 'session.restore'; sessionId: string; agentId: string; messages: Message[] }
   | { type: 'agent.list' }
   | { type: 'agent.detail'; agentId: string }
   | { type: 'skill.list' }
@@ -212,6 +213,7 @@ export type KernelEvent =
   | { type: 'session.created'; sessionId: string }
   | { type: 'session.list'; sessions: SessionInfo[] }
   | { type: 'session.info'; sessionId: string; workspaceRoot: string }
+  | { type: 'session.restored'; sessionId: string; messageCount: number }
   | { type: 'agent.list'; agents: AgentManifestEntry[] }
   | { type: 'agent.detail'; agent: AgentManifestEntry }
   | { type: 'skill.list'; skills: SkillEntry[] }

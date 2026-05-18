@@ -1,9 +1,7 @@
 import { invokeIpc } from '@/lib/api-client';
-import { getCanonicalPrefixFromSessions, getMessageText, toMs } from './helpers';
-import { DEFAULT_CANONICAL_PREFIX, DEFAULT_SESSION_KEY, type ChatSession, type RawMessage } from './types';
+import { getCanonicalPrefixFromSessions, toMs } from './helpers';
+import { DEFAULT_CANONICAL_PREFIX, DEFAULT_SESSION_KEY, type ChatSession } from './types';
 import type { ChatGet, ChatSet, SessionHistoryActions } from './store-api';
-
-const LABEL_FETCH_CONCURRENCY = 5;
 
 function getAgentIdFromSessionKey(sessionKey: string): string {
   if (!sessionKey.startsWith('agent:')) return 'main';
@@ -112,47 +110,6 @@ export function createSessionActions(
             get().loadHistory();
           }
 
-          // Background: fetch first user message for every non-main session to populate labels.
-          // Concurrency-limited to avoid flooding the gateway with parallel RPCs.
-          // By the time this runs, the gateway should already be fully ready (Sidebar
-          // gates on gatewayReady), so no startup-retry loop is needed.
-          const sessionsToLabel = sessionsWithCurrent.filter((s) => !s.key.endsWith(':main'));
-          if (sessionsToLabel.length > 0) {
-            void (async () => {
-              for (let i = 0; i < sessionsToLabel.length; i += LABEL_FETCH_CONCURRENCY) {
-                const batch = sessionsToLabel.slice(i, i + LABEL_FETCH_CONCURRENCY);
-                await Promise.all(
-                  batch.map(async (session) => {
-                    try {
-                      const r = await invokeIpc(
-                        'gateway:rpc',
-                        'chat.history',
-                        { sessionKey: session.key, limit: 1000 },
-                      ) as { success: boolean; result?: Record<string, unknown>; error?: string };
-                      if (!r.success || !r.result) return;
-                      const msgs = Array.isArray(r.result.messages) ? r.result.messages as RawMessage[] : [];
-                      const firstUser = msgs.find((m) => m.role === 'user');
-                      const lastMsg = msgs[msgs.length - 1];
-                      set((s) => {
-                        const next: Partial<typeof s> = {};
-                        if (firstUser) {
-                          const labelText = getMessageText(firstUser.content).trim();
-                          if (labelText) {
-                            const truncated = labelText.length > 50 ? `${labelText.slice(0, 50)}…` : labelText;
-                            next.sessionLabels = { ...s.sessionLabels, [session.key]: truncated };
-                          }
-                        }
-                        if (lastMsg?.timestamp) {
-                          next.sessionLastActivity = { ...s.sessionLastActivity, [session.key]: toMs(lastMsg.timestamp) };
-                        }
-                        return next;
-                      });
-                    } catch { /* ignore per-session errors */ }
-                  }),
-                );
-              }
-            })();
-          }
         }
       } catch (err) {
         console.warn('Failed to load sessions:', err);

@@ -373,6 +373,30 @@
                 "Получите App ID и Client Secret",
                 "Заполните ваши учётные данные ниже"
             ]
+        },
+        "slack": {
+            "description": "Подключение Slack через Bot API",
+            "docsUrl": "https://docs.openclaw.ai/channels/slack",
+            "fields": {
+                "botToken": {
+                    "label": "Bot Token",
+                    "placeholder": "xoxb-..."
+                },
+                "signingSecret": {
+                    "label": "Signing Secret",
+                    "placeholder": "Ваш Slack signing secret"
+                },
+                "appToken": {
+                    "label": "App Token (опционально)",
+                    "placeholder": "xapp-... (требуется для Socket Mode)"
+                }
+            },
+            "instructions": [
+                "Перейдите в Slack API → Create New App → From scratch",
+                "В разделе OAuth & Permissions добавьте Bot Token Scopes: chat:write, im:history, channels:history, groups:history",
+                "Установите приложение в рабочее пространство и скопируйте Bot User OAuth Token",
+                "В Basic Information скопируйте Signing Secret и при необходимости App-Level Token"
+            ]
         }
     },
     "viewDocs": "Просмотреть документацию"

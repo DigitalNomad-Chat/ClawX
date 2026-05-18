@@ -387,6 +387,7 @@ export class KernelLauncher {
         ev.type === 'agent.list' ||
         ev.type === 'agent.detail' ||
         ev.type === 'session.created' ||
+        ev.type === 'session.restored' ||
         ev.type === 'session.list' ||
         ev.type === 'skill.list' ||
         ev.type === 'skill.detail' ||

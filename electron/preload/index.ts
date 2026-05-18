@@ -148,6 +148,7 @@ const electronAPI = {
         'marketplace:listAgents',
         'marketplace:getAgent',
         'marketplace:hireAgent',
+        'marketplace:restoreSession',
         // Kernel communication
         'kernel:chat',
         'kernel:subscribe',
@@ -168,6 +169,12 @@ const electronAPI = {
         'kernel-llm:updateProviderConfig',
         'kernel-llm:discoverOpenClaw',
         'kernel-llm:importFromOpenClaw',
+        // Chat History
+        'history:list',
+        'history:get',
+        'history:save',
+        'history:delete',
+        'history:clearAgent',
         // License
         'license:activate',
         'license:get-machine-code',

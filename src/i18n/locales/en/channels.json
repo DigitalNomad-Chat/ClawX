@@ -398,7 +398,217 @@
                 "Get App ID and Client Secret",
                 "Fill in your credentials below"
             ]
+        },
+        "slack": {
+            "description": "Connect Slack via Bot API",
+            "docsUrl": "https://docs.openclaw.ai/channels/slack",
+            "fields": {
+                "botToken": {
+                    "label": "Bot Token",
+                    "placeholder": "xoxb-..."
+                },
+                "signingSecret": {
+                    "label": "Signing Secret",
+                    "placeholder": "Your Slack app signing secret"
+                },
+                "appToken": {
+                    "label": "App Token (optional)",
+                    "placeholder": "xapp-... (required for Socket Mode)"
+                }
+            },
+            "instructions": [
+                "Go to Slack API → Create New App → From scratch",
+                "In OAuth & Permissions, add Bot Token Scopes: chat:write, im:history, channels:history, groups:history",
+                "Install the app to your workspace and copy the Bot User OAuth Token",
+                "In Basic Information, copy the Signing Secret and optionally the App-Level Token"
+            ]
         }
     },
-    "viewDocs": "View Documentation"
+    "viewDocs": "View Documentation",
+    "settings": {
+        "credentials": "Credentials",
+        "access": "Access Policy",
+        "connection": "Connection Mode",
+        "advanced": "Advanced"
+    },
+    "fields": {
+        "dmPolicy": {
+            "label": "DM Policy (dmPolicy)",
+            "pairing": "pairing",
+            "allowlist": "allowlist",
+            "open": "open",
+            "disabled": "disabled"
+        },
+        "groupPolicy": {
+            "label": "Group Policy (groupPolicy)",
+            "allowlist": "allowlist",
+            "open": "open",
+            "disabled": "disabled"
+        },
+        "allowFrom": {
+            "label": "DM Allowlist (allowFrom)",
+            "placeholder": "One user ID per line, leave empty or use * to allow all",
+            "description": "Only effective in allowlist mode. Use * to allow all users."
+        },
+        "groupAllowFrom": {
+            "label": "Group Allowlist (groupAllowFrom)",
+            "placeholder": "One group ID per line"
+        },
+        "requireMention": {
+            "label": "Require @mention in groups (requireMention)"
+        },
+        "connectionMode": {
+            "label": "Connection Mode (connectionMode)",
+            "websocket": "websocket (recommended)",
+            "webhook": "webhook"
+        },
+        "webhookPath": {
+            "label": "Webhook Path (webhookPath)",
+            "placeholder": "/webhooks/events"
+        },
+        "webhookPort": {
+            "label": "Webhook Port (webhookPort)",
+            "placeholder": "e.g. 3000"
+        },
+        "websocketUrl": {
+            "label": "WebSocket URL (websocketUrl)",
+            "placeholder": "Optional, defaults to built-in address"
+        },
+        "proxy": {
+            "label": "Proxy (proxy)",
+            "placeholder": "e.g. http://127.0.0.1:7890"
+        },
+        "streaming": {
+            "label": "Enable streaming (streaming)"
+        },
+        "blockStreaming": {
+            "label": "Enable block streaming (blockStreaming)"
+        },
+        "renderMode": {
+            "label": "Render Mode (renderMode)",
+            "auto": "auto",
+            "raw": "raw",
+            "card": "card"
+        },
+        "mediaMaxMb": {
+            "label": "Media Max Size MB (mediaMaxMb)",
+            "placeholder": "e.g. 30"
+        },
+        "includeAttachments": {
+            "label": "Include Attachments (includeAttachments)"
+        },
+        "showThinking": {
+            "label": "Show thinking status (showThinking)"
+        },
+        "debug": {
+            "label": "Debug logging (debug)"
+        },
+        "messageType": {
+            "label": "Message Type (messageType)",
+            "markdown": "markdown",
+            "card": "card"
+        },
+        "mediaUrlAllowlist": {
+            "label": "Media URL Allowlist (mediaUrlAllowlist)",
+            "placeholder": "One domain or URL prefix per line"
+        },
+        "systemPrompt": {
+            "label": "System Prompt (systemPrompt)",
+            "placeholder": "Optional, overrides default system prompt"
+        },
+        "markdownSupport": {
+            "label": "Enable Markdown Support (markdownSupport)"
+        },
+        "domain": {
+            "label": "API Domain (domain)",
+            "feishu": "feishu (China)",
+            "lark": "lark (International)"
+        },
+        "groups": {
+            "label": "Group Fine-grained Config (groups)",
+            "placeholder": "JSON, e.g. {\"oc_xxx\":{\"requireMention\":true,\"groupPolicy\":\"allowlist\"}}"
+        },
+        "groupCommandMentionBypass": {
+            "label": "Group Command Mention Bypass (groupCommandMentionBypass)",
+            "single_bot": "single_bot (bypass when single bot)",
+            "never": "never (never bypass)",
+            "always": "always (always bypass)"
+        },
+        "typingIndicator": {
+            "label": "Typing Indicator (typingIndicator)"
+        },
+        "network": {
+            "label": "Network Parameters (network)",
+            "placeholder": "JSON, e.g. {\"autoSelectFamily\":true,\"dnsResultOrder\":\"verbatim\"}"
+        },
+        "encryptKey": {
+            "label": "Encrypt Key (encryptKey)",
+            "placeholder": "Webhook event encryption key"
+        },
+        "verificationToken": {
+            "label": "Verification Token (verificationToken)",
+            "placeholder": "Webhook verification token"
+        },
+        "dynamicAgentCreation": {
+            "label": "Dynamic Agent Creation (dynamicAgentCreation)",
+            "placeholder": "JSON, e.g. {\"enabled\":true,\"workspaceTemplate\":\"ws-feishu\",\"maxAgents\":10}"
+        },
+        "replyToMode": {
+            "label": "Reply Mode (replyToMode)"
+        },
+        "defaultTo": {
+            "label": "Default Routing Target (defaultTo)"
+        },
+        "sendThinkingMessage": {
+            "label": "Send Thinking Message (sendThinkingMessage)"
+        },
+        "imageServerBaseUrl": {
+            "label": "Image Server Base URL (imageServerBaseUrl)",
+            "placeholder": "e.g. https://your-image-server.com"
+        },
+        "mode": {
+            "label": "Work Mode (mode)"
+        },
+        "textChunkLimit": {
+            "label": "Text Chunk Limit (textChunkLimit)",
+            "placeholder": "e.g. 4000"
+        },
+        "chunkMode": {
+            "label": "Chunk Mode (chunkMode)"
+        },
+        "maxConnectionAttempts": {
+            "label": "Max Connection Attempts (maxConnectionAttempts)",
+            "placeholder": "e.g. 5"
+        },
+        "initialReconnectDelay": {
+            "label": "Initial Reconnect Delay ms (initialReconnectDelay)",
+            "placeholder": "e.g. 1000"
+        },
+        "maxReconnectDelay": {
+            "label": "Max Reconnect Delay ms (maxReconnectDelay)",
+            "placeholder": "e.g. 30000"
+        },
+        "reconnectJitter": {
+            "label": "Reconnect Jitter ms (reconnectJitter)",
+            "placeholder": "e.g. 500"
+        },
+        "maxReconnectCycles": {
+            "label": "Max Reconnect Cycles (maxReconnectCycles)",
+            "placeholder": "e.g. 3"
+        },
+        "useConnectionManager": {
+            "label": "Use Connection Manager (useConnectionManager)"
+        },
+        "cardTemplateId": {
+            "label": "Card Template ID (cardTemplateId)",
+            "placeholder": "e.g. tpl_xxx"
+        },
+        "cardTemplateKey": {
+            "label": "Card Template Key (cardTemplateKey)",
+            "placeholder": "Template key"
+        },
+        "proactivePermissionHint": {
+            "label": "Proactive Permission Hint (proactivePermissionHint)"
+        }
+    }
 }

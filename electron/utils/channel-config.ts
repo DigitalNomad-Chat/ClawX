@@ -74,6 +74,7 @@ const CHANNEL_UNIQUE_CREDENTIAL_KEY: Record<string, string> = {
     msteams: 'appId',
     googlechat: 'serviceAccountKey',
     mattermost: 'botToken',
+    slack: 'botToken',
 };
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -740,6 +741,7 @@ export async function saveChannelConfig(
     channelType: string,
     config: ChannelConfigData,
     accountId?: string,
+    publicSettings?: ChannelConfigData,
 ): Promise<void> {
     return withConfigLock(async () => {
         const resolvedChannelType = resolveStoredChannelType(channelType);
@@ -827,6 +829,15 @@ export async function saveChannelConfig(
             }
         }
 
+        // Write public settings (access/connection/advanced) to the channel
+        // top-level so they are shared across all accounts.
+        if (publicSettings) {
+            for (const [key, value] of Object.entries(publicSettings)) {
+                if (key === 'accounts' || key === 'defaultAccount') continue;
+                channelSection[key] = value;
+            }
+        }
+
         sanitizeChannelSectionsBeforeWrite(currentConfig);
         await writeOpenClawConfig(currentConfig);
         logger.info('Channel config saved', {
@@ -848,8 +859,18 @@ export async function getChannelConfig(channelType: string, accountId?: string):
 
     const resolvedAccountId = accountId || DEFAULT_ACCOUNT_ID;
     const accounts = getChannelAccountsMap(channelSection);
+
+    // Build public settings from top-level keys (excluding structural keys)
+    const publicSettings: ChannelConfigData = {};
+    for (const [key, value] of Object.entries(channelSection)) {
+        if (key === 'accounts' || key === 'defaultAccount') continue;
+        publicSettings[key] = value;
+    }
+
     if (accounts?.[resolvedAccountId]) {
-        return accounts[resolvedAccountId];
+        // Merge public settings so callers get both account credentials
+        // and shared access/connection/advanced fields.
+        return { ...publicSettings, ...accounts[resolvedAccountId] };
     }
 
     // Backward compat: fall back to flat top-level config (legacy format without accounts)
@@ -857,44 +878,43 @@ export async function getChannelConfig(channelType: string, accountId?: string):
         return channelSection;
     }
 
-    return undefined;
+    return publicSettings;
 }
 
 function extractFormValues(channelType: string, saved: ChannelConfigData): Record<string, string> {
     const values: Record<string, string> = {};
 
-    if (channelType === 'discord') {
-        if (saved.token && typeof saved.token === 'string') {
-            values.token = saved.token;
+    for (const [key, value] of Object.entries(saved)) {
+        if (key === 'accounts' || key === 'defaultAccount') {
+            continue;
         }
+        if (typeof value === 'string') {
+            values[key] = value;
+        } else if (typeof value === 'number') {
+            values[key] = String(value);
+        } else if (typeof value === 'boolean') {
+            values[key] = String(value);
+        } else if (Array.isArray(value)) {
+            values[key] = value.join('\n');
+        }
+    }
+
+    // Backward compat: extract guildId / channelId from nested guilds config
+    // so legacy Discord setups still display something sensible.
+    if (channelType === 'discord') {
         const guilds = saved.guilds as Record<string, Record<string, unknown>> | undefined;
-        if (guilds) {
+        if (guilds && !values.guildId) {
             const guildIds = Object.keys(guilds);
             if (guildIds.length > 0) {
                 values.guildId = guildIds[0];
                 const guildConfig = guilds[guildIds[0]];
                 const channels = guildConfig?.channels as Record<string, unknown> | undefined;
-                if (channels) {
+                if (channels && !values.channelId) {
                     const channelIds = Object.keys(channels).filter((id) => id !== '*');
                     if (channelIds.length > 0) {
                         values.channelId = channelIds[0];
                     }
                 }
-            }
-        }
-    } else if (channelType === 'telegram') {
-        if (Array.isArray(saved.allowFrom)) {
-            values.allowedUsers = saved.allowFrom.join(', ');
-        }
-        for (const [key, value] of Object.entries(saved)) {
-            if (typeof value === 'string' && key !== 'enabled') {
-                values[key] = value;
-            }
-        }
-    } else {
-        for (const [key, value] of Object.entries(saved)) {
-            if (typeof value === 'string' && key !== 'enabled') {
-                values[key] = value;
             }
         }
     }
@@ -1394,6 +1414,8 @@ export async function validateChannelCredentials(
             return validateDiscordCredentials(config);
         case 'telegram':
             return validateTelegramCredentials(config);
+        case 'slack':
+            return validateSlackCredentials(config);
         default:
             return { valid: true, errors: [], warnings: ['No online validation available for this channel type.'] };
     }
@@ -1488,10 +1510,8 @@ async function validateTelegramCredentials(
     config: Record<string, string>
 ): Promise<CredentialValidationResult> {
     const botToken = config.botToken?.trim();
-    const allowedUsers = config.allowedUsers?.trim();
 
     if (!botToken) return { valid: false, errors: ['Bot token is required'], warnings: [] };
-    if (!allowedUsers) return { valid: false, errors: ['At least one allowed user ID is required'], warnings: [] };
 
     try {
         const response = await proxyAwareFetch(`https://api.telegram.org/bot${botToken}/getMe`);
@@ -1500,6 +1520,35 @@ async function validateTelegramCredentials(
             return { valid: true, errors: [], warnings: [], details: { botUsername: data.result?.username || 'Unknown' } };
         }
         return { valid: false, errors: [data.description || 'Invalid bot token'], warnings: [] };
+    } catch (error) {
+        return { valid: false, errors: [`Connection error: ${error instanceof Error ? error.message : String(error)}`], warnings: [] };
+    }
+}
+
+async function validateSlackCredentials(
+    config: Record<string, string>
+): Promise<CredentialValidationResult> {
+    const botToken = config.botToken?.trim();
+
+    if (!botToken) return { valid: false, errors: ['Bot token is required'], warnings: [] };
+
+    try {
+        const response = await proxyAwareFetch('https://slack.com/api/auth.test', {
+            headers: { Authorization: `Bearer ${botToken}` },
+        });
+        const data = (await response.json()) as { ok?: boolean; error?: string; user?: string; team?: string };
+        if (data.ok) {
+            return {
+                valid: true,
+                errors: [],
+                warnings: [],
+                details: {
+                    botUsername: data.user || 'Unknown',
+                    guildName: data.team || 'Unknown',
+                },
+            };
+        }
+        return { valid: false, errors: [data.error || 'Invalid bot token'], warnings: [] };
     } catch (error) {
         return { valid: false, errors: [`Connection error: ${error instanceof Error ? error.message : String(error)}`], warnings: [] };
     }

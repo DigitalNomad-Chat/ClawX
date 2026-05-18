@@ -135,6 +135,42 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       break;
     }
 
+    case 'session.restore': {
+      const sid = req.sessionId as string;
+      const aid = req.agentId as string;
+      const histMessages = (req.messages || []) as Array<{ role: 'user' | 'assistant' | 'system' | 'tool'; content: string; toolCallId?: string }>;
+
+      try {
+        // Load agent config (same as session.create)
+        const config = loadAgentOnDemand(aid, AGENTS_DIR);
+
+        // Create new session with this config
+        const newId = sessions.createSession(config);
+
+        // If a previous session with same ID exists, migrate workspace
+        const existing = sessions.getSession(sid);
+        if (existing) {
+          // Delete old session but keep workspace
+          sessions.deleteSession(sid);
+        }
+
+        // Write historical messages into the new session
+        for (const m of histMessages) {
+          if (m.role === 'tool' && m.toolCallId) {
+            sessions.addMessage(newId, { role: 'tool', toolCallId: m.toolCallId, content: m.content });
+          } else if (m.role === 'user' || m.role === 'assistant' || m.role === 'system') {
+            sessions.addMessage(newId, { role: m.role, content: m.content });
+          }
+        }
+
+        console.log(`[Kernel] Session restored: ${newId} with ${histMessages.length} messages for agent ${aid}`);
+        yield { type: 'session.restored', sessionId: newId, messageCount: histMessages.length };
+      } catch (err) {
+        yield { type: 'error', message: `Failed to restore session: ${(err as Error).message}` };
+      }
+      break;
+    }
+
     case 'skill.list': {
       const skills = skillRegistry.list().map((s) => ({
         id: s.id,

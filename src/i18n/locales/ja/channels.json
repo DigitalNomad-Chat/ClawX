@@ -398,6 +398,30 @@
                 "認証情報を入力します"
             ],
             "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/KPIJwlyiGiupMrkiS9ice39Zn2c"
+        },
+        "slack": {
+            "description": "Slack Bot API で接続",
+            "docsUrl": "https://docs.openclaw.ai/channels/slack",
+            "fields": {
+                "botToken": {
+                    "label": "Bot Token",
+                    "placeholder": "xoxb-..."
+                },
+                "signingSecret": {
+                    "label": "Signing Secret",
+                    "placeholder": "Slack アプリの署名シークレット"
+                },
+                "appToken": {
+                    "label": "App Token（オプション）",
+                    "placeholder": "xapp-...（Socket Mode に必要）"
+                }
+            },
+            "instructions": [
+                "Slack API → Create New App → From scratch に移動",
+                "OAuth & Permissions で Bot Token Scopes を追加: chat:write、im:history、channels:history、groups:history",
+                "ワークスペースにアプリをインストールし Bot User OAuth Token をコピー",
+                "Basic Information で Signing Secret と必要に応じて App-Level Token をコピー"
+            ]
         }
     },
     "viewDocs": "ドキュメントを表示"

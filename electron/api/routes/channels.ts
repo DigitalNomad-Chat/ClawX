@@ -1451,7 +1451,14 @@ export async function handleChannelRoutes(
 
   if (url.pathname === '/api/channels/config' && req.method === 'POST') {
     try {
-      const body = await parseJsonBody<{ channelType: string; config: Record<string, unknown>; accountId?: string }>(req);
+      const body = await parseJsonBody<{
+        channelType: string;
+        config?: Record<string, unknown>;
+        credentials?: Record<string, unknown>;
+        settings?: Record<string, unknown>;
+        enabled?: boolean;
+        accountId?: string;
+      }>(req);
       const validAccountId = await validateAccountIdOrReply(res, body.channelType, body.accountId);
       if (!validAccountId) {
         return true;
@@ -1486,13 +1493,22 @@ export async function handleChannelRoutes(
           return true;
         }
       }
+      // Backward compat: if frontend only sends `config`, treat it as credentials.
+      const credentials = body.credentials ?? body.config ?? {};
+      const settings = body.settings ?? {};
+      const mergedConfig = { ...credentials, ...settings };
+      if (typeof body.enabled === 'boolean') {
+        mergedConfig.enabled = body.enabled;
+        credentials.enabled = body.enabled;
+      }
+
       const existingValues = await getChannelFormValues(body.channelType, body.accountId);
-      if (isSameConfigValues(existingValues, body.config)) {
+      if (isSameConfigValues(existingValues, mergedConfig)) {
         await ensureScopedChannelBinding(body.channelType, body.accountId);
         sendJson(res, 200, { success: true, noChange: true });
         return true;
       }
-      await saveChannelConfig(body.channelType, body.config, body.accountId);
+      await saveChannelConfig(body.channelType, credentials, body.accountId, settings);
       await ensureScopedChannelBinding(body.channelType, body.accountId);
       scheduleGatewayChannelSaveRefresh(ctx, storedChannelType, `channel:saveConfig:${storedChannelType}`);
       sendJson(res, 200, { success: true });

@@ -7,6 +7,13 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, join, extname } from 'path';
 import { getKernelLauncher } from '../index.js';
 import { registerKernelLLMRoutes } from './kernel-llm-store.js';
+import {
+  listSessions,
+  getSession,
+  saveSession,
+  deleteSession,
+  clearAgentSessions,
+} from '../history-store.js';
 
 function getManifestPath(): string {
   const isDev = !app.isPackaged;
@@ -111,6 +118,43 @@ export function registerMarketplaceRoutes(): void {
       return { success: false, error: 'No response from kernel' };
     } catch (err) {
       console.error('[Marketplace] hireAgent error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // Restore a session with historical messages
+  ipcMain.handle('marketplace:restoreSession', async (_event, agentId: string, messages: Array<{ role: string; content: string; toolCallId?: string }>) => {
+    try {
+      const launcher = getKernelLauncher();
+      if (!launcher) {
+        return { success: false, error: 'Kernel launcher not initialized' };
+      }
+
+      if (!launcher.isRunning()) {
+        await launcher.start();
+      }
+
+      const events = await launcher.sendRequest(
+        { type: 'session.restore', agentId, sessionId: `restore_${Date.now()}`, messages } as Record<string, unknown>,
+        30000
+      );
+
+      const restoredEvent = events.find((e: Record<string, unknown>) => e.type === 'session.restored');
+      if (restoredEvent) {
+        return {
+          success: true,
+          sessionId: (restoredEvent as Record<string, unknown>).sessionId,
+        };
+      }
+
+      const errorEvent = events.find((e: Record<string, unknown>) => e.type === 'error');
+      if (errorEvent) {
+        return { success: false, error: (errorEvent as Record<string, unknown>).message };
+      }
+
+      return { success: false, error: 'No response from kernel' };
+    } catch (err) {
+      console.error('[Marketplace] restoreSession error:', err);
       return { success: false, error: (err as Error).message };
     }
   });
@@ -362,6 +406,61 @@ export function registerMarketplaceRoutes(): void {
       return { success: false, error: 'No response from kernel' };
     } catch (err) {
       console.error('[Marketplace] skillDetail error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ─── Chat History ─────────────────────────────────────────────────
+
+  ipcMain.handle('history:list', async (_event, agentId?: string) => {
+    try {
+      const sessions = listSessions(agentId);
+      return { success: true, sessions };
+    } catch (err) {
+      console.error('[Marketplace] history:list error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('history:get', async (_event, sessionId: string) => {
+    try {
+      const session = getSession(sessionId);
+      if (session) {
+        return { success: true, session };
+      }
+      return { success: false, error: `Session '${sessionId}' not found` };
+    } catch (err) {
+      console.error('[Marketplace] history:get error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('history:save', async (_event, session: import('../history-store.js').ChatSession) => {
+    try {
+      saveSession(session);
+      return { success: true };
+    } catch (err) {
+      console.error('[Marketplace] history:save error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('history:delete', async (_event, sessionId: string) => {
+    try {
+      const ok = deleteSession(sessionId);
+      return { success: ok };
+    } catch (err) {
+      console.error('[Marketplace] history:delete error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('history:clearAgent', async (_event, agentId: string) => {
+    try {
+      const removed = clearAgentSessions(agentId);
+      return { success: true, removed };
+    } catch (err) {
+      console.error('[Marketplace] history:clearAgent error:', err);
       return { success: false, error: (err as Error).message };
     }
   });

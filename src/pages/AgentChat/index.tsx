@@ -13,7 +13,7 @@
  * - Message hover actions (copy, timestamp)
  */
 import { useEffect, useState, useRef, useCallback, memo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Wrench, Copy, Check,
   ChevronDown, ChevronRight, Send, Shield,
@@ -446,6 +446,7 @@ function AutoResizeTextarea({
 export function AgentChat() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -469,6 +470,20 @@ export function AgentChat() {
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
 
+  // History states
+  const [historySessions, setHistorySessions] = useState<Array<{
+    sessionId: string;
+    agentId: string;
+    agentName: string;
+    agentEmoji: string;
+    title: string;
+    messages: ChatMessage[];
+    createdAt: number;
+    updatedAt: number;
+  }>>([]);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [persistenceSessionId, setPersistenceSessionId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeToolRef = useRef<string | undefined>(undefined);
   const toolStartTimes = useRef<Map<string, number>>(new Map());
@@ -479,6 +494,28 @@ export function AgentChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-save history when messages change (debounced)
+  useEffect(() => {
+    if (!persistenceSessionId || !agentId || !agentInfo) return;
+    if (messages.length === 0) return;
+
+    const timeout = setTimeout(() => {
+      const title = messages.find((m) => m.role === 'user')?.content.slice(0, 30) || `${agentInfo.name} 的对话`;
+      kernelClient.saveHistory({
+        sessionId: persistenceSessionId,
+        agentId,
+        agentName: agentInfo.name,
+        agentEmoji: agentInfo.emoji,
+        title,
+        messages,
+        createdAt: historySessions.find((s) => s.sessionId === persistenceSessionId)?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      }).catch((err) => console.error('[AgentChat] Auto-save failed:', err));
+    }, 2000);
+
+    return () => clearTimeout(timeout);
+  }, [messages, persistenceSessionId, agentId, agentInfo]);
 
   // Load skills list
   useEffect(() => {
@@ -693,7 +730,7 @@ export function AgentChat() {
     };
   }, [sessionId]);
 
-  // Initialize: load agent info, pre-hire agent
+  // Initialize: load agent info, check provider, handle history restore
   useEffect(() => {
     if (!agentId) return;
     let cancelled = false;
@@ -726,31 +763,97 @@ export function AgentChat() {
         if (!checkResult.success) {
           setError(checkResult.error || 'AI服务商未配置');
           setNeedsProviderSetup(!!checkResult.needsSetup);
-        } else {
-          setProviderInfo({ name: checkResult.providerName || '', model: checkResult.model || '' });
-          setInitPhase('initializing');
+          return;
+        }
 
-          window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId)
-            .then((hireResult) => {
-              if (cancelled) return;
-              const hr = hireResult as { success: boolean; sessionId?: string; error?: string };
-              if (hr.success && hr.sessionId) {
-                setSessionId(hr.sessionId);
-              } else {
-                setInitPhase('idle');
-              }
-            })
-            .catch((err) => {
-              if (!cancelled) {
-                console.error('[AgentChat] Pre-hire failed:', err);
-                setInitPhase('idle');
-              }
-            });
+        setProviderInfo({ name: checkResult.providerName || '', model: checkResult.model || '' });
+
+        // Query history for this agent
+        const histResult = await kernelClient.listHistory(agentId);
+        if (cancelled) return;
+
+        if (histResult.success && histResult.sessions && histResult.sessions.length > 0) {
+          setHistorySessions(histResult.sessions as typeof historySessions);
+
+          // If navigated with a specific restoreSessionId, restore it directly
+          const restoreId = (location.state as { restoreSessionId?: string } | null)?.restoreSessionId;
+          if (restoreId) {
+            const session = histResult.sessions.find((s) => s.sessionId === restoreId);
+            if (session) {
+              await restoreFromSession(session as typeof historySessions[0]);
+              return;
+            }
+          }
+
+          // Show history choice dialog
+          setShowHistoryDialog(true);
+        } else {
+          // No history — start fresh
+          await startNewSession();
         }
       } catch (err) {
         if (!cancelled) {
           console.error('[AgentChat] Init failed:', err);
           setError((err as Error).message || '初始化失败');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    async function startNewSession() {
+      setInitPhase('initializing');
+      try {
+        const hireResult = await window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId) as {
+          success: boolean; sessionId?: string; error?: string;
+        };
+        if (cancelled) return;
+        if (hireResult.success && hireResult.sessionId) {
+          setSessionId(hireResult.sessionId);
+          setPersistenceSessionId(hireResult.sessionId);
+        } else {
+          setInitPhase('idle');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[AgentChat] Pre-hire failed:', err);
+          setInitPhase('idle');
+        }
+      }
+    }
+
+    async function restoreFromSession(session: typeof historySessions[0]) {
+      setLoading(true);
+      setPersistenceSessionId(session.sessionId);
+      const restoredMessages: ChatMessage[] = (session.messages || []).map((m) => ({
+        role: m.role,
+        content: m.content,
+        toolCalls: m.toolCalls,
+        timestamp: m.timestamp,
+      }));
+      setMessages(restoredMessages);
+
+      // Prepare messages for kernel restore (strip extra fields)
+      const kernelMessages = restoredMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      try {
+        const result = await kernelClient.restoreSession(agentId!, kernelMessages);
+        if (cancelled) return;
+        if (result.success && result.sessionId) {
+          setSessionId(result.sessionId);
+          setSessionReady(true);
+          setInitPhase('ready');
+        } else {
+          setError(result.error || '恢复会话失败');
+          setInitPhase('error');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError((err as Error).message || '恢复会话失败');
+          setInitPhase('error');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -812,6 +915,7 @@ export function AgentChat() {
 
         sid = hireResult.sessionId;
         setSessionId(sid);
+        setPersistenceSessionId(sid);
       }
 
       // Stage attachments to session workspace
@@ -1000,9 +1104,93 @@ export function AgentChat() {
         )}
       </div>
 
+      {/* History restore dialog */}
+      {showHistoryDialog && historySessions.length > 0 && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-md rounded-xl border bg-background p-6 shadow-lg">
+            <h3 className="text-lg font-semibold">发现历史对话</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              您与 {agentInfo.name} 有过以下对话，请选择：
+            </p>
+            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              {historySessions.slice(0, 3).map((session) => (
+                <button
+                  key={session.sessionId}
+                  onClick={() => {
+                    setShowHistoryDialog(false);
+                    const restoredMessages: ChatMessage[] = (session.messages || []).map((m) => ({
+                      role: m.role,
+                      content: m.content,
+                      toolCalls: m.toolCalls,
+                      timestamp: m.timestamp,
+                    }));
+                    setMessages(restoredMessages);
+                    setPersistenceSessionId(session.sessionId);
+                    const kernelMessages = restoredMessages.map((m) => ({
+                      role: m.role,
+                      content: m.content,
+                    }));
+                    setLoading(true);
+                    kernelClient.restoreSession(agentId!, kernelMessages)
+                      .then((result) => {
+                        if (result.success && result.sessionId) {
+                          setSessionId(result.sessionId);
+                          setSessionReady(true);
+                          setInitPhase('ready');
+                        } else {
+                          setError(result.error || '恢复会话失败');
+                          setInitPhase('error');
+                        }
+                      })
+                      .catch((err) => {
+                        setError((err as Error).message || '恢复会话失败');
+                        setInitPhase('error');
+                      })
+                      .finally(() => setLoading(false));
+                  }}
+                  className="w-full flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/60 transition-colors"
+                >
+                  <span className="text-xl">{session.agentEmoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{session.title}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(session.updatedAt).toLocaleDateString('zh-CN')} · {session.messages.length} 条消息
+                    </p>
+                  </div>
+                  <span className="text-xs text-primary font-medium">继续</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => {
+                setShowHistoryDialog(false);
+                // Start new session
+                setInitPhase('initializing');
+                window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId)
+                  .then((hireResult) => {
+                    const hr = hireResult as { success: boolean; sessionId?: string; error?: string };
+                    if (hr.success && hr.sessionId) {
+                      setSessionId(hr.sessionId);
+                      setPersistenceSessionId(hr.sessionId);
+                    } else {
+                      setInitPhase('idle');
+                    }
+                  })
+                  .catch((err) => {
+                    console.error('[AgentChat] Pre-hire failed:', err);
+                    setInitPhase('idle');
+                  });
+              }}>
+                开始新对话
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-        {messages.length === 0 && (
+        {messages.length === 0 && !showHistoryDialog && (
           <WelcomeScreen
             agent={agentInfo}
             onQuickPrompt={(text) => sendMessage(text)}

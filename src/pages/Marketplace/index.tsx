@@ -5,7 +5,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Store, Sparkles, Users, PenTool, Zap, Briefcase,
+  Search, Store, Sparkles, Users, Briefcase,
   Code, Megaphone, Palette, Package, Settings, Star, Gamepad2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { LlmConfigSection } from './LlmConfigSection';
+import { kernelClient } from '@/lib/kernel-client';
+import { MessageSquare, Clock } from 'lucide-react';
 
 interface AgentCardData {
   id: string;
@@ -49,9 +51,19 @@ export function Marketplace() {
   const [activeCategory, setActiveCategory] = useState('全部');
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<AgentCardData | null>(null);
+  const [recentSessions, setRecentSessions] = useState<Array<{
+    sessionId: string;
+    agentId: string;
+    agentName: string;
+    agentEmoji: string;
+    title: string;
+    updatedAt: number;
+    messageCount: number;
+  }>>([]);
 
   useEffect(() => {
     loadAgents();
+    loadRecentSessions();
   }, []);
 
   async function loadAgents() {
@@ -104,6 +116,26 @@ export function Marketplace() {
    */
   function hireAgent(agentId: string) {
     navigate(`/agent-chat/${agentId}`);
+  }
+
+  async function loadRecentSessions() {
+    try {
+      const result = await kernelClient.listHistory();
+      if (result.success && result.sessions) {
+        const sessions = result.sessions.slice(0, 5).map((s) => ({
+          sessionId: s.sessionId,
+          agentId: s.agentId,
+          agentName: s.agentName,
+          agentEmoji: s.agentEmoji,
+          title: s.title,
+          updatedAt: s.updatedAt,
+          messageCount: s.messages.length,
+        }));
+        setRecentSessions(sessions);
+      }
+    } catch (err) {
+      console.error('[Marketplace] Failed to load recent sessions:', err);
+    }
   }
 
   const filteredAgents = useMemo(() => {
@@ -161,6 +193,43 @@ export function Marketplace() {
           ))}
         </div>
       </div>
+
+      {/* Recent Conversations */}
+      {recentSessions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <h2 className="text-sm font-medium">最近对话</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recentSessions.map((session) => (
+              <div
+                key={session.sessionId}
+                onClick={() =>
+                  navigate(`/agent-chat/${session.agentId}`, {
+                    state: { restoreSessionId: session.sessionId },
+                  })
+                }
+                className={cn(
+                  'flex items-center gap-3 rounded-xl border bg-card p-4 cursor-pointer',
+                  'hover:shadow-md hover:border-primary/30 transition-all'
+                )}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xl">
+                  {session.agentEmoji}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{session.title}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {session.agentName} · {session.messageCount} 条消息 · {new Date(session.updatedAt).toLocaleDateString('zh-CN')}
+                  </p>
+                </div>
+                <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Agent Grid */}
       {loading ? (

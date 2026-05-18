@@ -21,7 +21,8 @@ export type ChannelType =
   | 'msteams'
   | 'googlechat'
   | 'mattermost'
-  | 'qqbot';
+  | 'qqbot'
+  | 'slack';
 
 /**
  * Channel connection status
@@ -63,6 +64,28 @@ export interface ChannelConfigField {
 }
 
 /**
+ * Channel settings field (for access/connection/advanced panels)
+ */
+export interface ChannelSettingsField {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number';
+  placeholder?: string;
+  description?: string;
+  options?: { value: string; label: string }[];
+  defaultValue?: string | boolean | number;
+}
+
+/**
+ * Channel settings group (access policy / connection mode / advanced)
+ */
+export interface ChannelSettingsGroup {
+  id: 'access' | 'connection' | 'advanced';
+  label: string;
+  fields: ChannelSettingsField[];
+}
+
+/**
  * Channel metadata with configuration info
  */
 export interface ChannelMeta {
@@ -75,6 +98,7 @@ export interface ChannelMeta {
   configFields: ChannelConfigField[];
   instructions: string[];
   isPlugin?: boolean;
+  settingsGroups?: ChannelSettingsGroup[];
 }
 
 /**
@@ -96,6 +120,7 @@ export const CHANNEL_ICONS: Record<ChannelType, string> = {
   googlechat: '💭',
   mattermost: '💠',
   qqbot: '🐧',
+  slack: '#',
 };
 
 /**
@@ -117,6 +142,7 @@ export const CHANNEL_NAMES: Record<ChannelType, string> = {
   googlechat: 'Google Chat',
   mattermost: 'Mattermost',
   qqbot: 'QQ Bot',
+  slack: 'Slack',
 };
 
 /**
@@ -151,6 +177,62 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.qqbot.instructions.1',
       'channels:meta.qqbot.instructions.2',
     ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'open',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'systemPrompt',
+            label: 'channels:fields.systemPrompt.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.systemPrompt.placeholder',
+          },
+          {
+            key: 'markdownSupport',
+            label: 'channels:fields.markdownSupport.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+          {
+            key: 'imageServerBaseUrl',
+            label: 'channels:fields.imageServerBaseUrl.label',
+            type: 'text',
+            placeholder: 'channels:fields.imageServerBaseUrl.placeholder',
+          },
+        ],
+      },
+    ],
   },
   dingtalk: {
     id: 'dingtalk',
@@ -181,6 +263,160 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.dingtalk.instructions.2',
     ],
     isPlugin: true,
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+            ],
+            defaultValue: 'open',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+            ],
+            defaultValue: 'open',
+          },
+          {
+            key: 'groups',
+            label: 'channels:fields.groups.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groups.placeholder',
+          },
+          {
+            key: 'cardTemplateId',
+            label: 'channels:fields.cardTemplateId.label',
+            type: 'text',
+            placeholder: 'channels:fields.cardTemplateId.placeholder',
+          },
+          {
+            key: 'cardTemplateKey',
+            label: 'channels:fields.cardTemplateKey.label',
+            type: 'text',
+            placeholder: 'channels:fields.cardTemplateKey.placeholder',
+          },
+          {
+            key: 'proactivePermissionHint',
+            label: 'channels:fields.proactivePermissionHint.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        label: 'channels:settings.connection',
+        fields: [
+          {
+            key: 'maxConnectionAttempts',
+            label: 'channels:fields.maxConnectionAttempts.label',
+            type: 'number',
+            placeholder: 'channels:fields.maxConnectionAttempts.placeholder',
+          },
+          {
+            key: 'initialReconnectDelay',
+            label: 'channels:fields.initialReconnectDelay.label',
+            type: 'number',
+            placeholder: 'channels:fields.initialReconnectDelay.placeholder',
+          },
+          {
+            key: 'maxReconnectDelay',
+            label: 'channels:fields.maxReconnectDelay.label',
+            type: 'number',
+            placeholder: 'channels:fields.maxReconnectDelay.placeholder',
+          },
+          {
+            key: 'reconnectJitter',
+            label: 'channels:fields.reconnectJitter.label',
+            type: 'number',
+            placeholder: 'channels:fields.reconnectJitter.placeholder',
+          },
+          {
+            key: 'maxReconnectCycles',
+            label: 'channels:fields.maxReconnectCycles.label',
+            type: 'number',
+            placeholder: 'channels:fields.maxReconnectCycles.placeholder',
+          },
+          {
+            key: 'useConnectionManager',
+            label: 'channels:fields.useConnectionManager.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'showThinking',
+            label: 'channels:fields.showThinking.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+          {
+            key: 'debug',
+            label: 'channels:fields.debug.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'messageType',
+            label: 'channels:fields.messageType.label',
+            type: 'select',
+            options: [
+              { value: 'markdown', label: 'channels:fields.messageType.markdown' },
+              { value: 'card', label: 'channels:fields.messageType.card' },
+            ],
+            defaultValue: 'markdown',
+          },
+          {
+            key: 'mediaMaxMb',
+            label: 'channels:fields.mediaMaxMb.label',
+            type: 'number',
+            placeholder: 'channels:fields.mediaMaxMb.placeholder',
+          },
+          {
+            key: 'mediaUrlAllowlist',
+            label: 'channels:fields.mediaUrlAllowlist.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.mediaUrlAllowlist.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
+    ],
   },
   wecom: {
     id: 'wecom',
@@ -211,6 +447,92 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.wecom.instructions.2',
     ],
     isPlugin: true,
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'open',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        label: 'channels:settings.connection',
+        fields: [
+          {
+            key: 'websocketUrl',
+            label: 'channels:fields.websocketUrl.label',
+            type: 'text',
+            placeholder: 'channels:fields.websocketUrl.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'sendThinkingMessage',
+            label: 'channels:fields.sendThinkingMessage.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
+    ],
   },
   telegram: {
     id: 'telegram',
@@ -233,7 +555,6 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
         label: 'channels:meta.telegram.fields.allowedUsers.label',
         type: 'text',
         placeholder: 'channels:meta.telegram.fields.allowedUsers.placeholder',
-        description: 'channels:meta.telegram.fields.allowedUsers.description',
         required: true,
       },
     ],
@@ -243,6 +564,74 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.telegram.instructions.2',
       'channels:meta.telegram.instructions.3',
       'channels:meta.telegram.instructions.4',
+    ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
     ],
   },
   discord: {
@@ -266,7 +655,6 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
         label: 'channels:meta.discord.fields.guildId.label',
         type: 'text',
         placeholder: 'channels:meta.discord.fields.guildId.placeholder',
-        required: true,
         description: 'channels:meta.discord.fields.guildId.description',
       },
       {
@@ -274,7 +662,6 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
         label: 'channels:meta.discord.fields.channelId.label',
         type: 'text',
         placeholder: 'channels:meta.discord.fields.channelId.placeholder',
-        required: false,
         description: 'channels:meta.discord.fields.channelId.description',
       },
     ],
@@ -285,6 +672,67 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.discord.instructions.3',
       'channels:meta.discord.instructions.4',
       'channels:meta.discord.instructions.5',
+    ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
     ],
   },
 
@@ -301,6 +749,103 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.whatsapp.instructions.1',
       'channels:meta.whatsapp.instructions.2',
       'channels:meta.whatsapp.instructions.3',
+    ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        label: 'channels:settings.connection',
+        fields: [
+          {
+            key: 'webhookPort',
+            label: 'channels:fields.webhookPort.label',
+            type: 'number',
+            placeholder: 'channels:fields.webhookPort.placeholder',
+          },
+          {
+            key: 'webhookPath',
+            label: 'channels:fields.webhookPath.label',
+            type: 'text',
+            placeholder: 'channels:fields.webhookPath.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'mediaMaxMb',
+            label: 'channels:fields.mediaMaxMb.label',
+            type: 'number',
+            placeholder: 'channels:fields.mediaMaxMb.placeholder',
+          },
+          {
+            key: 'includeAttachments',
+            label: 'channels:fields.includeAttachments.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
     ],
   },
   wechat: {
@@ -373,6 +918,182 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.feishu.instructions.3',
     ],
     isPlugin: true,
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+          {
+            key: 'requireMention',
+            label: 'channels:fields.requireMention.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+          {
+            key: 'groups',
+            label: 'channels:fields.groups.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groups.placeholder',
+          },
+          {
+            key: 'groupCommandMentionBypass',
+            label: 'channels:fields.groupCommandMentionBypass.label',
+            type: 'select',
+            options: [
+              { value: 'single_bot', label: 'channels:fields.groupCommandMentionBypass.single_bot' },
+              { value: 'never', label: 'channels:fields.groupCommandMentionBypass.never' },
+              { value: 'always', label: 'channels:fields.groupCommandMentionBypass.always' },
+            ],
+            defaultValue: 'single_bot',
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        label: 'channels:settings.connection',
+        fields: [
+          {
+            key: 'domain',
+            label: 'channels:fields.domain.label',
+            type: 'select',
+            options: [
+              { value: 'feishu', label: 'channels:fields.domain.feishu' },
+              { value: 'lark', label: 'channels:fields.domain.lark' },
+            ],
+            defaultValue: 'feishu',
+          },
+          {
+            key: 'connectionMode',
+            label: 'channels:fields.connectionMode.label',
+            type: 'select',
+            options: [
+              { value: 'websocket', label: 'channels:fields.connectionMode.websocket' },
+              { value: 'webhook', label: 'channels:fields.connectionMode.webhook' },
+            ],
+            defaultValue: 'websocket',
+          },
+          {
+            key: 'webhookPath',
+            label: 'channels:fields.webhookPath.label',
+            type: 'text',
+            placeholder: 'channels:fields.webhookPath.placeholder',
+          },
+          {
+            key: 'webhookPort',
+            label: 'channels:fields.webhookPort.label',
+            type: 'number',
+            placeholder: 'channels:fields.webhookPort.placeholder',
+          },
+          {
+            key: 'encryptKey',
+            label: 'channels:fields.encryptKey.label',
+            type: 'password',
+            placeholder: 'channels:fields.encryptKey.placeholder',
+          },
+          {
+            key: 'verificationToken',
+            label: 'channels:fields.verificationToken.label',
+            type: 'password',
+            placeholder: 'channels:fields.verificationToken.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'renderMode',
+            label: 'channels:fields.renderMode.label',
+            type: 'select',
+            options: [
+              { value: 'auto', label: 'channels:fields.renderMode.auto' },
+              { value: 'raw', label: 'channels:fields.renderMode.raw' },
+              { value: 'card', label: 'channels:fields.renderMode.card' },
+            ],
+            defaultValue: 'auto',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'blockStreaming',
+            label: 'channels:fields.blockStreaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'typingIndicator',
+            label: 'channels:fields.typingIndicator.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'mediaMaxMb',
+            label: 'channels:fields.mediaMaxMb.label',
+            type: 'number',
+            placeholder: 'channels:fields.mediaMaxMb.placeholder',
+          },
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+          {
+            key: 'dynamicAgentCreation',
+            label: 'channels:fields.dynamicAgentCreation.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.dynamicAgentCreation.placeholder',
+          },
+        ],
+      },
+    ],
   },
   imessage: {
     id: 'imessage',
@@ -401,6 +1122,68 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
       'channels:meta.imessage.instructions.0',
       'channels:meta.imessage.instructions.1',
       'channels:meta.imessage.instructions.2',
+    ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'mediaMaxMb',
+            label: 'channels:fields.mediaMaxMb.label',
+            type: 'number',
+            placeholder: 'channels:fields.mediaMaxMb.placeholder',
+          },
+          {
+            key: 'includeAttachments',
+            label: 'channels:fields.includeAttachments.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+        ],
+      },
     ],
   },
   matrix: {
@@ -551,13 +1334,156 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
     ],
     isPlugin: true,
   },
+  slack: {
+    id: 'slack',
+    name: 'Slack',
+    icon: '#',
+    description: 'channels:meta.slack.description',
+    connectionType: 'token',
+    docsUrl: 'channels:meta.slack.docsUrl',
+    configFields: [
+      {
+        key: 'botToken',
+        label: 'channels:meta.slack.fields.botToken.label',
+        type: 'password',
+        placeholder: 'channels:meta.slack.fields.botToken.placeholder',
+        required: true,
+        envVar: 'SLACK_BOT_TOKEN',
+      },
+      {
+        key: 'signingSecret',
+        label: 'channels:meta.slack.fields.signingSecret.label',
+        type: 'password',
+        placeholder: 'channels:meta.slack.fields.signingSecret.placeholder',
+        required: true,
+        envVar: 'SLACK_SIGNING_SECRET',
+      },
+      {
+        key: 'appToken',
+        label: 'channels:meta.slack.fields.appToken.label',
+        type: 'password',
+        placeholder: 'channels:meta.slack.fields.appToken.placeholder',
+        envVar: 'SLACK_APP_TOKEN',
+      },
+    ],
+    instructions: [
+      'channels:meta.slack.instructions.0',
+      'channels:meta.slack.instructions.1',
+      'channels:meta.slack.instructions.2',
+      'channels:meta.slack.instructions.3',
+    ],
+    settingsGroups: [
+      {
+        id: 'access',
+        label: 'channels:settings.access',
+        fields: [
+          {
+            key: 'dmPolicy',
+            label: 'channels:fields.dmPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'pairing', label: 'channels:fields.dmPolicy.pairing' },
+              { value: 'allowlist', label: 'channels:fields.dmPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.dmPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.dmPolicy.disabled' },
+            ],
+            defaultValue: 'pairing',
+          },
+          {
+            key: 'allowFrom',
+            label: 'channels:fields.allowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.allowFrom.placeholder',
+            description: 'channels:fields.allowFrom.description',
+          },
+          {
+            key: 'groupPolicy',
+            label: 'channels:fields.groupPolicy.label',
+            type: 'select',
+            options: [
+              { value: 'allowlist', label: 'channels:fields.groupPolicy.allowlist' },
+              { value: 'open', label: 'channels:fields.groupPolicy.open' },
+              { value: 'disabled', label: 'channels:fields.groupPolicy.disabled' },
+            ],
+            defaultValue: 'allowlist',
+          },
+          {
+            key: 'groupAllowFrom',
+            label: 'channels:fields.groupAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupAllowFrom.placeholder',
+          },
+          {
+            key: 'requireMention',
+            label: 'channels:fields.requireMention.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+        ],
+      },
+      {
+        id: 'connection',
+        label: 'channels:settings.connection',
+        fields: [
+          {
+            key: 'webhookPort',
+            label: 'channels:fields.webhookPort.label',
+            type: 'number',
+            placeholder: 'channels:fields.webhookPort.placeholder',
+          },
+          {
+            key: 'webhookPath',
+            label: 'channels:fields.webhookPath.label',
+            type: 'text',
+            placeholder: 'channels:fields.webhookPath.placeholder',
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        label: 'channels:settings.advanced',
+        fields: [
+          {
+            key: 'textChunkLimit',
+            label: 'channels:fields.textChunkLimit.label',
+            type: 'number',
+            placeholder: 'channels:fields.textChunkLimit.placeholder',
+          },
+          {
+            key: 'chunkMode',
+            label: 'channels:fields.chunkMode.label',
+            type: 'text',
+            placeholder: 'channels:fields.textChunkLimit.placeholder',
+          },
+          {
+            key: 'proxy',
+            label: 'channels:fields.proxy.label',
+            type: 'text',
+            placeholder: 'channels:fields.proxy.placeholder',
+          },
+          {
+            key: 'streaming',
+            label: 'channels:fields.streaming.label',
+            type: 'checkbox',
+            defaultValue: false,
+          },
+          {
+            key: 'network',
+            label: 'channels:fields.network.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.network.placeholder',
+          },
+        ],
+      },
+    ],
+  },
 };
 
 /**
  * Get primary supported channels (non-plugin, commonly used)
  */
 export function getPrimaryChannels(): ChannelType[] {
-  return ['telegram', 'discord', 'whatsapp', 'wechat', 'dingtalk', 'feishu', 'wecom', 'qqbot'];
+  return ['telegram', 'discord', 'whatsapp', 'wechat', 'dingtalk', 'feishu', 'wecom', 'qqbot', 'slack'];
 }
 
 /**

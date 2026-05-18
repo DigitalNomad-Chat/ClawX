@@ -11,6 +11,11 @@ import {
   AlertCircle,
   CheckCircle,
   ShieldCheck,
+  KeyRound,
+  MessageSquareLock,
+  Code2,
+  Settings2,
+  Plug,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +23,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChannelsStore } from '@/stores/channels';
 
 import { hostApiFetch } from '@/lib/host-api';
@@ -31,6 +38,7 @@ import {
   type ChannelType,
   type ChannelMeta,
   type ChannelConfigField,
+  type ChannelSettingsField,
 } from '@/types/channel';
 import {
   buildQrChannelEventName,
@@ -47,6 +55,7 @@ import dingtalkIcon from '@/assets/channels/dingtalk.svg';
 import feishuIcon from '@/assets/channels/feishu.svg';
 import wecomIcon from '@/assets/channels/wecom.svg';
 import qqIcon from '@/assets/channels/qq.svg';
+import slackIcon from '@/assets/channels/slack.svg';
 
 interface ChannelConfigModalProps {
   initialSelectedType?: ChannelType | null;
@@ -62,10 +71,26 @@ interface ChannelConfigModalProps {
   onChannelSaved?: (channelType: ChannelType) => void | Promise<void>;
 }
 
+type ConfigPanel = 'credentials' | 'access' | 'connection' | 'advanced';
+
 const inputClasses = 'h-[44px] rounded-xl font-mono text-meta bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 shadow-sm transition-all text-foreground placeholder:text-foreground/40';
 const labelClasses = 'text-sm text-foreground/80 font-bold';
 const outlineButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-foreground/80 hover:text-foreground';
 const primaryButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 shadow-none';
+
+function getDefaultPanel(meta: ChannelMeta | null): ConfigPanel {
+  if (!meta?.settingsGroups || meta.settingsGroups.length === 0) return 'credentials';
+  return 'credentials';
+}
+
+function getAllPanels(meta: ChannelMeta | null): ConfigPanel[] {
+  if (!meta?.settingsGroups || meta.settingsGroups.length === 0) return ['credentials'];
+  const panels: ConfigPanel[] = ['credentials'];
+  for (const group of meta.settingsGroups) {
+    if (!panels.includes(group.id)) panels.push(group.id);
+  }
+  return panels;
+}
 
 export function ChannelConfigModal({
   initialSelectedType = null,
@@ -84,6 +109,7 @@ export function ChannelConfigModal({
   const { channels, addChannel, fetchChannels } = useChannelsStore();
   const [selectedType, setSelectedType] = useState<ChannelType | null>(initialSelectedType);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
+  const [settingsValues, setSettingsValues] = useState<Record<string, string>>({});
   const [channelName, setChannelName] = useState('');
   const [accountIdInput, setAccountIdInput] = useState(accountId || '');
   const [accountIdError, setAccountIdError] = useState<string | null>(null);
@@ -93,6 +119,8 @@ export function ChannelConfigModal({
   const [validating, setValidating] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [isExistingConfig, setIsExistingConfig] = useState(false);
+  const [activePanel, setActivePanel] = useState<ConfigPanel>('credentials');
+  const [enabled, setEnabled] = useState(true);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [validationResult, setValidationResult] = useState<{
     valid: boolean;
@@ -113,9 +141,11 @@ export function ChannelConfigModal({
     selectedType && allowExistingConfig && configuredTypes.includes(selectedType)
   );
   const accountIdForConfigLoad = shouldLoadExistingConfig ? resolvedAccountId : undefined;
+  const availablePanels = getAllPanels(meta);
 
   useEffect(() => {
     setSelectedType(initialSelectedType);
+    setActivePanel('credentials');
   }, [initialSelectedType]);
 
   useEffect(() => {
@@ -126,28 +156,38 @@ export function ChannelConfigModal({
   useEffect(() => {
     if (!selectedType) {
       setConfigValues({});
+      setSettingsValues({});
       setChannelName('');
       setIsExistingConfig(false);
       setValidationResult(null);
       setQrCode(null);
       setConnecting(false);
       setAccountIdError(null);
+      setActivePanel('credentials');
+      setEnabled(true);
       return;
     }
 
     if (!shouldLoadExistingConfig) {
       setConfigValues({});
+      setSettingsValues({});
       setIsExistingConfig(false);
       setLoadingConfig(false);
       setChannelName(showChannelName ? CHANNEL_NAMES[selectedType] : '');
+      setActivePanel('credentials');
+      setEnabled(true);
       return;
     }
 
     if (initialConfigValues) {
-      setConfigValues(initialConfigValues);
+      const { creds, settings } = splitConfigValues(selectedType, initialConfigValues);
+      setConfigValues(creds);
+      setSettingsValues(settings);
       setIsExistingConfig(Object.keys(initialConfigValues).length > 0);
       setLoadingConfig(false);
       setChannelName(showChannelName ? CHANNEL_NAMES[selectedType] : '');
+      const enabledValue = initialConfigValues.enabled;
+      setEnabled(enabledValue === 'true' || enabledValue === undefined);
       return;
     }
 
@@ -164,15 +204,22 @@ export function ChannelConfigModal({
         if (cancelled) return;
 
         if (result.success && result.values && Object.keys(result.values).length > 0) {
-          setConfigValues(result.values);
+          const { creds, settings } = splitConfigValues(selectedType, result.values);
+          setConfigValues(creds);
+          setSettingsValues(settings);
           setIsExistingConfig(true);
+          const enabledValue = result.values.enabled;
+          setEnabled(enabledValue === 'true' || enabledValue === undefined);
         } else {
           setConfigValues({});
+          setSettingsValues({});
           setIsExistingConfig(false);
+          setEnabled(true);
         }
       } catch {
         if (!cancelled) {
           setConfigValues({});
+          setSettingsValues({});
           setIsExistingConfig(false);
         }
       } finally {
@@ -186,10 +233,10 @@ export function ChannelConfigModal({
   }, [accountIdForConfigLoad, initialConfigValues, selectedType, shouldLoadExistingConfig, showChannelName]);
 
   useEffect(() => {
-    if (selectedType && !loadingConfig && showChannelName && firstInputRef.current) {
+    if (selectedType && !loadingConfig && showChannelName && firstInputRef.current && activePanel === 'credentials') {
       firstInputRef.current.focus();
     }
-  }, [selectedType, loadingConfig, showChannelName]);
+  }, [selectedType, loadingConfig, showChannelName, activePanel]);
 
   const finishSave = useCallback(async (channelType: ChannelType) => {
     const displayName = showChannelName && channelName.trim()
@@ -428,14 +475,15 @@ export function ChannelConfigModal({
         });
       }
 
-      const config: Record<string, unknown> = { ...configValues };
+      const credentials: Record<string, unknown> = { ...configValues, enabled };
+      const settings: Record<string, unknown> = { ...settingsValues };
       const saveResult = await hostApiFetch<{
         success?: boolean;
         error?: string;
         warning?: string;
       }>('/api/channels/config', {
         method: 'POST',
-        body: JSON.stringify({ channelType: selectedType, config, accountId: resolvedAccountId }),
+        body: JSON.stringify({ channelType: selectedType, credentials, settings, enabled, accountId: resolvedAccountId }),
       });
       if (!saveResult?.success) {
         throw new Error(saveResult?.error || 'Failed to save channel config');
@@ -486,8 +534,16 @@ export function ChannelConfigModal({
     setConfigValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateSettingsValue = (key: string, value: string) => {
+    setSettingsValues((prev) => ({ ...prev, [key]: value }));
+  };
+
   const toggleSecretVisibility = (key: string) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const panelLabel = (panel: ConfigPanel): string => {
+    return t(`settings.${panel}`);
   };
 
   return (
@@ -679,18 +735,88 @@ export function ChannelConfigModal({
                 </div>
               )}
 
-              <div className="space-y-4">
-                {meta?.configFields.map((field) => (
-                  <ConfigField
-                    key={field.key}
-                    field={field}
-                    value={configValues[field.key] || ''}
-                    onChange={(value) => updateConfigValue(field.key, value)}
-                    showSecret={showSecrets[field.key] || false}
-                    onToggleSecret={() => toggleSecretVisibility(field.key)}
-                  />
-                ))}
-              </div>
+              {/* Enable Channel Toggle */}
+              {selectedType && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{t('dialog.enableChannel')}</p>
+                    <p className="text-xs text-muted-foreground">{t('dialog.enableChannelDesc')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEnabled((prev) => !prev)}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50',
+                      enabled ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                        enabled ? 'translate-x-6' : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {/* Panel Tabs */}
+              {availablePanels.length > 1 && (
+                <Tabs value={activePanel} onValueChange={(v) => setActivePanel(v as ConfigPanel)} className="w-full">
+                  <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${availablePanels.length}, 1fr)` }}>
+                    {availablePanels.map((panel) => (
+                      <TabsTrigger key={panel} value={panel} className="text-xs sm:text-sm gap-1.5">
+                        {panel === 'credentials' && <KeyRound className="h-3.5 w-3.5 hidden sm:inline" />}
+                        {panel === 'access' && <MessageSquareLock className="h-3.5 w-3.5 hidden sm:inline" />}
+                        {panel === 'connection' && <Plug className="h-3.5 w-3.5 hidden sm:inline" />}
+                        {panel === 'advanced' && <Settings2 className="h-3.5 w-3.5 hidden sm:inline" />}
+                        {panelLabel(panel)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  <TabsContent value="credentials" className="mt-4 space-y-5">
+                    {meta?.configFields.map((field) => (
+                      <ConfigField
+                        key={field.key}
+                        field={field}
+                        value={configValues[field.key] || ''}
+                        onChange={(value) => updateConfigValue(field.key, value)}
+                        showSecret={showSecrets[field.key] || false}
+                        onToggleSecret={() => toggleSecretVisibility(field.key)}
+                      />
+                    ))}
+                  </TabsContent>
+
+                  {meta?.settingsGroups?.map((group) => (
+                    <TabsContent key={group.id} value={group.id} className="mt-4">
+                      <SettingsGroupPanel
+                        group={group}
+                        settingsValues={settingsValues}
+                        showSecrets={showSecrets}
+                        onChange={updateSettingsValue}
+                        onToggleSecret={toggleSecretVisibility}
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
+
+              {/* Single panel (no tabs) fallback */}
+              {availablePanels.length <= 1 && (
+                <div className="space-y-5">
+                  {meta?.configFields.map((field) => (
+                    <ConfigField
+                      key={field.key}
+                      field={field}
+                      value={configValues[field.key] || ''}
+                      onChange={(value) => updateConfigValue(field.key, value)}
+                      showSecret={showSecrets[field.key] || false}
+                      onToggleSecret={() => toggleSecretVisibility(field.key)}
+                    />
+                  ))}
+                </div>
+              )}
 
               {validationResult && (
                 <div
@@ -744,7 +870,7 @@ export function ChannelConfigModal({
 
               <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {meta?.connectionType === 'token' && shouldUseCredentialValidation && (
+                  {meta?.connectionType === 'token' && shouldUseCredentialValidation && activePanel === 'credentials' && (
                     <Button
                       variant="outline"
                       onClick={handleValidate}
@@ -795,8 +921,46 @@ export function ChannelConfigModal({
   );
 }
 
+function splitConfigValues(
+  channelType: ChannelType,
+  values: Record<string, string>
+): { creds: Record<string, string>; settings: Record<string, string> } {
+  const meta = CHANNEL_META[channelType];
+  const credKeys = new Set(meta?.configFields.map((f) => f.key) ?? []);
+  const settingKeys = new Set<string>();
+  for (const group of meta?.settingsGroups ?? []) {
+    for (const field of group.fields) {
+      settingKeys.add(field.key);
+    }
+  }
+
+  const creds: Record<string, string> = {};
+  const settings: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(values)) {
+    if (credKeys.has(key)) {
+      creds[key] = value;
+    } else if (settingKeys.has(key)) {
+      settings[key] = value;
+    } else {
+      // Unknown keys go to creds for backward compatibility
+      creds[key] = value;
+    }
+  }
+
+  return { creds, settings };
+}
+
 interface ConfigFieldProps {
   field: ChannelConfigField;
+  value: string;
+  onChange: (value: string) => void;
+  showSecret: boolean;
+  onToggleSecret: () => void;
+}
+
+interface SettingsFieldProps {
+  field: ChannelSettingsField;
   value: string;
   onChange: (value: string) => void;
   showSecret: boolean;
@@ -821,6 +985,8 @@ function ChannelLogo({ type }: { type: ChannelType }) {
       return <img src={wecomIcon} alt="WeCom" className="w-[22px] h-[22px] dark:invert" />;
     case 'qqbot':
       return <img src={qqIcon} alt="QQ" className="w-[22px] h-[22px] dark:invert" />;
+    case 'slack':
+      return <img src={slackIcon} alt="Slack" className="w-[22px] h-[22px] dark:invert" />;
     default:
       return <span className="text-xl">{CHANNEL_ICONS[type] || '💬'}</span>;
   }
@@ -865,6 +1031,209 @@ function ConfigField({ field, value, onChange, showSecret, onToggleSecret }: Con
       {field.envVar && (
         <p className="text-xs text-muted-foreground/70 font-mono">
           {t('dialog.envVar', { var: field.envVar })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SettingsGroupPanel({
+  group,
+  settingsValues,
+  showSecrets,
+  onChange,
+  onToggleSecret,
+}: {
+  group: { id: string; label: string; fields: ChannelSettingsField[] };
+  settingsValues: Record<string, string>;
+  showSecrets: Record<string, boolean>;
+  onChange: (key: string, value: string) => void;
+  onToggleSecret: (key: string) => void;
+}) {
+  // Determine which fields are "compact" (can sit side-by-side)
+  const isCompact = (f: ChannelSettingsField) => f.type === 'checkbox' || f.type === 'number';
+  const isFullWidth = (f: ChannelSettingsField) => f.type === 'textarea' || f.type === 'password' || f.key === 'proxy';
+
+  // Group consecutive compact fields into pairs
+  const rows: Array<{ kind: 'single' | 'pair'; fields: ChannelSettingsField[] }> = [];
+  let i = 0;
+  while (i < group.fields.length) {
+    const f = group.fields[i];
+    if (isFullWidth(f)) {
+      rows.push({ kind: 'single', fields: [f] });
+      i++;
+    } else if (isCompact(f) && i + 1 < group.fields.length && isCompact(group.fields[i + 1])) {
+      rows.push({ kind: 'pair', fields: [f, group.fields[i + 1]] });
+      i += 2;
+    } else {
+      rows.push({ kind: 'single', fields: [f] });
+      i++;
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {rows.map((row, rowIndex) =>
+        row.kind === 'pair' ? (
+          <div key={rowIndex} className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {row.fields.map((field) => (
+              <SettingsField
+                key={field.key}
+                field={field}
+                value={settingsValues[field.key] ?? String(field.defaultValue ?? '')}
+                onChange={(value) => onChange(field.key, value)}
+                showSecret={showSecrets[field.key] || false}
+                onToggleSecret={() => onToggleSecret(field.key)}
+              />
+            ))}
+          </div>
+        ) : (
+          <SettingsField
+            key={row.fields[0].key}
+            field={row.fields[0]}
+            value={settingsValues[row.fields[0].key] ?? String(row.fields[0].defaultValue ?? '')}
+            onChange={(value) => onChange(row.fields[0].key, value)}
+            showSecret={showSecrets[row.fields[0].key] || false}
+            onToggleSecret={() => onToggleSecret(row.fields[0].key)}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+function SettingsField({ field, value, onChange, showSecret, onToggleSecret }: SettingsFieldProps) {
+  const { t } = useTranslation('channels');
+  const inputId = `setting-${field.key}`;
+  const isJsonField = ['groups', 'network', 'dynamicAgentCreation'].includes(field.key);
+
+  if (field.type === 'checkbox') {
+    const boolValue = value === 'true' || (value as unknown) === true;
+    return (
+      <div className="flex items-start justify-between p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10">
+        <div className="space-y-0.5 min-w-0">
+          <Label htmlFor={inputId} className="text-sm font-medium text-foreground cursor-pointer">
+            {t(field.label)}
+          </Label>
+          {field.description && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t(field.description)}
+            </p>
+          )}
+        </div>
+        <Switch
+          id={inputId}
+          checked={boolValue}
+          onCheckedChange={(checked) => onChange(String(checked))}
+        />
+      </div>
+    );
+  }
+
+  if (field.type === 'select') {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={inputId} className={labelClasses}>
+          {t(field.label)}
+        </Label>
+        <div className="relative">
+          <select
+            id={inputId}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className={cn(
+              inputClasses,
+              'h-[44px] px-3 appearance-none w-full pr-10'
+            )}
+          >
+            {field.options?.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.label)}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        {field.description && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t(field.description)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (field.type === 'textarea') {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor={inputId} className={labelClasses}>
+            {t(field.label)}
+          </Label>
+          {isJsonField && (
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
+              <Code2 className="h-3 w-3 mr-0.5" />
+              JSON
+            </Badge>
+          )}
+        </div>
+        <textarea
+          id={inputId}
+          placeholder={field.placeholder ? t(field.placeholder) : undefined}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={isJsonField ? 5 : 4}
+          className={cn(
+            inputClasses,
+            'h-auto py-2.5 resize-none font-mono text-sm leading-relaxed',
+            isJsonField && 'border-dashed border-amber-500/30 dark:border-amber-400/20 bg-amber-50/[0.03] dark:bg-amber-400/[0.02]'
+          )}
+        />
+        {field.description && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t(field.description)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const isPassword = field.type === 'password';
+  const isNumber = field.type === 'number';
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={inputId} className={labelClasses}>
+        {t(field.label)}
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          id={inputId}
+          type={isPassword && !showSecret ? 'password' : isNumber ? 'number' : 'text'}
+          placeholder={field.placeholder ? t(field.placeholder) : undefined}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(inputClasses, isNumber && 'font-mono')}
+        />
+        {isPassword && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onToggleSecret}
+            className="h-[44px] w-[44px] rounded-xl bg-surface-input border-black/10 dark:border-white/10 text-muted-foreground hover:text-foreground shrink-0 shadow-sm"
+          >
+            {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        )}
+      </div>
+      {field.description && (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {t(field.description)}
         </p>
       )}
     </div>

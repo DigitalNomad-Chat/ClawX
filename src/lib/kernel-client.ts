@@ -118,6 +118,37 @@ class KernelClient {
     }>;
   }
 
+  // ─── History ──────────────────────────────────────────────────────
+
+  async listHistory(agentId?: string): Promise<{ success: boolean; sessions?: Array<{ sessionId: string; agentId: string; agentName: string; agentEmoji: string; title: string; messages: unknown[]; createdAt: number; updatedAt: number }>; error?: string }> {
+    return window.electron.ipcRenderer.invoke('history:list', agentId) as Promise<{
+      success: boolean;
+      sessions?: Array<{ sessionId: string; agentId: string; agentName: string; agentEmoji: string; title: string; messages: unknown[]; createdAt: number; updatedAt: number }>;
+      error?: string;
+    }>;
+  }
+
+  async saveHistory(session: { sessionId: string; agentId: string; agentName: string; agentEmoji: string; title: string; messages: unknown[]; createdAt: number; updatedAt: number }): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('history:save', session) as Promise<{ success: boolean; error?: string }>;
+  }
+
+  async deleteHistory(sessionId: string): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('history:delete', sessionId) as Promise<{ success: boolean; error?: string }>;
+  }
+
+  /**
+   * Restore a session with historical messages
+   */
+  async restoreSession(agentId: string, messages: Array<{ role: string; content: string; toolCallId?: string }>): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:restoreSession', agentId, messages) as Promise<{
+      success: boolean;
+      sessionId?: string;
+      error?: string;
+    }>;
+  }
+
+  // ─── File staging ─────────────────────────────────────────────────
+
   /**
    * Stage file attachments for a session (saves to session workspace)
    */
