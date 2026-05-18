@@ -650,7 +650,7 @@ export function Channels() {
                 <MessageSquare className="h-4 w-4" />
                 <h2 className="text-sm font-medium">{t('configured')}</h2>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {configuredGroups.map((group) => (
                   <div
                     key={group.channelType}
@@ -711,7 +711,9 @@ export function Channels() {
                           >
                             {/* 第一行：名称 + 操作按钮 */}
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{displayName}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{displayName}</p>
+                              </div>
                               <div className="flex items-center gap-0.5 shrink-0">
                                 <Button
                                   size="icon"
@@ -821,7 +823,7 @@ export function Channels() {
                 <h2 className="text-sm font-medium">{t('supportedChannels')}</h2>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {unsupportedGroups.map((type) => {
                   const meta = CHANNEL_META[type];
                   return (
