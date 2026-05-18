@@ -15,18 +15,19 @@ interface ModulePageLayoutProps {
 }
 
 export function ModulePageLayout({ children, className, title, actions, compact }: ModulePageLayoutProps) {
+  const hasHeader = !!title || !!actions;
   return (
     <div className={cn('flex h-full flex-col overflow-hidden', className)}>
-      {(title || actions) && (
+      {hasHeader && (
         <div className={cn(
-          'flex items-center justify-between',
+          'flex items-center justify-between shrink-0',
           compact ? 'px-4 py-2.5' : 'border-b px-6 py-4'
         )}>
           {title && <h1 className={cn('font-semibold tracking-tight', compact ? 'text-base' : 'text-lg')}>{title}</h1>}
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className={cn('flex-1 overflow-auto', compact ? 'p-3' : 'p-6')}>
+      <div className={cn('flex-1 overflow-auto', hasHeader ? (compact ? 'p-3' : 'p-6') : '')}>
         {children}
       </div>
     </div>
