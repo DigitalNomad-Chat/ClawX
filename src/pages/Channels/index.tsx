@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, Settings2 } from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, Settings2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -150,6 +150,7 @@ export function Channels() {
   const [existingAccountIdsForModal, setExistingAccountIdsForModal] = useState<string[]>([]);
   const [initialConfigValuesForModal, setInitialConfigValuesForModal] = useState<Record<string, string> | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [quickBindAgentId, setQuickBindAgentId] = useState<string | undefined>();
   const convergenceRefreshTimersRef = useRef<number[]>([]);
   const fetchInFlightRef = useRef(false);
   const queuedFetchOptionsRef = useRef<FetchPageDataOptions | null>(null);
@@ -529,6 +530,20 @@ export function Channels() {
     return items;
   }, [visibleChannelGroups]);
 
+  // 计算未绑定任何渠道的 Agent（频道主页面顶部横幅 + 绑定管理页共用）
+  const unboundAgents = useMemo(() => {
+    // 从 bindings 推断已绑定的 agentId —— 通过已配置账号的 agentId 字段判断
+    const boundAgentIds = new Set<string>();
+    for (const group of visibleChannelGroups) {
+      for (const account of group.accounts) {
+        if (account.agentId) {
+          boundAgentIds.add(account.agentId);
+        }
+      }
+    }
+    return visibleAgents.filter((a) => !boundAgentIds.has(a.id));
+  }, [visibleAgents, visibleChannelGroups]);
+
   if (loading && !hasStableValue) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -543,7 +558,11 @@ export function Channels() {
         <BindingManageView
           agents={visibleAgents}
           configuredAccounts={configuredAccounts}
-          onBack={() => setActiveView('channels')}
+          initialAgentId={quickBindAgentId}
+          onBack={() => {
+            setActiveView('channels');
+            setQuickBindAgentId(undefined);
+          }}
         />
       </div>
     );
@@ -580,6 +599,37 @@ export function Channels() {
           </Button>
         </div>
       </div>
+
+      {/* 未绑定 Agent 提醒横幅 */}
+      {unboundAgents.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                {t('bindingManage.unboundWarning', { count: unboundAgents.length })}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {unboundAgents.map((agent) => (
+                  <Button
+                    key={agent.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setQuickBindAgentId(agent.id);
+                      setActiveView('bindings');
+                    }}
+                    className="rounded-full border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 text-xs"
+                  >
+                    <Zap className="h-3 w-3 mr-1" />
+                    {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
           {gatewayStatus.state !== 'running' && (

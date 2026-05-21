@@ -29,17 +29,19 @@ interface BindingManageViewProps {
   agents: { id: string; name: string }[];
   /** 已配置的渠道账号列表（用于 AddBindingModal 中的 accountId 下拉选择） */
   configuredAccounts?: ConfiguredAccountItem[];
+  /** 可选：从外部传入的预填充 agentId（快速绑定） */
+  initialAgentId?: string;
   onBack: () => void;
 }
 
-export function BindingManageView({ agents, configuredAccounts = [], onBack }: BindingManageViewProps) {
+export function BindingManageView({ agents, configuredAccounts = [], initialAgentId, onBack }: BindingManageViewProps) {
   const { t } = useTranslation('channels');
   const [bindings, setBindings] = useState<BindingInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editBinding, setEditBinding] = useState<BindingInfo | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BindingInfo | null>(null);
-  const [quickBindAgentId, setQuickBindAgentId] = useState<string | undefined>();
+  const [quickBindAgentId, setQuickBindAgentId] = useState<string | undefined>(initialAgentId);
 
   const fetchBindings = useCallback(async () => {
     try {
@@ -65,6 +67,12 @@ export function BindingManageView({ agents, configuredAccounts = [], onBack }: B
   useEffect(() => {
     fetchBindings();
   }, [fetchBindings]);
+
+  useEffect(() => {
+    if (initialAgentId) {
+      setQuickBindAgentId(initialAgentId);
+    }
+  }, [initialAgentId]);
 
   const unboundAgents = useMemo(() => {
     const boundAgentIds = new Set(bindings.map((b) => b.agentId));
