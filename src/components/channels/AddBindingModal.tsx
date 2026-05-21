@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Link2,
@@ -79,10 +79,11 @@ export function AddBindingModal({
     requestAnimationFrame(() => setMounted(true));
   }, []);
 
-  // 当选择渠道后，过滤出该渠道下已配置的账号
-  const availableAccounts = configuredAccounts.filter(
-    (a) => a.channelType === channel
-  );
+  // 从已配置账号列表中过滤当前渠道的可用账号
+  const availableAccounts = useMemo(() => {
+    if (!channel) return [];
+    return configuredAccounts.filter((a) => a.channelType === channel);
+  }, [channel, configuredAccounts]);
 
   const validate = (): string | null => {
     if (!agentId.trim()) return t('bindingManage.fields.agentPlaceholder');
@@ -275,7 +276,16 @@ export function AddBindingModal({
           {showAccountIdField && (
             <div className="space-y-2.5">
               <Label className={labelClasses}>{t('bindingManage.fields.accountId')}</Label>
-              {availableAccounts.length > 0 ? (
+              {!channel ? (
+                // 未选渠道时，下拉置灰提示先选渠道
+                <select
+                  disabled
+                  className={cn(inputBaseClasses, 'w-full px-3 opacity-50 cursor-not-allowed')}
+                >
+                  <option>{t('bindingManage.fields.selectChannelFirst')}</option>
+                </select>
+              ) : availableAccounts.length > 0 ? (
+                // 有已配置账号，显示下拉选择
                 <select
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
@@ -290,18 +300,22 @@ export function AddBindingModal({
                   ))}
                 </select>
               ) : (
-                <>
+                // 无已配置账号，显示置灰提示 + 手动输入
+                <div className="space-y-2">
+                  <select
+                    disabled
+                    className={cn(inputBaseClasses, 'w-full px-3 opacity-50 cursor-not-allowed')}
+                  >
+                    <option>{t('bindingManage.fields.noConfiguredAccounts')}</option>
+                  </select>
                   <Input
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
-                    placeholder={t('bindingManage.fields.accountIdPlaceholder')}
+                    placeholder={t('bindingManage.fields.accountIdManualHint')}
                     disabled={saving}
                     className={inputBaseClasses}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t('bindingManage.fields.accountIdManualHint')}
-                  </p>
-                </>
+                </div>
               )}
             </div>
           )}
