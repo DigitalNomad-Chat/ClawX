@@ -510,15 +510,8 @@ export function Channels() {
     return nextAccountId;
   };
 
-  if (loading && !hasStableValue) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
   // 从 channelGroups 中提取已配置的账号列表，供绑定管理下拉选择
+  // 必须在所有 hooks 之后、early return 之前定义
   const configuredAccounts = useMemo(() => {
     const items: { channelType: string; accountId: string; name: string }[] = [];
     for (const group of visibleChannelGroups) {
@@ -534,6 +527,14 @@ export function Channels() {
     }
     return items;
   }, [visibleChannelGroups]);
+
+  if (loading && !hasStableValue) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   if (activeView === 'bindings') {
     return (
