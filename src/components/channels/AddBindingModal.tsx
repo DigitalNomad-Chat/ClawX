@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   X,
   Link2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +23,17 @@ import {
 } from '@/types/channel';
 import { useTranslation } from 'react-i18next';
 
+/** 已配置的渠道账号条目 */
+export interface ConfiguredAccountItem {
+  channelType: string;
+  accountId: string;
+  name: string;
+}
+
 interface AddBindingModalProps {
   agents: { id: string; name: string }[];
+  /** 当前已配置的渠道账号列表（用于 accountId 下拉选择） */
+  configuredAccounts?: ConfiguredAccountItem[];
   /** 可选：预填充 agentId（从快速绑定传入） */
   initialAgentId?: string;
   /** 可选：编辑模式，传入现有 binding 数据 */
@@ -32,13 +42,14 @@ interface AddBindingModalProps {
   onClose: () => void;
 }
 
-const inputBaseClasses = 'h-11 rounded-xl bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-cyan-500/30 focus-visible:border-cyan-500/50 shadow-sm transition-all text-foreground placeholder:text-foreground/30';
+const inputBaseClasses = 'h-11 rounded-xl bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 shadow-sm transition-all text-foreground placeholder:text-foreground/30';
 const labelClasses = 'text-xs font-bold uppercase tracking-widest text-foreground/70';
 const outlineButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-foreground/80 hover:text-foreground';
 const primaryButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 shadow-none';
 
 export function AddBindingModal({
   agents,
+  configuredAccounts = [],
   initialAgentId,
   editBinding,
   onConfirm,
@@ -68,6 +79,11 @@ export function AddBindingModal({
     requestAnimationFrame(() => setMounted(true));
   }, []);
 
+  // 当选择渠道后，过滤出该渠道下已配置的账号
+  const availableAccounts = configuredAccounts.filter(
+    (a) => a.channelType === channel
+  );
+
   const validate = (): string | null => {
     if (!agentId.trim()) return t('bindingManage.fields.agentPlaceholder');
     if (!channel.trim()) return t('bindingManage.fields.channelPlaceholder');
@@ -85,10 +101,7 @@ export function AddBindingModal({
 
   const handleSubmit = async () => {
     const error = validate();
-    if (error) {
-      // 简单提示，实际可用 toast
-      return;
-    }
+    if (error) return;
 
     setSaving(true);
     try {
@@ -124,6 +137,10 @@ export function AddBindingModal({
   const showPeerFields = routingMode === 'peer' || routingMode === 'both';
   const showAcpFields = bindingType === 'acp';
 
+  // 按钮组选中态 — 使用项目标准 primary 色
+  const segBtnActive = 'border-primary/50 bg-primary/10 text-primary';
+  const segBtnIdle = 'border-black/10 dark:border-white/10 bg-surface-input text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5';
+
   return (
     <div
       className={cn(
@@ -131,9 +148,7 @@ export function AddBindingModal({
         mounted ? 'bg-black/60 backdrop-blur-sm' : 'bg-black/0'
       )}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <Card
@@ -145,20 +160,20 @@ export function AddBindingModal({
         onClick={(event) => event.stopPropagation()}
       >
         <CardHeader className="relative flex flex-row items-start justify-between pb-4 shrink-0 overflow-hidden">
-          {/* 顶部品牌色光带 */}
-          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-          {/* 右上角辉光 */}
-          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-[0.08] blur-3xl pointer-events-none bg-cyan-500" />
+          {/* 顶部品牌色光带 — 统一为 primary */}
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-primary to-transparent" />
+          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-[0.08] blur-3xl pointer-events-none bg-primary" />
+
           <div className="relative z-10 pt-1 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-cyan-500/10 flex items-center justify-center">
-              <Link2 className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Link2 className="h-5 w-5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-xl font-bold tracking-tight text-foreground">
                 {isEdit ? t('bindingManage.editBinding') : t('bindingManage.addBinding')}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {isEdit ? t('bindingManage.subtitle') : t('bindingManage.subtitle')}
+                {t('bindingManage.subtitle')}
               </p>
             </div>
           </div>
@@ -197,7 +212,7 @@ export function AddBindingModal({
             <Label className={labelClasses}>{t('bindingManage.fields.channel')}</Label>
             <select
               value={channel}
-              onChange={(e) => setChannel(e.target.value)}
+              onChange={(e) => { setChannel(e.target.value); setAccountId(''); }}
               disabled={saving}
               className={cn(inputBaseClasses, 'w-full px-3')}
             >
@@ -210,7 +225,7 @@ export function AddBindingModal({
             </select>
           </div>
 
-          <Separator className="my-2 bg-border/50" />
+          <Separator className="bg-border/50" />
 
           {/* 路由模式 */}
           <div className="space-y-2.5">
@@ -224,9 +239,7 @@ export function AddBindingModal({
                   disabled={saving}
                   className={cn(
                     'flex-1 px-3 py-2 rounded-xl text-sm font-medium border transition-all',
-                    routingMode === opt.value
-                      ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
-                      : 'border-black/10 dark:border-white/10 bg-surface-input text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5'
+                    routingMode === opt.value ? segBtnActive : segBtnIdle
                   )}
                 >
                   <span className="block text-sm font-semibold">{opt.label}</span>
@@ -248,9 +261,7 @@ export function AddBindingModal({
                   disabled={saving}
                   className={cn(
                     'flex-1 px-3 py-2 rounded-xl text-sm font-medium border transition-all',
-                    bindingType === opt.value
-                      ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
-                      : 'border-black/10 dark:border-white/10 bg-surface-input text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5'
+                    bindingType === opt.value ? segBtnActive : segBtnIdle
                   )}
                 >
                   <span className="block text-sm font-semibold">{opt.label}</span>
@@ -260,20 +271,42 @@ export function AddBindingModal({
             </div>
           </div>
 
-          {/* 条件字段 */}
+          {/* 账号选择（accountId/both 模式） */}
           {showAccountIdField && (
             <div className="space-y-2.5">
               <Label className={labelClasses}>{t('bindingManage.fields.accountId')}</Label>
-              <Input
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                placeholder={t('bindingManage.fields.accountIdPlaceholder')}
-                disabled={saving}
-                className={inputBaseClasses}
-              />
+              {availableAccounts.length > 0 ? (
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  disabled={saving}
+                  className={cn(inputBaseClasses, 'w-full px-3')}
+                >
+                  <option value="">{t('bindingManage.fields.accountIdPlaceholder')}</option>
+                  {availableAccounts.map((acc) => (
+                    <option key={acc.accountId} value={acc.accountId}>
+                      {acc.name !== acc.accountId ? `${acc.name} (${acc.accountId})` : acc.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <Input
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    placeholder={t('bindingManage.fields.accountIdPlaceholder')}
+                    disabled={saving}
+                    className={inputBaseClasses}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('bindingManage.fields.accountIdManualHint')}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
+          {/* Peer 字段（peer/both 模式） */}
           {showPeerFields && (
             <>
               <div className="space-y-2.5">
@@ -287,9 +320,7 @@ export function AddBindingModal({
                       disabled={saving}
                       className={cn(
                         'flex-1 px-3 py-2 rounded-xl text-sm font-medium border transition-all',
-                        peerKind === opt.value
-                          ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300'
-                          : 'border-black/10 dark:border-white/10 bg-surface-input text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5'
+                        peerKind === opt.value ? segBtnActive : segBtnIdle
                       )}
                     >
                       {opt.label}
@@ -310,9 +341,10 @@ export function AddBindingModal({
             </>
           )}
 
+          {/* ACP 远程配置 */}
           {showAcpFields && (
             <>
-              <Separator className="my-2 bg-border/50" />
+              <Separator className="bg-border/50" />
               <div className="space-y-2.5">
                 <Label className={labelClasses}>{t('bindingManage.fields.acpEndpoint')}</Label>
                 <Input
@@ -359,7 +391,7 @@ export function AddBindingModal({
           </div>
 
           {/* 底部操作按钮 */}
-          <div className="flex items-center justify-end gap-3 pt-4">
+          <div className="flex items-center justify-end gap-3 pt-2">
             <Button
               variant="outline"
               onClick={onClose}
@@ -370,12 +402,12 @@ export function AddBindingModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={saving}
-              className={cn(primaryButtonClasses, 'bg-cyan-600 hover:bg-cyan-700 text-white')}
+              disabled={saving || !agentId || !channel}
+              className={cn(primaryButtonClasses, 'bg-primary hover:bg-primary/90 text-primary-foreground')}
             >
               {saving ? (
                 <>
-                  <span className="animate-spin mr-2">⚙</span>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   {t('dialog.saving')}
                 </>
               ) : isEdit ? (

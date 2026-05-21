@@ -518,11 +518,29 @@ export function Channels() {
     );
   }
 
+  // 从 channelGroups 中提取已配置的账号列表，供绑定管理下拉选择
+  const configuredAccounts = useMemo(() => {
+    const items: { channelType: string; accountId: string; name: string }[] = [];
+    for (const group of visibleChannelGroups) {
+      for (const account of group.accounts) {
+        if (account.configured) {
+          items.push({
+            channelType: group.channelType,
+            accountId: account.accountId,
+            name: account.name,
+          });
+        }
+      }
+    }
+    return items;
+  }, [visibleChannelGroups]);
+
   if (activeView === 'bindings') {
     return (
       <div data-testid="channels-page" className="flex h-full flex-col gap-6">
         <BindingManageView
           agents={visibleAgents}
+          configuredAccounts={configuredAccounts}
           onBack={() => setActiveView('channels')}
         />
       </div>

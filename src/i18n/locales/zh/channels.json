@@ -640,6 +640,7 @@
             "bindingType": "绑定类型",
             "accountId": "选择账号",
             "accountIdPlaceholder": "选择渠道账号",
+            "accountIdManualHint": "该渠道暂无已配置账号，请手动输入账号 ID",
             "peerKind": "Peer 类型",
             "peerId": "Peer ID",
             "peerIdPlaceholder": "例如: ou_xxxxxx, 123456789",
