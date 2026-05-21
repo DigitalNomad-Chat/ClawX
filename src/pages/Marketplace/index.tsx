@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Store, Sparkles, Users, Briefcase,
   Code, Megaphone, Palette, Package, Settings, Star, Gamepad2,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,18 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   专项: <Star className="h-4 w-4" />,
   创意: <Gamepad2 className="h-4 w-4" />,
   通用: <Users className="h-4 w-4" />,
+  管理: <Shield className="h-4 w-4" />,
 };
 
-const CATEGORIES = ['全部', '工程', '营销', '设计', '产品', '商务', '运营', '专项', '创意'];
+/** Agent IDs that are pinned to the top of the marketplace */
+const PINNED_AGENT_IDS = [
+  'openclaw-recruiter',
+  'openclaw-optimizer',
+  'openclaw-cleaner',
+  'openclaw-inspector',
+];
+
+const CATEGORIES = ['全部', '工程', '营销', '设计', '产品', '商务', '运营', '专项', '创意', '管理'];
 
 export function Marketplace() {
   const navigate = useNavigate();
@@ -153,6 +163,14 @@ export function Marketplace() {
     });
   }, [agents, searchQuery, activeCategory]);
 
+  const pinnedAgents = useMemo(() => {
+    return agents.filter((agent) => PINNED_AGENT_IDS.includes(agent.id));
+  }, [agents]);
+
+  const regularAgents = useMemo(() => {
+    return filteredAgents.filter((agent) => !PINNED_AGENT_IDS.includes(agent.id));
+  }, [filteredAgents]);
+
   return (
     <div className="flex h-full flex-col gap-6">
       {/* Header */}
@@ -236,22 +254,53 @@ export function Marketplace() {
         <div className="flex flex-1 items-center justify-center text-muted-foreground">
           加载中...
         </div>
-      ) : filteredAgents.length === 0 ? (
+      ) : filteredAgents.length === 0 && pinnedAgents.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
           <Search className="h-8 w-8" />
           <p>未找到匹配的 Agent</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredAgents.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              onClick={() => setSelectedAgent(agent)}
-              onHire={() => hireAgent(agent.id)}
-            />
-          ))}
-        </div>
+        <>
+          {/* Pinned Management Agents */}
+          {pinnedAgents.length > 0 && activeCategory === '全部' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                <h2 className="text-sm font-medium">管理 Agent</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {pinnedAgents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    onClick={() => setSelectedAgent(agent)}
+                    onHire={() => hireAgent(agent.id)}
+                    pinned
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Regular Agent Grid */}
+          {regularAgents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {regularAgents.map((agent) => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  onClick={() => setSelectedAgent(agent)}
+                  onHire={() => hireAgent(agent.id)}
+                />
+              ))}
+            </div>
+          ) : pinnedAgents.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Search className="h-8 w-8" />
+              <p>未找到匹配的 Agent</p>
+            </div>
+          ) : null}
+        </>
       )}
 
       {/* Agent Detail Dialog */}
@@ -270,16 +319,68 @@ function AgentCard({
   agent,
   onClick,
   onHire,
+  pinned,
 }: {
   agent: AgentCardData;
   onClick: () => void;
   onHire: () => void;
+  pinned?: boolean;
 }) {
+  if (pinned) {
+    return (
+      <div
+        className={cn(
+          'group relative flex flex-col rounded-xl p-5 transition-all cursor-pointer',
+          'bg-gradient-to-br from-card to-primary/5 border border-primary/40',
+          'hover:border-primary/50 hover:shadow-md',
+        )}
+        onClick={onClick}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-2xl">
+            {agent.emoji}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold truncate">{agent.name}</h3>
+            <p className="text-xs text-muted-foreground truncate">{agent.creature}</p>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{agent.description}</p>
+
+        {/* Tags */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {agent.tags.map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto pt-4 flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">v{agent.version}</span>
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onHire();
+            }}
+          >
+            雇佣
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
         'group relative flex flex-col rounded-xl border bg-card p-5 transition-all',
-        'hover:shadow-md hover:border-primary/30 cursor-pointer'
+        'hover:shadow-md hover:border-primary/30 cursor-pointer',
       )}
       onClick={onClick}
     >
