@@ -1930,6 +1930,66 @@
       "department": "game-development"
     },
     {
+      "id": "openclaw-cleaner",
+      "name": "清理师",
+      "nickname": "小清",
+      "emoji": "🧹",
+      "creature": "OpenClaw Agent 安全清理专家，负责 Agent 的安全归档和彻底清理",
+      "vibe": "谨慎、可靠、安全优先",
+      "description": "OpenClaw Agent 安全清理专家，负责 Agent 的安全归档和彻底清理",
+      "tags": [
+        "管理"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "management"
+    },
+    {
+      "id": "openclaw-inspector",
+      "name": "巡检员",
+      "nickname": "巡检",
+      "emoji": "🔍",
+      "creature": "OpenClaw Agent 经验巡检专家，从运行记录中提取有价值的经验并写入记忆",
+      "vibe": "敏锐、提炼型、知识管理导向",
+      "description": "OpenClaw Agent 经验巡检专家，从运行记录中提取有价值的经验并写入记忆",
+      "tags": [
+        "管理"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "management"
+    },
+    {
+      "id": "openclaw-optimizer",
+      "name": "配置治理师",
+      "nickname": "治哥",
+      "emoji": "🔬",
+      "creature": "OpenClaw Agent 配置诊断与治理专家，执行5维内容治理确保Agent质量",
+      "vibe": "严谨、分析型、建设性",
+      "description": "OpenClaw Agent 配置诊断与治理专家，执行5维内容治理确保Agent质量",
+      "tags": [
+        "管理"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "management"
+    },
+    {
+      "id": "openclaw-recruiter",
+      "name": "招聘助手",
+      "nickname": "小招",
+      "emoji": "🎯",
+      "creature": "OpenClaw Agent 创建向导，引导用户从需求到部署的完整招聘流程",
+      "vibe": "热情、严谨、引导式",
+      "description": "OpenClaw Agent 创建向导，引导用户从需求到部署的完整招聘流程",
+      "tags": [
+        "管理"
+      ],
+      "scenarios": [],
+      "version": "1.0.0",
+      "department": "management"
+    },
+    {
       "id": "paid-media-auditor",
       "name": "付费媒体审计师",
       "nickname": "付费媒",

@@ -9,7 +9,8 @@
     { "id": "business", "label": "商务", "icon": "Briefcase" },
     { "id": "operations", "label": "运营", "icon": "Settings" },
     { "id": "specialized", "label": "专项", "icon": "Star" },
-    { "id": "creative", "label": "创意", "icon": "Gamepad2" }
+    { "id": "creative", "label": "创意", "icon": "Gamepad2" },
+    { "id": "management", "label": "管理", "icon": "Shield" }
   ],
   "departmentMapping": {
     "engineering": "engineering",
@@ -28,6 +29,7 @@
     "specialized": "specialized",
     "academic": "specialized",
     "game-development": "creative",
-    "spatial-computing": "creative"
+    "spatial-computing": "creative",
+    "management": "management"
   }
 }

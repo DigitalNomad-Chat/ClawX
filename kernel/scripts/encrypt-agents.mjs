@@ -173,6 +173,7 @@ const CATEGORY_MAP = {
   academic: '专项',
   'game-development': '创意',
   'spatial-computing': '创意',
+  management: '管理',
 };
 
 function extractTags(soul, agents, department) {
