@@ -9,6 +9,7 @@ import { handleGatewayRoutes } from './routes/gateway';
 import { handleSettingsRoutes } from './routes/settings';
 import { handleProviderRoutes } from './routes/providers';
 import { handleAgentRoutes } from './routes/agents';
+import { handleBindingRoutes } from './routes/bindings';
 import { handleChannelRoutes } from './routes/channels';
 import { handleLogRoutes } from './routes/logs';
 import { handleUsageRoutes } from './routes/usage';
@@ -33,6 +34,7 @@ const coreRouteHandlers: RouteHandler[] = [
   handleSettingsRoutes,
   handleProviderRoutes,
   handleAgentRoutes,
+  handleBindingRoutes,
   handleChannelRoutes,
   handleSkillRoutes,
   handleFileRoutes,

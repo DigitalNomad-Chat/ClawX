@@ -1479,6 +1479,79 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
   },
 };
 
+// ═══ Binding Types ═══
+
+/** 路由模式：决定消息如何匹配到绑定规则 */
+export type RoutingMode = 'peer' | 'accountId' | 'both';
+
+/** 绑定类型：标准路由 vs 远程 Agent 协议 */
+export type BindingType = 'route' | 'acp';
+
+/** Peer 类型：私聊 vs 群聊（仅 peer/both 模式） */
+export type PeerKind = 'dm' | 'group';
+
+/** ACP 远程 Agent 配置（仅 acp 绑定类型） */
+export interface AcpConfig {
+  endpoint: string;
+  protocol?: string;
+  capabilities?: string[];
+}
+
+/** Discord 绑定扩展字段 */
+export interface DiscordBindingFields {
+  guildId?: string;
+  teamId?: string;
+  roles?: string[];
+}
+
+/** 绑定信息（后端返回给前端） */
+export interface BindingInfo {
+  index: number;
+  agentId: string;
+  channel: string;
+  routingMode: RoutingMode;
+  accountId?: string;
+  peerKind?: PeerKind;
+  peerId?: string;
+  comment?: string;
+  bindingType: BindingType;
+  acp?: AcpConfig;
+  discord?: DiscordBindingFields;
+}
+
+/** 绑定请求（前端提交给后端） */
+export interface BindingRequest {
+  agentId: string;
+  channel: string;
+  routingMode?: RoutingMode;
+  accountId?: string;
+  peerKind?: PeerKind;
+  peerId?: string;
+  comment?: string;
+  bindingType?: BindingType;
+  acp?: AcpConfig;
+  discord?: DiscordBindingFields;
+}
+
+/** 路由模式选项（UI 展示用） */
+export const ROUTING_MODE_OPTIONS: { value: RoutingMode; label: string; description: string }[] = [
+  { value: 'peer', label: 'Peer', description: '通过聊天对象路由' },
+  { value: 'accountId', label: 'Account ID', description: '通过账号 ID 路由' },
+  { value: 'both', label: 'Both', description: '同时支持两种方式' },
+];
+
+/** 绑定类型选项（UI 展示用） */
+export const BINDING_TYPE_OPTIONS: { value: BindingType; label: string; description: string }[] = [
+  { value: 'route', label: '路由绑定', description: '标准消息路由（默认）' },
+  { value: 'acp', label: 'ACP 远程', description: '远程 Agent 协议绑定' },
+];
+
+/** Peer 类型选项（UI 展示用） */
+export const PEER_KIND_OPTIONS: { value: PeerKind; label: string }[] = [
+  { value: 'dm', label: '私聊 (DM)' },
+  { value: 'group', label: '群聊 (Group)' },
+];
+
 /**
  * Get primary supported channels (non-plugin, commonly used)
  */

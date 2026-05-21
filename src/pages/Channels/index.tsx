@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio } from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { hostApiFetch } from '@/lib/host-api';
 import { subscribeHostEvent } from '@/lib/host-events';
 import { ChannelConfigModal } from '@/components/channels/ChannelConfigModal';
+import { BindingManageView } from '@/components/channels/BindingManageView';
 import { cn } from '@/lib/utils';
 import {
   CHANNEL_ICONS,
@@ -132,6 +133,7 @@ export function Channels() {
   const gatewayStatus = useGatewayStore((state) => state.status);
   const lastGatewayStateRef = useRef(gatewayStatus.state);
 
+  const [activeView, setActiveView] = useState<'channels' | 'bindings'>('channels');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [channelGroups, setChannelGroups] = useState<ChannelGroupItem[]>([]);
@@ -516,6 +518,17 @@ export function Channels() {
     );
   }
 
+  if (activeView === 'bindings') {
+    return (
+      <div data-testid="channels-page" className="flex h-full flex-col gap-6">
+        <BindingManageView
+          agents={visibleAgents}
+          onBack={() => setActiveView('channels')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div data-testid="channels-page" className="flex h-full flex-col gap-6">
       {/* Header */}
@@ -527,15 +540,25 @@ export function Channels() {
             <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={gatewayStatus.state !== 'running'}
-        >
-          <RefreshCw className={cn('h-4 w-4 mr-2', isUsingStableValue && 'animate-spin')} />
-          {t('refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActiveView('bindings')}
+          >
+            <Settings2 className="h-4 w-4 mr-2" />
+            {t('bindingManage.entry')}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={gatewayStatus.state !== 'running'}
+          >
+            <RefreshCw className={cn('h-4 w-4 mr-2', isUsingStableValue && 'animate-spin')} />
+            {t('refresh')}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -845,6 +868,7 @@ export function Channels() {
         <ChannelConfigModal
           initialSelectedType={selectedChannelType}
           accountId={selectedAccountId}
+          agents={visibleAgents}
           configuredTypes={configuredTypes}
           allowExistingConfig={allowExistingConfigInModal}
           allowEditAccountId={allowEditAccountIdInModal}

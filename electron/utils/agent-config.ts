@@ -51,14 +51,41 @@ interface AgentsConfig extends Record<string, unknown> {
   list?: AgentListEntry[];
 }
 
+interface PeerMatch {
+  kind: string;
+  id: string;
+}
+
 interface BindingMatch extends Record<string, unknown> {
   channel?: string;
   accountId?: string;
+  peer?: PeerMatch;
+  discord?: Record<string, unknown>;
 }
 
 interface BindingConfig extends Record<string, unknown> {
   agentId?: string;
   match?: BindingMatch;
+  type?: string;
+  comment?: string;
+  acp?: Record<string, unknown>;
+}
+
+type RoutingMode = 'peer' | 'accountId' | 'both';
+type BindingType = 'route' | 'acp';
+
+interface BindingInfo {
+  index: number;
+  agentId: string;
+  channel: string;
+  routingMode: RoutingMode;
+  accountId?: string;
+  peerKind?: string;
+  peerId?: string;
+  comment?: string;
+  bindingType: BindingType;
+  acp?: Record<string, unknown>;
+  discord?: Record<string, unknown>;
 }
 
 interface ChannelSectionConfig extends Record<string, unknown> {
@@ -222,11 +249,9 @@ function isChannelBinding(binding: unknown): binding is BindingConfig {
   if (typeof candidate.agentId !== 'string' || !candidate.agentId) return false;
   if (!candidate.match || typeof candidate.match !== 'object' || Array.isArray(candidate.match)) return false;
   if (typeof candidate.match.channel !== 'string' || !candidate.match.channel) return false;
-  const keys = Object.keys(candidate.match);
-  // Accept bindings with just {channel} or {channel, accountId}
-  if (keys.length === 1 && keys[0] === 'channel') return true;
-  if (keys.length === 2 && keys.includes('channel') && keys.includes('accountId')) return true;
-  return false;
+  // Allow: {channel}, {channel, accountId}, {channel, peer}, {channel, accountId, peer}
+  const allowedKeys = new Set(['channel', 'accountId', 'peer']);
+  return Object.keys(candidate.match).every((key) => allowedKeys.has(key));
 }
 
 /** Normalize agent ID for consistent comparison (bindings vs entries). */
@@ -799,4 +824,162 @@ export async function clearAllBindingsForChannel(channelType: string): Promise<v
     await writeOpenClawConfig(config);
     logger.info('Cleared all bindings for channel', { channelType });
   });
+}
+
+// ═══ Binding Serialization Helpers ═══
+
+/** 从 match 结构推断路由模式 */
+export function inferRoutingMode(match: BindingMatch): RoutingMode {
+  const hasAccountId = typeof match.accountId === 'string' && match.accountId;
+  const hasPeer = match.peer && typeof match.peer.id === 'string' && match.peer.id;
+  if (hasAccountId && hasPeer) return 'both';
+  if (hasAccountId) return 'accountId';
+  return 'peer';
+}
+
+/** 从请求参数构建 match 对象（用于写入 openclaw.json） */
+export function buildBindingMatch(request: {
+  channel: string;
+  routingMode?: string;
+  accountId?: string;
+  peerKind?: string;
+  peerId?: string;
+}): Record<string, unknown> {
+  const match: Record<string, unknown> = { channel: request.channel };
+  const mode = request.routingMode || 'peer';
+
+  if (mode === 'accountId' || mode === 'both') {
+    if (request.accountId) {
+      match.accountId = request.accountId;
+    }
+  }
+  if (mode === 'peer' || mode === 'both') {
+    if (request.peerId) {
+      match.peer = {
+        kind: request.peerKind || 'dm',
+        id: request.peerId,
+      };
+    }
+  }
+  return match;
+}
+
+/** 解析所有绑定为 BindingInfo[] */
+export function parseAllBindings(config: Record<string, unknown>): BindingInfo[] {
+  const bindings = config.bindings;
+  if (!Array.isArray(bindings)) return [];
+
+  return bindings
+    .map((binding: unknown, index: number) => {
+      if (!isChannelBinding(binding)) return null;
+      const b = binding as BindingConfig;
+      const match = b.match!;
+      const mode = inferRoutingMode(match);
+
+      return {
+        index,
+        agentId: b.agentId || '',
+        channel: match.channel || '',
+        routingMode: mode,
+        accountId: mode === 'accountId' || mode === 'both' ? match.accountId : undefined,
+        peerKind: (mode === 'peer' || mode === 'both') && match.peer ? match.peer.kind : undefined,
+        peerId: (mode === 'peer' || mode === 'both') && match.peer ? match.peer.id : undefined,
+        comment: typeof b.comment === 'string' ? b.comment : undefined,
+        bindingType: (b.type === 'acp' ? 'acp' : 'route') as BindingType,
+        acp: b.acp,
+        discord: match.discord,
+      };
+    })
+    .filter((item): item is BindingInfo => item !== null);
+}
+
+/** 添加绑定到 config */
+export function addBindingToConfig(
+  config: Record<string, unknown>,
+  request: {
+    agentId: string;
+    channel: string;
+    routingMode?: string;
+    accountId?: string;
+    peerKind?: string;
+    peerId?: string;
+    comment?: string;
+    bindingType?: string;
+    acp?: Record<string, unknown>;
+  }
+): void {
+  if (!Array.isArray(config.bindings)) {
+    config.bindings = [];
+  }
+
+  const match = buildBindingMatch(request);
+  const entry: Record<string, unknown> = {
+    agentId: request.agentId,
+    match,
+  };
+
+  if (request.bindingType === 'acp') {
+    entry.type = 'acp';
+  }
+  if (request.comment) {
+    entry.comment = request.comment;
+  }
+  if (request.acp) {
+    entry.acp = request.acp;
+  }
+
+  (config.bindings as unknown[]).push(entry);
+}
+
+/** 更新指定索引的绑定 */
+export function updateBindingInConfig(
+  config: Record<string, unknown>,
+  index: number,
+  request: {
+    agentId: string;
+    channel: string;
+    routingMode?: string;
+    accountId?: string;
+    peerKind?: string;
+    peerId?: string;
+    comment?: string;
+    bindingType?: string;
+    acp?: Record<string, unknown>;
+  }
+): void {
+  if (!Array.isArray(config.bindings)) return;
+  const bindings = config.bindings as unknown[];
+  if (index < 0 || index >= bindings.length) return;
+
+  const match = buildBindingMatch(request);
+  const entry: Record<string, unknown> = {
+    agentId: request.agentId,
+    match,
+  };
+
+  if (request.bindingType === 'acp') {
+    entry.type = 'acp';
+  }
+  if (request.comment) {
+    entry.comment = request.comment;
+  }
+  if (request.acp) {
+    entry.acp = request.acp;
+  }
+
+  bindings[index] = entry;
+}
+
+/** 删除指定索引的绑定 */
+export function removeBindingFromConfig(
+  config: Record<string, unknown>,
+  index: number
+): void {
+  if (!Array.isArray(config.bindings)) return;
+  const bindings = config.bindings as unknown[];
+  if (index < 0 || index >= bindings.length) return;
+  bindings.splice(index, 1);
+  if (bindings.length === 0) {
+    delete config.bindings;
+  }
 }

@@ -67,7 +67,10 @@
             "error": "异常"
         },
         "accountIdPrompt": "请输入该频道的新账号 ID",
-        "accountIdExists": "账号 ID {{accountId}} 已存在"
+        "accountIdExists": "账号 ID {{accountId}} 已存在",
+        "associateAgent": "关联 Agent",
+        "associateAgentPlaceholder": "选择一个 Agent（可选）",
+        "associateAgentDesc": "选择一个 Agent，系统将自动使用其 ID 作为账号标识。您也可以手动修改。"
     },
     "dialog": {
         "updateTitle": "更新 {{name}}",
@@ -610,6 +613,67 @@
         },
         "proactivePermissionHint": {
             "label": "主动权限提示 (proactivePermissionHint)"
+        }
+    },
+    "bindingManage": {
+        "entry": "绑定管理",
+        "title": "绑定管理（高级）",
+        "subtitle": "管理频道账号与 Agent 之间的消息路由规则",
+        "back": "返回频道列表",
+        "unboundWarning": "发现 {{count}} 个 Agent 未配置任何渠道绑定",
+        "quickBind": "快速绑定",
+        "ignoreAll": "全部忽略",
+        "noBindings": "暂无绑定规则。点击下方按钮添加第一条绑定。",
+        "addBinding": "添加绑定",
+        "editBinding": "编辑绑定",
+        "deleteBinding": "删除绑定",
+        "deleteConfirm": "确定要删除此绑定规则吗？",
+        "bindingSaved": "绑定规则已保存",
+        "bindingDeleted": "绑定规则已删除",
+        "bindingFailed": "操作失败: {{error}}",
+        "fields": {
+            "agent": "选择 Agent",
+            "agentPlaceholder": "选择要绑定的 Agent",
+            "channel": "选择渠道",
+            "channelPlaceholder": "选择消息渠道",
+            "routingMode": "路由模式",
+            "bindingType": "绑定类型",
+            "accountId": "选择账号",
+            "accountIdPlaceholder": "选择渠道账号",
+            "peerKind": "Peer 类型",
+            "peerId": "Peer ID",
+            "peerIdPlaceholder": "例如: ou_xxxxxx, 123456789",
+            "comment": "备注",
+            "commentPlaceholder": "可选备注信息",
+            "acpEndpoint": "端点 URL",
+            "acpEndpointPlaceholder": "例如: https://remote-agent.example.com",
+            "acpProtocol": "协议",
+            "acpCapabilities": "能力声明"
+        },
+        "routingModes": {
+            "peer": "Peer",
+            "peerDesc": "通过聊天对象路由",
+            "accountId": "Account ID",
+            "accountIdDesc": "通过账号 ID 路由",
+            "both": "Both",
+            "bothDesc": "同时支持两种方式"
+        },
+        "bindingTypes": {
+            "route": "路由绑定",
+            "routeDesc": "标准消息路由（默认）",
+            "acp": "ACP 远程",
+            "acpDesc": "远程 Agent 协议绑定"
+        },
+        "peerKinds": {
+            "dm": "私聊 (DM)",
+            "group": "群聊 (Group)"
+        },
+        "labels": {
+            "peer": "Peer",
+            "account": "Account",
+            "both": "私聊 + Account",
+            "route": "路由",
+            "acp": "ACP"
         }
     }
 }

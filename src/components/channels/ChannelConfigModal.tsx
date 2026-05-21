@@ -24,6 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Select } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChannelsStore } from '@/stores/channels';
 
@@ -57,6 +58,11 @@ import wecomIcon from '@/assets/channels/wecom.svg';
 import qqIcon from '@/assets/channels/qq.svg';
 import slackIcon from '@/assets/channels/slack.svg';
 
+export interface AgentOption {
+  id: string;
+  name: string;
+}
+
 interface ChannelConfigModalProps {
   initialSelectedType?: ChannelType | null;
   configuredTypes?: string[];
@@ -67,6 +73,7 @@ interface ChannelConfigModalProps {
   initialConfigValues?: Record<string, string>;
   agentId?: string;
   accountId?: string;
+  agents?: AgentOption[];
   onClose: () => void;
   onChannelSaved?: (channelType: ChannelType) => void | Promise<void>;
 }
@@ -79,11 +86,6 @@ const inputCodeClasses = 'font-mono text-sm';
 const labelClasses = 'text-xs font-bold uppercase tracking-widest text-foreground/70';
 const outlineButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 border-black/10 dark:border-white/10 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 shadow-none text-foreground/80 hover:text-foreground';
 const primaryButtonClasses = 'h-9 text-meta font-medium rounded-full px-4 shadow-none';
-
-function getDefaultPanel(meta: ChannelMeta | null): ConfigPanel {
-  if (!meta?.settingsGroups || meta.settingsGroups.length === 0) return 'credentials';
-  return 'credentials';
-}
 
 function getAllPanels(meta: ChannelMeta | null): ConfigPanel[] {
   if (!meta?.settingsGroups || meta.settingsGroups.length === 0) return ['credentials'];
@@ -118,6 +120,7 @@ export function ChannelConfigModal({
   initialConfigValues,
   agentId,
   accountId,
+  agents = [],
   onClose,
   onChannelSaved,
 }: ChannelConfigModalProps) {
@@ -129,6 +132,7 @@ export function ChannelConfigModal({
   const [channelName, setChannelName] = useState('');
   const [accountIdInput, setAccountIdInput] = useState(accountId || '');
   const [accountIdError, setAccountIdError] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(agentId || '');
   const [connecting, setConnecting] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -514,6 +518,22 @@ export function ChannelConfigModal({
         toast.warning(saveResult.warning);
       }
 
+      // 如果选择了关联 Agent，自动绑定
+      if (selectedAgentId && resolvedAccountId) {
+        try {
+          await hostApiFetch<{ success: boolean; error?: string }>('/api/channels/binding', {
+            method: 'PUT',
+            body: JSON.stringify({
+              channelType: selectedType,
+              accountId: resolvedAccountId,
+              agentId: selectedAgentId,
+            }),
+          });
+        } catch (bindError) {
+          console.warn('Auto-binding agent failed:', bindError);
+        }
+      }
+
       try {
         await finishSave(selectedType);
       } catch (postSaveError) {
@@ -756,6 +776,39 @@ export function ChannelConfigModal({
                     onChange={(event) => setChannelName(event.target.value)}
                     className={cn(inputBaseClasses, inputTextClasses)}
                   />
+                </div>
+              )}
+
+              {showAccountIdEditor && agents.length > 0 && (
+                <div className="space-y-2.5">
+                  <Label htmlFor="associate-agent" className={labelClasses}>
+                    {t('account.associateAgent')}
+                  </Label>
+                  <Select
+                    id="associate-agent"
+                    value={selectedAgentId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedAgentId(value);
+                      if (value) {
+                        setAccountIdInput(value);
+                      }
+                      if (accountIdError) {
+                        setAccountIdError(null);
+                      }
+                    }}
+                    className={cn(inputBaseClasses, 'pr-10')}
+                  >
+                    <option value="">{t('account.associateAgentPlaceholder')}</option>
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t('account.associateAgentDesc')}
+                  </p>
                 </div>
               )}
 
