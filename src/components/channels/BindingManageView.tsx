@@ -234,36 +234,37 @@ export function BindingManageView({ agents, configuredAccounts = [], onBack }: B
         </div>
       </div>
 
-      {/* 未绑定 Agent 提醒横幅 */}
-      {unboundAgents.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('bindingManage.unboundWarning', { count: unboundAgents.length })}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {unboundAgents.map((agent) => (
-                  <Button
-                    key={agent.id}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openQuickBind(agent.id)}
-                    className="rounded-full border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 text-xs"
-                  >
-                    <Zap className="h-3 w-3 mr-1" />
-                    {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
-                  </Button>
-                ))}
+      {/* 可滚动内容区（包含未绑定提醒 + 绑定列表） */}
+      <div className="flex-1 overflow-y-auto space-y-4">
+        {/* 未绑定 Agent 提醒横幅 */}
+        {unboundAgents.length > 0 && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {t('bindingManage.unboundWarning', { count: unboundAgents.length })}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {unboundAgents.map((agent) => (
+                    <Button
+                      key={agent.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openQuickBind(agent.id)}
+                      className="rounded-full border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 text-xs"
+                    >
+                      <Zap className="h-3 w-3 mr-1" />
+                      {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 绑定列表 */}
-      <div className="flex-1 overflow-y-auto space-y-4">
+        {/* 绑定列表 */}
         {loading ? (
           <div className="flex items-center justify-center h-40 text-muted-foreground gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
