@@ -138,22 +138,28 @@ export function AddProviderDialog({
         enabled: true,
       };
 
-      const result = await kernelLlmConfig.addProvider(provider);
-      if (!result.success) {
-        // If already exists, just update active
-        if (result.error?.includes('already exists') && editProvider) {
-          setError(result.error);
-        } else {
-          setError(result.error || '保存失败');
+      if (editProvider) {
+        // Edit mode: update existing provider
+        const result = await kernelLlmConfig.updateProvider(provider);
+        if (!result.success) {
+          setError(result.error || '更新失败');
+          return;
         }
-        return;
-      }
-
-      // Auto-set as active (first provider or explicitly chosen)
-      const setActiveResult = await kernelLlmConfig.setActive(provider.id, model);
-      if (!setActiveResult.success) {
-        setError(setActiveResult.error || '设置为默认失败');
-        return;
+        // If this was the active provider, refresh active config
+        await kernelLlmConfig.setActive(provider.id, model).catch(() => {});
+      } else {
+        // Add mode: create new provider
+        const result = await kernelLlmConfig.addProvider(provider);
+        if (!result.success) {
+          setError(result.error || '保存失败');
+          return;
+        }
+        // Auto-set as active (first provider or explicitly chosen)
+        const setActiveResult = await kernelLlmConfig.setActive(provider.id, model);
+        if (!setActiveResult.success) {
+          setError(setActiveResult.error || '设置为默认失败');
+          return;
+        }
       }
 
       // Try to hot-update running kernel
@@ -397,7 +403,7 @@ export function AddProviderDialog({
                     disabled={!apiKey.trim() || !getEffectiveModel() || saving}
                   >
                     {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    保存并启用
+                    {editProvider ? '保存' : '保存并启用'}
                   </Button>
                 </div>
               </div>

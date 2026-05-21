@@ -182,6 +182,13 @@ export const kernelLlmConfig = {
     return window.electron.ipcRenderer.invoke('kernel-llm:addProvider', provider);
   },
 
+  /** Update a provider */
+  async updateProvider(
+    provider: KernelLLMProvider,
+  ): Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel-llm:updateProvider', provider);
+  },
+
   /** Delete a provider */
   async deleteProvider(
     providerId: string,

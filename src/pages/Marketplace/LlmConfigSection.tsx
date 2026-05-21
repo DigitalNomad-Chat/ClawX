@@ -3,7 +3,7 @@
  * Shows configured providers, active status, and quick actions
  */
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Check, Trash2, Settings2, Loader2, Zap, AlertCircle, Download } from 'lucide-react';
+import { Plus, Check, Trash2, Settings2, Loader2, Zap, AlertCircle, Download, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ export function LlmConfigSection() {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<KernelLLMProvider | undefined>(undefined);
   const [activeCheck, setActiveCheck] = useState<{
     providerName?: string;
     model?: string;
@@ -79,6 +80,12 @@ export function LlmConfigSection() {
   function handleSaved() {
     loadConfig();
     checkActive();
+    setEditingProvider(undefined);
+  }
+
+  function handleEdit(provider: KernelLLMProvider) {
+    setEditingProvider(provider);
+    setShowAddDialog(true);
   }
 
   if (loading) {
@@ -222,7 +229,15 @@ export function LlmConfigSection() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="ml-auto h-6 px-2 text-[11px] text-destructive hover:text-destructive"
+                    className="ml-auto h-6 px-2 text-[11px]"
+                    onClick={() => handleEdit(provider)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[11px] text-destructive hover:text-destructive"
                     onClick={() => handleDelete(provider.id)}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -243,7 +258,11 @@ export function LlmConfigSection() {
       {/* Add Provider Dialog */}
       <AddProviderDialog
         open={showAddDialog}
-        onOpenChange={setShowAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) setEditingProvider(undefined);
+        }}
+        editProvider={editingProvider}
         onSaved={handleSaved}
       />
 

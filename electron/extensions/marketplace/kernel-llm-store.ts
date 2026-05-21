@@ -254,6 +254,22 @@ export function registerKernelLLMRoutes(): void {
     }
   });
 
+  // Update provider
+  ipcMain.handle('kernel-llm:updateProvider', async (_event, provider: KernelLLMProvider) => {
+    try {
+      const config = await readKernelLLMConfig();
+      const idx = config.providers.findIndex((p) => p.id === provider.id);
+      if (idx === -1) {
+        return { success: false, error: `Provider '${provider.id}' not found` };
+      }
+      config.providers[idx] = provider;
+      await writeKernelLLMConfig(config);
+      return { success: true, config };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
   // Delete provider
   ipcMain.handle('kernel-llm:deleteProvider', async (_event, providerId: string) => {
     try {
