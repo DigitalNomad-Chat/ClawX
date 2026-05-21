@@ -70,6 +70,8 @@ export interface ReActLoopOptions {
   onEvent?: (event: KernelEvent) => void;
   /** Callback to request user approval for a mutating tool. Returns true if approved. */
   requestApproval?: (requestId: string, tool: string, input: unknown) => Promise<boolean>;
+  /** Sync check: is this tool already auto-approved for the current session? */
+  isToolAutoApproved?: (tool: string) => boolean;
   /** File attachments to include in the conversation context */
   attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
   /** Skill content to inject into the system prompt (manual selection) */
@@ -93,6 +95,7 @@ export async function* runReActLoop(
     messages,
     maxTurns = agentConfig.maxTurns ?? DEFAULT_MAX_TURNS,
     requestApproval,
+    isToolAutoApproved,
     attachments,
     skillContent,
     allSkills,
@@ -206,23 +209,30 @@ export async function* runReActLoop(
         continue;
       }
 
-      if (perm.requiresConfirmation && requestApproval) {
-        const approvalId = `approval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        yield {
-          type: 'approval.request',
-          sessionId,
-          requestId: approvalId,
-          tool: call.name,
-          input: call.input,
-        };
+      if (perm.requiresConfirmation) {
+        // Fast path: tool already auto-approved → skip dialog entirely
+        if (isToolAutoApproved && isToolAutoApproved(call.name)) {
+          console.log(`[ReAct] Tool '${call.name}' auto-approved, skipping dialog`);
+          if (auditWorkspace) auditApproval(auditWorkspace, sessionId, agentId, 'auto', true, call.name);
+        } else if (requestApproval) {
+          // Need user approval → show dialog and wait
+          const approvalId = `approval_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          yield {
+            type: 'approval.request',
+            sessionId,
+            requestId: approvalId,
+            tool: call.name,
+            input: call.input,
+          };
 
-        const approved = await requestApproval(approvalId, call.name, call.input);
-        if (auditWorkspace) auditApproval(auditWorkspace, sessionId, agentId, approvalId, approved, call.name);
-        if (!approved) {
-          const error = `Error: Tool '${call.name}' was not approved by user.`;
-          yield { type: 'tool.completed', sessionId, tool: call.name, output: error };
-          messages.push({ role: 'tool', toolCallId: call.id, content: error });
-          continue;
+          const approved = await requestApproval(approvalId, call.name, call.input);
+          if (auditWorkspace) auditApproval(auditWorkspace, sessionId, agentId, approvalId, approved, call.name);
+          if (!approved) {
+            const error = `Error: Tool '${call.name}' was not approved by user.`;
+            yield { type: 'tool.completed', sessionId, tool: call.name, output: error };
+            messages.push({ role: 'tool', toolCallId: call.id, content: error });
+            continue;
+          }
         }
       }
 

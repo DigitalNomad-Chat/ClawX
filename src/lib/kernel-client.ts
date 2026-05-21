@@ -89,8 +89,8 @@ class KernelClient {
   /**
    * Send a chat message to an agent
    */
-  async sendChat(sessionId: string, agentId: string, message: string, attachments?: StagedAttachment[], skillId?: string): Promise<{ success: boolean; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message, attachments, skillId) as Promise<{
+  async sendChat(sessionId: string, agentId: string, message: string, attachments?: StagedAttachment[], skillId?: string, permissionMode?: string): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('kernel:chat', sessionId, agentId, message, attachments, skillId, permissionMode) as Promise<{
       success: boolean;
       error?: string;
     }>;

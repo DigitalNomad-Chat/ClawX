@@ -441,6 +441,14 @@ function AutoResizeTextarea({
   );
 }
 
+// ── Permission Mode Options ─────────────────────────────────────────
+
+const PERMISSION_MODES = [
+  { value: 'default' as const, label: '默认', desc: '读文件等自动通过，执行命令/写文件需审批' },
+  { value: 'full_auto' as const, label: '自动', desc: '所有工具自动允许，无需审批' },
+  { value: 'plan' as const, label: '计划', desc: '只允许读取操作，禁止执行和写入' },
+];
+
 // ── Main Component ─────────────────────────────────────────────────
 
 export function AgentChat() {
@@ -469,6 +477,8 @@ export function AgentChat() {
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
+  const [permissionMode, setPermissionMode] = useState<'default' | 'plan' | 'full_auto'>('default');
+  const [permMenuOpen, setPermMenuOpen] = useState(false);
 
   // History states
   const [historySessions, setHistorySessions] = useState<Array<{
@@ -934,7 +944,7 @@ export function AgentChat() {
 
       setAttachments([]);
 
-      const result = await kernelClient.sendChat(sid, agentId, text, stagedAttachments, selectedSkill || undefined);
+      const result = await kernelClient.sendChat(sid, agentId, text, stagedAttachments, selectedSkill || undefined, permissionMode);
 
       if (!result.success) {
         setStreaming(false);
@@ -1304,11 +1314,55 @@ export function AgentChat() {
             ))}
           </div>
         )}
-        {/* Skill selector */}
-        {skills.length > 0 && (
-          <div className="relative mb-2">
+        {/* Permission mode & Skill selector */}
+        <div className="flex items-start gap-2 mb-2">
+          {/* Permission mode selector */}
+          <div className="relative">
             <button
-              onClick={() => setSkillMenuOpen((v) => !v)}
+              onClick={() => { setPermMenuOpen((v) => !v); setSkillMenuOpen(false); }}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                permissionMode !== 'default'
+                  ? 'border-primary/40 bg-primary/5 text-primary'
+                  : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted'
+              )}
+            >
+              <Shield className="h-3 w-3" />
+              {PERMISSION_MODES.find((m) => m.value === permissionMode)?.label || '默认'}
+              <ChevronDown className={cn('h-3 w-3 transition-transform', permMenuOpen && 'rotate-180')} />
+            </button>
+            {permMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setPermMenuOpen(false)}
+                />
+                <div className="absolute bottom-full left-0 mb-1 z-50 w-64 rounded-lg border bg-background shadow-lg p-1.5">
+                  {PERMISSION_MODES.map((mode) => (
+                    <button
+                      key={mode.value}
+                      onClick={() => { setPermissionMode(mode.value); setPermMenuOpen(false); }}
+                      className={cn(
+                        'flex w-full items-start gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors',
+                        permissionMode === mode.value ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                      )}
+                    >
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">{mode.label}</div>
+                        <div className="text-[10px] text-muted-foreground">{mode.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Skill selector */}
+          {skills.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => { setSkillMenuOpen((v) => !v); setPermMenuOpen(false); }}
               className={cn(
                 'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
                 selectedSkill
@@ -1398,7 +1452,8 @@ export function AgentChat() {
               </>
             )}
           </div>
-        )}
+          )}
+        </div>
         <div className="flex items-end gap-2">
           <AutoResizeTextarea
             value={input}

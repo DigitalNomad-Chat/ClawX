@@ -83,8 +83,9 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       const message = req.message as string;
       const attachments = (req.attachments || []) as Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>;
       const skillId = (req.skillId as string) || undefined;
+      const permissionMode = req.permissionMode as string | undefined;
 
-      yield* handleChatSend(sessionId, agentId, message, attachments, skillId);
+      yield* handleChatSend(sessionId, agentId, message, attachments, skillId, permissionMode as import('./types.js').PermissionMode | undefined);
       break;
     }
 
@@ -224,8 +225,14 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
 
     case 'kernel.updateConfig': {
       // Runtime hot-update of provider config (no restart needed)
-      if (req.apiKey) process.env.ANTHROPIC_API_KEY = req.apiKey as string;
-      if (req.openaiApiKey) process.env.OPENAI_API_KEY = req.openaiApiKey as string;
+      if (req.apiKey) {
+        process.env.ANTHROPIC_API_KEY = req.apiKey as string;
+        process.env.KERNEL_API_KEY = req.apiKey as string;
+      }
+      if (req.openaiApiKey) {
+        process.env.OPENAI_API_KEY = req.openaiApiKey as string;
+        process.env.KERNEL_API_KEY = req.openaiApiKey as string;
+      }
       if (req.model) process.env.KERNEL_MODEL = req.model as string;
       if (req.baseUrl) process.env.KERNEL_BASE_URL = req.baseUrl as string;
       console.log(`[Kernel] Config updated: model=${process.env.KERNEL_MODEL || 'unchanged'}`);
@@ -244,6 +251,7 @@ async function* handleChatSend(
   message: string,
   attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>,
   skillId?: string,
+  permissionMode?: import('./types.js').PermissionMode,
 ): AsyncGenerator<KernelEvent> {
   console.log(`[DEBUG handleChatSend] START sessionId=${sessionId}, agentId=${agentId}, msgLen=${message.length}`);
 
@@ -257,10 +265,17 @@ async function* handleChatSend(
 
   const agentConfig = session.agentConfig;
 
+  // Runtime override: apply permission mode from UI if provided
+  if (permissionMode) {
+    session.agentConfig = { ...session.agentConfig, permissionMode };
+    console.log(`[Kernel] Permission mode overridden to '${permissionMode}' for session '${sessionId}'`);
+  }
+
   // Build provider config from agent settings + environment
   // Priority: KERNEL_* env vars (injected by launcher) > provider-specific env vars > agent config > defaults
+  const apiKey = process.env.KERNEL_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || '';
   providerConfig = {
-    apiKey: process.env.KERNEL_API_KEY || '',
+    apiKey,
     baseUrl: process.env.KERNEL_BASE_URL || '',
     model: process.env.KERNEL_MODEL || agentConfig.model || 'claude-sonnet-4-6',
     temperature: agentConfig.temperature ?? 0.7,
@@ -313,11 +328,8 @@ async function* handleChatSend(
       sessionId,
       messages,
       workspaceRoot: session.workspaceRoot,
+      isToolAutoApproved: (tool) => sessions.isToolAutoApproved(sessionId, tool),
       requestApproval: (requestId, tool, _input) => {
-        if (sessions.isToolAutoApproved(sessionId, tool)) {
-          console.log(`[Kernel] Tool '${tool}' is auto-approved for session '${sessionId}', skipping confirmation`);
-          return Promise.resolve(true);
-        }
         return sessions.waitForApproval(requestId, tool, sessionId);
       },
       attachments,

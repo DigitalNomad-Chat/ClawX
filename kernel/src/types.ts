@@ -184,7 +184,7 @@ export interface AttachmentInfo {
 }
 
 export type KernelRequest =
-  | { type: 'chat.send'; sessionId: string; agentId: string; message: string; attachments?: AttachmentInfo[]; skillId?: string }
+  | { type: 'chat.send'; sessionId: string; agentId: string; message: string; attachments?: AttachmentInfo[]; skillId?: string; permissionMode?: PermissionMode }
   | { type: 'session.create'; agentId: string }
   | { type: 'session.list' }
   | { type: 'session.info'; sessionId: string }

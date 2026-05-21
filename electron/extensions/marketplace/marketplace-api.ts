@@ -208,7 +208,7 @@ export function registerMarketplaceRoutes(): void {
   });
 
   // Send a chat message to the kernel
-  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string, attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>, skillId?: string) => {
+  ipcMain.handle('kernel:chat', async (_event, sessionId: string, agentId: string, message: string, attachments?: Array<{ fileName: string; stagedPath: string; mimeType: string; fileSize: number }>, skillId?: string, permissionMode?: string) => {
     try {
       const launcher = getKernelLauncher();
       if (!launcher) {
@@ -225,6 +225,9 @@ export function registerMarketplaceRoutes(): void {
       }
       if (skillId) {
         payload.skillId = skillId;
+      }
+      if (permissionMode) {
+        payload.permissionMode = permissionMode;
       }
       await launcher.sendStream(payload);
       return { success: true };

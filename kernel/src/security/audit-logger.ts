@@ -137,6 +137,9 @@ export function auditApproval(
     eventType: 'approval.respond',
     toolName,
     decision: approved ? 'approved' : 'denied',
-    metadata: { requestId },
+    metadata: {
+      requestId,
+      source: requestId === 'auto' ? 'auto-approved' : 'user',
+    },
   });
 }
