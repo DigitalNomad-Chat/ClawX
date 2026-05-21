@@ -600,38 +600,38 @@ export function Channels() {
         </div>
       </div>
 
-      {/* 未绑定 Agent 提醒横幅 */}
-      {unboundAgents.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                {t('bindingManage.unboundWarning', { count: unboundAgents.length })}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {unboundAgents.map((agent) => (
-                  <Button
-                    key={agent.id}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQuickBindAgentId(agent.id);
-                      setActiveView('bindings');
-                    }}
-                    className="rounded-full border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 text-xs"
-                  >
-                    <Zap className="h-3 w-3 mr-1" />
-                    {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
-                  </Button>
-                ))}
+      <div className="flex-1 overflow-y-auto">
+          {/* 未绑定 Agent 提醒横幅 */}
+          {unboundAgents.length > 0 && (
+            <div className="mb-8 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    {t('bindingManage.unboundWarning', { count: unboundAgents.length })}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {unboundAgents.map((agent) => (
+                      <Button
+                        key={agent.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setQuickBindAgentId(agent.id);
+                          setActiveView('bindings');
+                        }}
+                        className="rounded-full border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-200 text-xs"
+                      >
+                        <Zap className="h-3 w-3 mr-1" />
+                        {agent.name !== agent.id ? `${agent.name} (${agent.id})` : agent.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      <div className="flex-1 overflow-y-auto">
           {gatewayStatus.state !== 'running' && (
             <div className="mb-8 p-4 rounded-xl border border-yellow-500/50 bg-yellow-500/10 flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
