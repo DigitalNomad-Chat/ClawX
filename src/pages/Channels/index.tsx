@@ -516,11 +516,12 @@ export function Channels() {
     const items: { channelType: string; accountId: string; name: string }[] = [];
     for (const group of visibleChannelGroups) {
       for (const account of group.accounts) {
-        if (account.configured) {
+        // 包含所有有 accountId 的账号（不要求 configured 标志）
+        if (account.accountId) {
           items.push({
             channelType: group.channelType,
             accountId: account.accountId,
-            name: account.name,
+            name: account.name || account.accountId,
           });
         }
       }
