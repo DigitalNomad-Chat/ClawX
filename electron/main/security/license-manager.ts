@@ -83,6 +83,12 @@ class LicenseManager {
   }
 
   activateLicense(licenseString: string): { success: boolean; reason?: string } {
+    // [FROZEN] License check is temporarily disabled — keep original logic below for re-enable
+    const LICENSE_CHECK_FROZEN = true;
+    if (LICENSE_CHECK_FROZEN) {
+      return { success: true };
+    }
+
     if (!this.verifier) {
       return { success: true };
     }
@@ -106,6 +112,12 @@ class LicenseManager {
   }
 
   checkLicense(): { valid: boolean; reason?: string; machineCode?: string } {
+    // [FROZEN] License check is temporarily disabled — keep original logic below for re-enable
+    const LICENSE_CHECK_FROZEN = true;
+    if (LICENSE_CHECK_FROZEN) {
+      return { valid: true };
+    }
+
     if (!this.verifier) {
       return { valid: true };
     }
