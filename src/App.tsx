@@ -20,6 +20,7 @@ import { moduleRoutes } from './modules/registry';
 import { Marketplace } from './pages/Marketplace';
 import { AgentChat } from './pages/AgentChat';
 import { Settings } from './pages/Settings';
+import { AdvancedConfig } from './pages/AdvancedConfig';
 import { Setup } from './pages/Setup';
 import ActivationPage from './pages/ActivationPage';
 import { useSettingsStore } from './stores/settings';
@@ -204,6 +205,7 @@ function App() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/agent-chat/:agentId" element={<AgentChat />} />
             <Route path="/settings/*" element={<Settings />} />
+            <Route path="/advanced-config" element={<AdvancedConfig />} />
             {extraRoutes.map((r) => (
               <Route key={r.path} path={r.path} element={<r.component />} />
             ))}

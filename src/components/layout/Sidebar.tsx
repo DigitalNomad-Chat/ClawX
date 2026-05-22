@@ -24,6 +24,7 @@ import {
   ChevronUp,
   ChevronDown,
   Wrench,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rendererExtensionRegistry } from '@/extensions/registry';
@@ -216,6 +217,7 @@ export function Sidebar() {
     ...(devModeUnlocked
       ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
       : []),
+    { to: '/advanced-config', icon: <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.advancedConfig') || '高级配置', testId: 'sidebar-nav-advanced-config' },
     // Module nav items (dashboard, collaboration, etc.) — placed before marketplace
     ...moduleNavItems.map((item) => ({
       to: item.to,

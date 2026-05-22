@@ -15,7 +15,8 @@
         "deleteSessionConfirm": "Are you sure you want to delete session \"{{label}}\"?",
         "openClawPage": "OpenClaw Page",
         "openClawDreams": "Dreams",
-        "managementTools": "Management Tools"
+        "managementTools": "Management Tools",
+        "advancedConfig": "Advanced Config"
     },
     "actions": {
         "save": "Save",
