@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/sheet';
 import {
   type BuiltInProvider,
-  type KernelApiType,
   type KernelLLMProvider,
   BUILT_IN_PROVIDERS,
   kernelLlmConfig,

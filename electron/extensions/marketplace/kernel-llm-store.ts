@@ -5,6 +5,8 @@
  * Storage: electron-store (name: 'clawdock-kernel-llm')
  */
 import { ipcMain } from 'electron';
+import { getProviderApiKeyFromOpenClaw } from '../../utils/openclaw-auth.js';
+import { getOpenClawProviderKeyForType } from '../../utils/provider-keys.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -109,12 +111,165 @@ export const BUILT_IN_PROVIDERS: BuiltInProvider[] = [
     category: 'cn',
   },
   {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    api: 'openai',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    defaultModels: ['anthropic/claude-opus-4.6', 'openai/gpt-4o'],
+    keyUrl: 'https://openrouter.ai/keys',
+    category: 'intl',
+  },
+  {
+    id: 'xai',
+    name: 'xAI (Grok)',
+    api: 'openai',
+    baseUrl: 'https://api.x.ai/v1',
+    defaultModels: ['grok-4', 'grok-4-fast'],
+    keyUrl: 'https://console.x.ai/',
+    category: 'intl',
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    api: 'openai',
+    baseUrl: 'https://api.mistral.ai/v1',
+    defaultModels: ['mistral-large-latest'],
+    keyUrl: 'https://console.mistral.ai/',
+    category: 'intl',
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    api: 'openai',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultModels: ['llama-4-scout'],
+    keyUrl: 'https://console.groq.com/',
+    category: 'intl',
+  },
+  {
+    id: 'together',
+    name: 'Together AI',
+    api: 'openai',
+    baseUrl: 'https://api.together.xyz/v1',
+    defaultModels: ['meta-llama/Llama-4-Scout'],
+    keyUrl: 'https://api.together.xyz/',
+    category: 'intl',
+  },
+  {
+    id: 'fireworks',
+    name: 'Fireworks AI',
+    api: 'openai',
+    baseUrl: 'https://api.fireworks.ai/inference/v1',
+    defaultModels: ['accounts/fireworks/models/kimi-k2p6'],
+    keyUrl: 'https://fireworks.ai/',
+    category: 'intl',
+  },
+  {
+    id: 'moonshot',
+    name: 'Moonshot (CN)',
+    api: 'openai',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    defaultModels: ['kimi-k2.6'],
+    keyUrl: 'https://platform.moonshot.cn/',
+    category: 'cn',
+  },
+  {
+    id: 'moonshot-global',
+    name: 'Moonshot (Global)',
+    api: 'openai',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    defaultModels: ['kimi-k2.6'],
+    keyUrl: 'https://platform.moonshot.ai/',
+    category: 'cn',
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi Coding',
+    api: 'anthropic',
+    baseUrl: 'https://api.kimi.com/coding/',
+    defaultModels: ['kimi-code'],
+    keyUrl: 'https://platform.moonshot.cn/',
+    category: 'cn',
+  },
+  {
+    id: 'zai',
+    name: 'Z.AI (GLM)',
+    api: 'openai',
+    baseUrl: 'https://api.z.ai/v1',
+    defaultModels: ['glm-5'],
+    keyUrl: 'https://open.bigmodel.cn/',
+    category: 'cn',
+  },
+  {
     id: 'deepseek',
     name: 'DeepSeek',
     api: 'openai',
     baseUrl: 'https://api.deepseek.com/v1',
     defaultModels: ['deepseek-chat', 'deepseek-reasoner'],
     keyUrl: 'https://platform.deepseek.com/api_keys',
+    category: 'cn',
+  },
+  {
+    id: 'stepfun',
+    name: 'Stepfun',
+    api: 'openai',
+    baseUrl: 'https://api.stepfun.com/v1',
+    defaultModels: ['step-3.5-flash'],
+    keyUrl: 'https://platform.stepfun.com/',
+    category: 'cn',
+  },
+  {
+    id: 'stepfun-plan',
+    name: 'Stepfun Plan',
+    api: 'openai',
+    baseUrl: 'https://api.stepfun.com/step_plan/v1',
+    defaultModels: ['step-3.5-flash'],
+    keyUrl: 'https://platform.stepfun.com/',
+    category: 'cn',
+  },
+  {
+    id: 'ark',
+    name: '火山引擎 Ark',
+    api: 'openai',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    defaultModels: ['ep-20260228000000-xxxxx'],
+    keyUrl: 'https://www.volcengine.com/',
+    category: 'cn',
+  },
+  {
+    id: 'modelstudio',
+    name: 'Model Studio',
+    api: 'openai',
+    baseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
+    defaultModels: ['qwen3.5-plus'],
+    keyUrl: 'https://bailian.console.aliyun.com/',
+    category: 'cn',
+  },
+  {
+    id: 'qwen-coding-cn',
+    name: 'Qwen Coding (CN)',
+    api: 'openai',
+    baseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
+    defaultModels: ['qwen3.5-plus'],
+    keyUrl: 'https://bailian.console.aliyun.com/',
+    category: 'cn',
+  },
+  {
+    id: 'qwen-standard-global',
+    name: 'Qwen Standard (Global)',
+    api: 'openai',
+    baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    defaultModels: ['qwen3.5-plus'],
+    keyUrl: 'https://bailian.console.aliyun.com/',
+    category: 'cn',
+  },
+  {
+    id: 'qwen-standard-cn',
+    name: 'Qwen Standard (CN)',
+    api: 'openai',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultModels: ['qwen3.5-plus'],
+    keyUrl: 'https://bailian.console.aliyun.com/',
     category: 'cn',
   },
   {
@@ -166,6 +321,24 @@ export const BUILT_IN_PROVIDERS: BuiltInProvider[] = [
     baseUrl: 'https://api.siliconflow.cn/v1',
     defaultModels: ['deepseek-ai/DeepSeek-V3'],
     keyUrl: 'https://cloud.siliconflow.cn/account/ak',
+    category: 'platform',
+  },
+  {
+    id: 'minimax-portal',
+    name: 'MiniMax (Global)',
+    api: 'anthropic',
+    baseUrl: 'https://api.minimax.io/anthropic',
+    defaultModels: ['MiniMax-M2.7'],
+    keyUrl: 'https://platform.minimax.io',
+    category: 'platform',
+  },
+  {
+    id: 'minimax-portal-cn',
+    name: 'MiniMax (CN)',
+    api: 'anthropic',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+    defaultModels: ['MiniMax-M2.7'],
+    keyUrl: 'https://platform.minimaxi.com/',
     category: 'platform',
   },
 ];
@@ -511,24 +684,47 @@ export interface OpenClawProviderSummary {
 const VENDOR_DISPLAY_NAMES: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  'openai-response': 'OpenAI Responses',
   google: 'Google AI',
   openrouter: 'OpenRouter',
-  ark: '火山引擎',
+  xai: 'xAI (Grok)',
+  mistral: 'Mistral AI',
+  groq: 'Groq',
+  together: 'Together AI',
+  fireworks: 'Fireworks AI',
   moonshot: 'Moonshot',
+  'moonshot-global': 'Moonshot (Global)',
+  'kimi-coding': 'Kimi Coding',
+  zai: 'Z.AI (GLM)',
+  deepseek: 'DeepSeek',
+  stepfun: 'Stepfun',
+  'stepfun-plan': 'Stepfun Plan',
+  ark: '火山引擎 Ark',
+  modelstudio: 'Model Studio',
+  'qwen-coding-cn': 'Qwen Coding (CN)',
+  'qwen-standard-global': 'Qwen Standard (Global)',
+  'qwen-standard-cn': 'Qwen Standard (CN)',
+  zhipu: '智谱 GLM',
+  'zhipu-coding': '智谱编程专用',
+  'bailian-coding': '百炼编程',
+  dashscope: '通义千问',
+  'tencent-coding': '腾讯云编程',
   siliconflow: 'SiliconFlow',
   'minimax-portal': 'MiniMax',
   'minimax-portal-cn': 'MiniMax (国内)',
-  modelstudio: '百炼',
   ollama: 'Ollama',
   custom: '自定义',
 };
 
 /**
  * Map OpenClaw vendorId to kernel API type.
- * Only 'anthropic' uses Anthropic API; everything else goes through OpenAI-compatible.
+ * Providers whose OpenClaw providerConfig.api includes 'anthropic' use Anthropic API;
+ * everything else goes through OpenAI-compatible.
  */
 function vendorIdToApiType(vendorId: string): KernelApiType {
-  return vendorId === 'anthropic' ? 'anthropic' : 'openai';
+  // Anthropic-protocol providers (must match registry providerConfig.api)
+  const anthropicProviders = new Set(['anthropic', 'kimi-coding', 'minimax-portal', 'minimax-portal-cn']);
+  return anthropicProviders.has(vendorId) ? 'anthropic' : 'openai';
 }
 
 /**
@@ -566,13 +762,19 @@ export async function discoverOpenClawProviders(): Promise<OpenClawProviderSumma
     // Filter: only api_key or local auth (kernel doesn't support OAuth)
     if (account.authMode !== 'api_key' && account.authMode !== 'local') continue;
 
-    // Get API key
+    // Get API key from ClawDock secret store first, then fall back to OpenClaw auth-profiles
     const secret = await getProviderSecret(accountId);
     let apiKey = '';
     if (secret?.type === 'api_key') {
       apiKey = secret.apiKey;
     } else if (secret?.type === 'local') {
       apiKey = secret.apiKey || '';
+    }
+
+    // Fall back to OpenClaw auth-profiles if no key in secret store
+    if (!apiKey) {
+      const runtimeProviderKey = getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode);
+      apiKey = (await getProviderApiKeyFromOpenClaw(runtimeProviderKey)) || '';
     }
 
     // Collect models

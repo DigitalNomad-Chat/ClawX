@@ -423,21 +423,25 @@ function getApiKeyFromAuthProfilesStore(
   store: AuthProfilesStore,
   provider: string,
 ): string | null {
-  const profileIds = [
-    store.lastGood?.[provider],
-    ...(store.order?.[provider] ?? []),
-    `${provider}:default`,
-  ].filter((id): id is string => Boolean(id));
+  const providersToSearch = expandProviderKeysForDeletion(provider);
 
-  for (const profileId of profileIds) {
-    const profile = store.profiles[profileId];
-    if (profile?.type === 'api_key' && profile.provider === provider && profile.key) {
-      return profile.key;
+  for (const searchProvider of providersToSearch) {
+    const profileIds = [
+      store.lastGood?.[searchProvider],
+      ...(store.order?.[searchProvider] ?? []),
+      `${searchProvider}:default`,
+    ].filter((id): id is string => Boolean(id));
+
+    for (const profileId of profileIds) {
+      const profile = store.profiles[profileId];
+      if (profile?.type === 'api_key' && profile.provider === searchProvider && profile.key) {
+        return profile.key;
+      }
     }
   }
 
   for (const profile of Object.values(store.profiles)) {
-    if (profile.type === 'api_key' && profile.provider === provider && profile.key) {
+    if (profile.type === 'api_key' && providersToSearch.includes(profile.provider) && profile.key) {
       return profile.key;
     }
   }
@@ -520,6 +524,7 @@ const BUNDLED_ALLOWLIST_PRESERVE_IDS = new Set([
 const AUTH_PROFILE_PROVIDER_KEY_MAP: Record<string, string> = {
   'openai-codex': 'openai',
   'google-gemini-cli': 'google',
+  'qwen': 'modelstudio',
 };
 
 /**
@@ -541,7 +546,12 @@ const AUTH_PROFILE_PROVIDER_KEY_REVERSE_MAP: Record<string, string[]> = Object.e
  * Always includes the provider itself.
  */
 function expandProviderKeysForDeletion(provider: string): string[] {
-  return [provider, ...(AUTH_PROFILE_PROVIDER_KEY_REVERSE_MAP[provider] ?? [])];
+  const keys = [provider, ...(AUTH_PROFILE_PROVIDER_KEY_REVERSE_MAP[provider] ?? [])];
+  // Qwen family: all ClawDock qwen variants share the OpenClaw 'qwen' auth-profile key
+  if (provider === 'modelstudio' || provider.startsWith('qwen-')) {
+    if (!keys.includes('qwen')) keys.push('qwen');
+  }
+  return keys;
 }
 
 function normalizePluginPathForCompare(pluginPath: string): string {

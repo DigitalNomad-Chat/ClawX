@@ -15,7 +15,21 @@ const PROVIDER_KEY_ALIASES: Record<string, string> = {
   'minimax-portal-cn': OPENCLAW_PROVIDER_KEY_MINIMAX,
 };
 
-export function getOpenClawProviderKeyForType(type: string, providerId: string): string {
+export function getOpenClawProviderKeyForType(
+  type: string,
+  providerId: string,
+  authMode?: string,
+): string {
+  if (authMode === 'oauth_browser') {
+    if (type === 'google') return 'google-gemini-cli';
+    if (type === 'openai') return 'openai-codex';
+  }
+
+  // OpenClaw uses 'kimi' for the Kimi Coding provider
+  if (type === 'kimi-coding') {
+    return 'kimi';
+  }
+
   if (MULTI_INSTANCE_PROVIDER_TYPES.has(type)) {
     // If the providerId is already a runtime key (e.g. re-seeded from openclaw.json
     // as "custom-XXXXXXXX"), return it directly to avoid double-hashing.

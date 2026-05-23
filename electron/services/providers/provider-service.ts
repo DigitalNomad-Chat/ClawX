@@ -68,6 +68,11 @@ function inferProviderVendorIdFromOpenClawEntry(
     }
   }
 
+  // OpenClaw uses 'kimi' for the Kimi Coding provider
+  if (key === 'kimi') {
+    return 'kimi-coding';
+  }
+
   return ((BUILTIN_PROVIDER_TYPES as readonly string[]).includes(key) ? key : 'custom') as ProviderType | 'custom';
 }
 
@@ -96,7 +101,7 @@ export class ProviderService {
     // Index store accounts by their openclaw runtime key for fast lookup.
     const storeByKey = new Map<string, ProviderAccount[]>();
     for (const account of allStoreAccounts) {
-      const ock = getOpenClawProviderKeyForType(account.vendorId, account.id);
+      const ock = getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode);
       const group = storeByKey.get(ock) ?? [];
       group.push(account);
       storeByKey.set(ock, group);
@@ -374,7 +379,7 @@ export class ProviderService {
     const accounts = await this.listAccounts();
     const results: Array<{ accountId: string; hasKey: boolean; keyMasked: string | null }> = [];
     for (const account of accounts) {
-      const runtimeProviderKey = getOpenClawProviderKeyForType(account.vendorId, account.id);
+      const runtimeProviderKey = getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode);
       const apiKey = (await getProviderApiKeyFromOpenClaw(runtimeProviderKey))
         ?? (await getApiKey(account.id))
         ?? (runtimeProviderKey !== account.id ? await getApiKey(runtimeProviderKey) : null);
@@ -396,7 +401,7 @@ export class ProviderService {
   async hasAccountApiKey(accountId: string): Promise<boolean> {
     const account = await this.getAccount(accountId);
     const runtimeProviderKey = account
-      ? getOpenClawProviderKeyForType(account.vendorId, account.id)
+      ? getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode)
       : accountId;
     if (await getProviderApiKeyFromOpenClaw(runtimeProviderKey)) {
       return true;

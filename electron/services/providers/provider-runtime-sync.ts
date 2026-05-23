@@ -93,6 +93,18 @@ export function getOpenClawProviderKey(type: string, providerId: string): string
   if (type === 'minimax-portal-cn') {
     return 'minimax-portal';
   }
+  // Kimi Coding maps to OpenClaw 'kimi'
+  if (type === 'kimi-coding') {
+    return 'kimi';
+  }
+  // Qwen family providers all map to the OpenClaw 'qwen' provider
+  if (type === 'modelstudio' || type === 'qwen-coding-cn' || type === 'qwen-standard-global' || type === 'qwen-standard-cn') {
+    return 'qwen';
+  }
+  // Stepfun family providers map to OpenClaw 'stepfun' / 'stepfun-plan'
+  if (type === 'stepfun-plan') {
+    return 'stepfun-plan';
+  }
   return type;
 }
 
