@@ -1,0 +1,127 @@
+<h2>详细数据流与模块设计</h2>
+<p class="subtitle">方案 C：混合验证（在线实时 + 离线 Token 兜底）</p>
+
+<div class="section">
+  <p class="label">核心数据流</p>
+  <div class="mockup">
+    <div class="mockup-header">使用高级功能时的完整验证流程</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.7;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Step 1 -->
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 8px 12px; min-width: 140px; text-align: center;">用户点击<br/>"协作大厅"</div>
+          <div style="font-size: 16px;">➜</div>
+          <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; padding: 8px 12px; min-width: 180px;">① 检查网络状态</div>
+        </div>
+
+        <!-- Branch: Online -->
+        <div style="margin-left: 160px; border-left: 2px dashed #4caf50; padding-left: 16px;">
+          <div style="color: #4caf50; font-weight: bold; margin-bottom: 6px;">在线路径</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: #f1f8e9; border: 1px solid #aed581; border-radius: 4px; padding: 6px 10px;">② 调用 API: GET /api/v1/usage/check?feature=collaboration</div>
+            <div style="background: #f1f8e9; border: 1px solid #aed581; border-radius: 4px; padding: 6px 10px;">③ 后端返回: { allowed: true, remaining: 2, tier: "free" }</div>
+            <div style="background: #f1f8e9; border: 1px solid #aed581; border-radius: 4px; padding: 6px 10px;">④ 若 allowed=true → 放行，记录使用日志</div>
+            <div style="background: #ffebee; border: 1px solid #ef9a9a; border-radius: 4px; padding: 6px 10px;">④' 若 allowed=false → 显示升级弹窗 / 登录引导</div>
+          </div>
+        </div>
+
+        <!-- Branch: Offline -->
+        <div style="margin-left: 160px; border-left: 2px dashed #ff9800; padding-left: 16px; margin-top: 8px;">
+          <div style="color: #ff9800; font-weight: bold; margin-bottom: 6px;">离线路径</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 6px 10px;">② 读取本地 Feature Token（RSA 验签）</div>
+            <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 6px 10px;">③ 读取本地使用计数器</div>
+            <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 6px 10px;">④ 若 tier=pro/enterprise → 直接放行（无限制）</div>
+            <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 6px 10px;">④' 若 tier=free 且 count&lt;3 → 放行，count++</div>
+            <div style="background: #ffebee; border: 1px solid #ef9a9a; border-radius: 4px; padding: 6px 10px;">④'' 若 tier=free 且 count&gt;=3 → 显示"请联网或升级"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">ClawX 本地模块划分</p>
+  <div class="mockup">
+    <div class="mockup-header">Electron 主进程新增服务</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px;">
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div style="border: 2px solid #4caf50; border-radius: 6px; padding: 10px; width: 200px; background: #f0fdf4;">
+          <div style="font-weight: bold; color: #166534; margin-bottom: 6px;">📦 MemberManager</div>
+          <ul style="margin: 0; padding-left: 16px; font-size: 11px; color: #444;">
+            <li>登录/注册/登出</li>
+            <li>用户信息缓存</li>
+            <li>会员状态查询</li>
+          </ul>
+        </div>
+        <div style="border: 2px solid #2196f3; border-radius: 6px; padding: 10px; width: 200px; background: #eff6ff;">
+          <div style="font-weight: bold; color: #1e40af; margin-bottom: 6px;">📦 TokenManager</div>
+          <ul style="margin: 0; padding-left: 16px; font-size: 11px; color: #444;">
+            <li>Feature Token 续签</li>
+            <li>RSA 本地验签</li>
+            <li>Token 加密存储</li>
+          </ul>
+        </div>
+        <div style="border: 2px solid #ff9800; border-radius: 6px; padding: 10px; width: 200px; background: #fff8e1;">
+          <div style="font-weight: bold; color: #92400e; margin-bottom: 6px;">📦 UsageCounter</div>
+          <ul style="margin: 0; padding-left: 16px; font-size: 11px; color: #444;">
+            <li>本地次数计数</li>
+            <li>月度周期重置</li>
+            <li>同步服务端日志</li>
+          </ul>
+        </div>
+        <div style="border: 2px solid #9c27b0; border-radius: 6px; padding: 10px; width: 200px; background: #faf5ff;">
+          <div style="font-weight: bold; color: #6b21a8; margin-bottom: 6px;">📦 NetworkDetector</div>
+          <ul style="margin: 0; padding-left: 16px; font-size: 11px; color: #444;">
+            <li>网络连通性检测</li>
+            <li>在线/离线切换</li>
+            <li>服务端可达性探测</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">guada_ai 后端新增模块</p>
+  <div class="mockup">
+    <div class="mockup-header">NestJS 后端扩展</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 12px;">
+      <div style="display: flex; gap: 12px;">
+        <div style="border: 2px solid #2196f3; border-radius: 6px; padding: 10px; flex: 1; background: #eff6ff;">
+          <div style="font-weight: bold; color: #1e40af; margin-bottom: 6px;">UsageModule（新建）</div>
+          <div style="font-size: 11px; color: #444; line-height: 1.6;">
+            <b>Models:</b> FeatureUsageLog, MonthlyQuota<br>
+            <b>APIs:</b><br>
+            • GET /api/v1/usage/check — 使用前检查<br>
+            • POST /api/v1/usage/record — 使用后记录<br>
+            • GET /api/v1/usage/stats — 用户用量统计<br>
+            <b>Logic:</b> 按自然月计数，订阅等级决定配额
+          </div>
+        </div>
+        <div style="border: 2px solid #4caf50; border-radius: 6px; padding: 10px; flex: 1; background: #f0fdf4;">
+          <div style="font-weight: bold; color: #166534; margin-bottom: 6px;">LicenseModule（复用改造）</div>
+          <div style="font-size: 11px; color: #444; line-height: 1.6;">
+            <b>新增:</b><br>
+            • Feature Token payload 增加 usage 字段<br>
+            • POST /api/v1/license/issue 支持 ClawX client_type<br>
+            • 设备绑定支持多产品（guada_ai + ClawX）<br>
+            <b>不变:</b> RSA 签发/验签逻辑保持不变
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 16px; padding: 12px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffcc80;">
+  <div style="font-weight: bold; color: #e65100; margin-bottom: 4px;">⚠️ 关键设计决策</div>
+  <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #555;">
+    <li><b>计数周期：</b>自然月（每月1日00:00重置），与后端数据库的 <code>MonthlyQuota</code> 表同步</li>
+    <li><b>计数维度：</b>协作大厅每次"新建任务"计1次；应用广场每次"雇佣Agent并发送首条消息"计1次</li>
+    <li><b>离线策略：</b>离线时依赖本地计数 + Feature Token，恢复联网后向服务端同步并校准计数</li>
+    <li><b>安全：</b>本地计数文件使用 <code>electron-store</code> 加密存储，防止篡改；校验失败则强制在线验证</li>
+  </ul>
+</div>

@@ -1,0 +1,120 @@
+<h2>会员系统架构方案对比</h2>
+<p class="subtitle">三种集成方案，推荐方案 C（混合在线+离线验证）</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>纯在线验证</h3>
+      <p>每次使用高级功能都调用 guada_ai 后端 API 验证会员状态</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>实时性强，状态同步快</li><li>实现最简单</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>必须联网，离线不可用</li><li>频繁请求后端，延迟高</li><li>后端压力大</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>纯离线 Token（guada_ai 原生模式）</h3>
+      <p>ClawX 启动时从 guada_ai 获取 Feature Token，本地 RSA 验签，离线也能用</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>完全离线可用</li><li>不依赖网络</li><li>与 guada_ai 桌面端一致</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>状态同步有延迟（24h续签）</li><li>无法实时限制（过期后还能用）</li><li>次数限制需本地计数，易被篡改</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>混合模式（推荐）</h3>
+      <p><strong>在线时：</strong>API 实时验证会员状态和次数限制<br><strong>离线时：</strong>Feature Token 本地验证，允许有限使用</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>在线时实时精确控制次数</li><li>离线时通过 Token 兜底</li><li>兼顾体验与安全性</li><li>与 guada_ai 现有架构兼容</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>实现复杂度中等</li><li>需要设计在线/离线切换逻辑</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">推荐方案 C 的详细架构</p>
+  <div class="mockup">
+    <div class="mockup-header">ClawX + guada_ai 会员系统架构图</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <div style="display: flex; gap: 20px; align-items: flex-start;">
+        <!-- ClawX 侧 -->
+        <div style="border: 2px solid #4CAF50; border-radius: 8px; padding: 12px; flex: 1; background: #f0fdf4;">
+          <div style="font-weight: bold; color: #166534; margin-bottom: 8px;">🖥️ ClawX (Electron)</div>
+          <div style="border: 1px solid #86efac; border-radius: 4px; padding: 8px; margin-bottom: 6px; background: white;">
+            <div style="font-weight: bold;">前端 (React)</div>
+            <div style="color: #666; font-size: 11px;">LoginModal / UserBadge / UsageLimitModal</div>
+          </div>
+          <div style="border: 1px solid #86efac; border-radius: 4px; padding: 8px; margin-bottom: 6px; background: white;">
+            <div style="font-weight: bold;">主进程 (Node.js)</div>
+            <div style="color: #666; font-size: 11px;">MemberManager / TokenManager / UsageCounter</div>
+          </div>
+          <div style="border: 1px solid #86efac; border-radius: 4px; padding: 8px; background: white;">
+            <div style="font-weight: bold;">本地存储</div>
+            <div style="color: #666; font-size: 11px;">Feature Token (RSA验签) + 使用次数计数</div>
+          </div>
+        </div>
+
+        <!-- 网络 -->
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px;">
+          <div style="font-size: 20px;">🌐</div>
+          <div style="font-size: 11px; color: #666; text-align: center;">HTTPS</div>
+          <div style="width: 2px; height: 60px; background: #ccc;"></div>
+          <div style="font-size: 11px; color: #666; text-align: center;">Feature Token<br>(24h续签)</div>
+        </div>
+
+        <!-- guada_ai 侧 -->
+        <div style="border: 2px solid #2196F3; border-radius: 8px; padding: 12px; flex: 1; background: #eff6ff;">
+          <div style="font-weight: bold; color: #1e40af; margin-bottom: 8px;">☁️ guada_ai (NestJS)</div>
+          <div style="border: 1px solid #93c5fd; border-radius: 4px; padding: 8px; margin-bottom: 6px; background: white;">
+            <div style="font-weight: bold;">Auth Module</div>
+            <div style="color: #666; font-size: 11px;">JWT 签发 / 登录注册 / GitHub OAuth</div>
+          </div>
+          <div style="border: 1px solid #93c5fd; border-radius: 4px; padding: 8px; margin-bottom: 6px; background: white;">
+            <div style="font-weight: bold;">License Module</div>
+            <div style="color: #666; font-size: 11px;">Feature Token 签发 (RSA私钥) / 订阅管理</div>
+          </div>
+          <div style="border: 1px solid #93c5fd; border-radius: 4px; padding: 8px; background: white;">
+            <div style="font-weight: bold;">数据库 (PostgreSQL)</div>
+            <div style="color: #666; font-size: 11px;">User / Subscription / UsageLog</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px dashed #ccc; padding-top: 12px;">
+        <div style="font-weight: bold; margin-bottom: 8px;">📋 功能限制映射</div>
+        <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+          <tr style="background: #f5f5f5;">
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">等级</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">协作大厅</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">应用广场</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">设备数</th>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 6px;">free</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">3次/月</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">3次/月</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">1台</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 6px;">pro</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">无限</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">无限</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">2台</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 6px;">enterprise</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">无限</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">无限</td>
+            <td style="border: 1px solid #ddd; padding: 6px;">5台</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
