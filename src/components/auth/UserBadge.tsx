@@ -60,7 +60,7 @@ function Avatar({ name, url }: { name: string; url?: string }) {
   );
 }
 
-export function UserBadge() {
+export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
   const { t } = useTranslation('auth');
   const auth = useAuthStore();
   const [showLogin, setShowLogin] = useState(false);
@@ -92,11 +92,11 @@ export function UserBadge() {
         <Button
           variant="ghost"
           size="sm"
-          className="gap-1 text-xs"
+          className={cn('gap-1 text-xs', collapsed && 'px-0')}
           onClick={() => setShowLogin(true)}
         >
-          <User className="h-4 w-4" />
-          {t('userBadge.login') || '登录 / 注册'}
+          <User className="h-4 w-4 shrink-0" />
+          {!collapsed && (t('userBadge.login') || '登录 / 注册')}
         </Button>
         <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
       </>
@@ -115,20 +115,25 @@ export function UserBadge() {
           onClick={() => setMenuOpen((v) => !v)}
           className={cn(
             'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
-            'hover:bg-primary/5 dark:hover:bg-primary/8'
+            'hover:bg-primary/5 dark:hover:bg-primary/8',
+            collapsed && 'px-0 justify-center'
           )}
         >
           <Avatar name={userInfo.username} url={userInfo.avatarUrl} />
-          <span className="max-w-[80px] truncate font-medium text-foreground/80">
-            {userInfo.username}
-          </span>
-          <TierBadge tier={tier ?? 'free'} />
-          <ChevronDown
-            className={cn(
-              'h-3.5 w-3.5 text-muted-foreground transition-transform',
-              menuOpen && 'rotate-180'
-            )}
-          />
+          {!collapsed && (
+            <>
+              <span className="max-w-[80px] truncate font-medium text-foreground/80">
+                {userInfo.username}
+              </span>
+              <TierBadge tier={tier ?? 'free'} />
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                  menuOpen && 'rotate-180'
+                )}
+              />
+            </>
+          )}
         </button>
 
         {menuOpen && (

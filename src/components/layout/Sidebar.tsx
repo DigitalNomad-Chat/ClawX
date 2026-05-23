@@ -478,7 +478,7 @@ export function Sidebar() {
           'flex items-center',
           sidebarCollapsed ? 'justify-center' : 'justify-start'
         )}>
-          <UserBadge />
+          <UserBadge collapsed={sidebarCollapsed} />
         </div>
 
         <NavLink
