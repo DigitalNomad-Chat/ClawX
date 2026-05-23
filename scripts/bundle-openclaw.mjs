@@ -518,10 +518,13 @@ function cleanupBundle(outputDir) {
       '.d.cts', '.d.cts.map',
       '.js.map', '.mjs.map', '.cjs.map', '.ts.map',
       '.markdown',
+      // Phase 2: TypeScript source, protobuf defs, logs — useless at runtime
+      '.ts', '.proto', '.log',
     ];
     const NM_REMOVE_FILE_NAMES = new Set([
       '.DS_Store', 'README.md', 'CHANGELOG.md', 'LICENSE.md', 'CONTRIBUTING.md',
       'tsconfig.json', '.npmignore', '.eslintrc', '.prettierrc', '.editorconfig',
+      '.nycrc',
     ]);
 
     // .md files inside skills/ directories are runtime content (SKILL.md,
@@ -578,10 +581,13 @@ function cleanupBundle(outputDir) {
       '.d.cts', '.d.cts.map',
       '.js.map', '.mjs.map', '.cjs.map', '.ts.map',
       '.markdown',
+      // Phase 2: TypeScript source, protobuf defs, logs — useless at runtime
+      '.ts', '.proto', '.log',
     ];
     const REMOVE_FILE_NAMES = new Set([
       '.DS_Store', 'README.md', 'CHANGELOG.md', 'LICENSE.md', 'CONTRIBUTING.md',
       'tsconfig.json', '.npmignore', '.eslintrc', '.prettierrc', '.editorconfig',
+      '.nycrc',
     ]);
 
     function walkClean(dir) {
@@ -765,6 +771,64 @@ function patchBrokenModules(nodeModulesDir) {
   }
   const lruPatched = patchAllLruCacheInstances(nodeModulesDir);
   count += lruPatched;
+
+  // eventemitter3 CJS/ESM interop fix (recursive):
+  // eventemitter3 v5's CJS entry assigns `EventEmitter.EventEmitter = EventEmitter`,
+  // but Node.js 22+ `cjs-module-lexer` cannot detect this pattern when building
+  // ESM named exports for synchronous `require()` loads. This causes:
+  //   SyntaxError: The requested module 'eventemitter3' does not provide an export named 'EventEmitter'
+  // We add a direct `module.exports.EventEmitter` assignment so the static lexer
+  // can detect the named export.
+  function patchAllEventEmitter3Instances(rootDir) {
+    let eeCount = 0;
+    const stack = [rootDir];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      let entries;
+      try { entries = fs.readdirSync(normWin(dir), { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        let isDirectory = entry.isDirectory();
+        if (!isDirectory) {
+          try { isDirectory = fs.statSync(normWin(fullPath)).isDirectory(); } catch { isDirectory = false; }
+        }
+        if (!isDirectory) continue;
+        if (entry.name === 'eventemitter3') {
+          const pkgPath = path.join(fullPath, 'package.json');
+          if (!fs.existsSync(normWin(pkgPath))) { stack.push(fullPath); continue; }
+          try {
+            const pkg = JSON.parse(fs.readFileSync(normWin(pkgPath), 'utf8'));
+            if (pkg.type === 'module') continue;
+            const mainFile = pkg.main || 'index.js';
+            const entryFile = path.join(fullPath, mainFile);
+            if (!fs.existsSync(normWin(entryFile))) continue;
+            const original = fs.readFileSync(normWin(entryFile), 'utf8');
+            if (!original.includes('module.exports.EventEmitter')) {
+              const patched = [
+                original,
+                '',
+                '// ClawDock patch: add EventEmitter named export for Node.js 22+ ESM interop',
+                'if (typeof module.exports === "function" && !module.exports.EventEmitter) {',
+                '  module.exports.EventEmitter = module.exports;',
+                '}',
+                '',
+              ].join('\n');
+              fs.writeFileSync(normWin(entryFile), patched, 'utf8');
+              eeCount++;
+              echo`   🩹 Patched eventemitter3 CJS (v${pkg.version}) at ${path.relative(rootDir, fullPath)}`;
+            }
+          } catch (err) {
+            echo`   ⚠️  Failed to patch eventemitter3 at ${fullPath}: ${err.message}`;
+          }
+        } else {
+          stack.push(fullPath);
+        }
+      }
+    }
+    return eeCount;
+  }
+  const eePatched = patchAllEventEmitter3Instances(nodeModulesDir);
+  count += eePatched;
 
   if (count > 0) {
     echo`   🩹 Patched ${count} broken module(s) in node_modules`;

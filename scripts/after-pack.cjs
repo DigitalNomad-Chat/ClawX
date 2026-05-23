@@ -78,10 +78,13 @@ function cleanupUnnecessaryFiles(dir) {
     '.d.cts', '.d.cts.map',
     '.js.map', '.mjs.map', '.cjs.map', '.ts.map',
     '.markdown',
+    // Phase 2: TypeScript source, protobuf defs, logs — useless at runtime
+    '.ts', '.proto', '.log',
   ];
   const REMOVE_FILE_NAMES = new Set([
     '.DS_Store', 'README.md', 'CHANGELOG.md', 'LICENSE.md', 'CONTRIBUTING.md',
     'tsconfig.json', '.npmignore', '.eslintrc', '.prettierrc', '.editorconfig',
+    '.nycrc',
   ]);
 
   function walk(currentDir) {
@@ -394,6 +397,64 @@ function patchBrokenModules(nodeModulesDir) {
   }
   const lruPatched = patchAllLruCacheInstances(nodeModulesDir);
   count += lruPatched;
+
+  // eventemitter3 CJS/ESM interop fix (recursive):
+  // eventemitter3 v5's CJS entry assigns `EventEmitter.EventEmitter = EventEmitter`,
+  // but Node.js 22+ `cjs-module-lexer` cannot detect this pattern when building
+  // ESM named exports for synchronous `require()` loads. This causes:
+  //   SyntaxError: The requested module 'eventemitter3' does not provide an export named 'EventEmitter'
+  // We add a direct `module.exports.EventEmitter` assignment so the static lexer
+  // can detect the named export.
+  function patchAllEventEmitter3Instances(rootDir) {
+    let eeCount = 0;
+    const stack = [rootDir];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      let entries;
+      try { entries = readdirSync(normWin(dir), { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        let isDirectory = entry.isDirectory();
+        if (!isDirectory) {
+          try { isDirectory = statSync(normWin(fullPath)).isDirectory(); } catch { isDirectory = false; }
+        }
+        if (!isDirectory) continue;
+        if (entry.name === 'eventemitter3') {
+          const pkgPath = join(fullPath, 'package.json');
+          if (!existsSync(normWin(pkgPath))) { stack.push(fullPath); continue; }
+          try {
+            const pkg = JSON.parse(readFileSync(normWin(pkgPath), 'utf8'));
+            if (pkg.type === 'module') continue;
+            const mainFile = pkg.main || 'index.js';
+            const entryFile = join(fullPath, mainFile);
+            if (!existsSync(normWin(entryFile))) continue;
+            const original = readFileSync(normWin(entryFile), 'utf8');
+            if (!original.includes('module.exports.EventEmitter')) {
+              const patched = [
+                original,
+                '',
+                '// ClawDock patch: add EventEmitter named export for Node.js 22+ ESM interop',
+                'if (typeof module.exports === "function" && !module.exports.EventEmitter) {',
+                '  module.exports.EventEmitter = module.exports;',
+                '}',
+                '',
+              ].join('\n');
+              writeFileSync(normWin(entryFile), patched, 'utf8');
+              eeCount++;
+              console.log(`[after-pack] 🩹 Patched eventemitter3 CJS (v${pkg.version}) at ${relative(rootDir, fullPath)}`);
+            }
+          } catch (err) {
+            console.warn(`[after-pack] ⚠️  Failed to patch eventemitter3 at ${fullPath}:`, err.message);
+          }
+        } else {
+          stack.push(fullPath);
+        }
+      }
+    }
+    return eeCount;
+  }
+  const eePatched = patchAllEventEmitter3Instances(nodeModulesDir);
+  count += eePatched;
 
   if (count > 0) {
     console.log(`[after-pack] 🩹 Patched ${count} broken module(s) in ${nodeModulesDir}`);
@@ -750,6 +811,40 @@ exports.default = async function afterPack(context) {
         }
       }
     }
+
+    // === 阶段一优化：Windows 删除扩展冗余 node_modules ===
+    // 扩展 JS 代码通过 shared chunks 加载，模块解析会向上查找到顶层
+    // openclaw/node_modules/。扩展本地 node_modules/ 与顶层完全重复，
+    // 删除后可减少 ~115,000 个文件、~936 MB，安装/卸载速度提升 3-5 倍。
+    if (platform === 'win32') {
+      let removedExtNM = 0;
+      for (const extEntry of readdirSync(packExtDir, { withFileTypes: true })) {
+        if (!extEntry.isDirectory()) continue;
+        const extNM = join(packExtDir, extEntry.name, 'node_modules');
+        if (existsSync(extNM)) {
+          rmSync(extNM, { recursive: true, force: true });
+          removedExtNM++;
+        }
+        // 清理扩展 package.json 中的依赖声明，让 Node.js 向上解析
+        const extPkgPath = join(packExtDir, extEntry.name, 'package.json');
+        if (existsSync(extPkgPath)) {
+          const extPkg = readJsonSafe(extPkgPath);
+          if (extPkg) {
+            let modified = false;
+            if (extPkg.dependencies) { delete extPkg.dependencies; modified = true; }
+            if (extPkg.optionalDependencies) { delete extPkg.optionalDependencies; modified = true; }
+            if (extPkg.devDependencies) { delete extPkg.devDependencies; modified = true; }
+            if (modified) {
+              writeFileSync(extPkgPath, JSON.stringify(extPkg, null, 2) + '\n', 'utf8');
+            }
+          }
+        }
+      }
+      if (removedExtNM > 0) {
+        console.log(`[after-pack] ✅ Removed ${removedExtNM} extension redundant node_modules dirs (Windows optimization).`);
+      }
+    }
+
     if (extNMCount > 0) {
       console.log(`[after-pack] ✅ Prepared node_modules for ${extNMCount} built-in extension(s), merged ${mergedPkgCount} packages into top-level${prunedSharedDepCount > 0 ? `, pruned ${prunedSharedDepCount} redundant direct deps on macOS` : ''}.`);
     }
@@ -759,6 +854,15 @@ exports.default = async function afterPack(context) {
   console.log('[after-pack] 🧹 Cleaning up unnecessary files ...');
   const removedRoot = cleanupUnnecessaryFiles(openclawRoot);
   console.log(`[after-pack] ✅ Removed ${removedRoot} unnecessary files/directories.`);
+
+  // 2.5 Remove known unsignable native binaries that break macOS ad-hoc signing
+  if (platform === 'darwin' && arch === 'arm64') {
+    const tlonSkillDir = join(dest, '@tloncorp', 'tlon-skill-darwin-arm64');
+    if (existsSync(tlonSkillDir)) {
+      rmSync(tlonSkillDir, { recursive: true, force: true });
+      console.log('[after-pack] ✅ Removed @tloncorp/tlon-skill-darwin-arm64 (unsignable binary).');
+    }
+  }
 
   // 3. Platform-specific: strip koffi non-target platform binaries
   const koffiRemoved = cleanupKoffi(dest, platform, arch);
