@@ -15,7 +15,7 @@ function fsPath(filePath: string): string {
   }
   return `\\\\?\\${windowsPath}`;
 }
-import { getAllSettings } from '../utils/store';
+import { getAllSettings, setSetting, generateToken } from '../utils/store';
 import { getApiKey, getDefaultProvider, getProvider } from '../utils/secure-storage';
 import { getProviderEnvVar, getKeyableProviderTypes } from '../utils/provider-registry';
 import {
@@ -572,15 +572,48 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
   }
 
   const appSettings = await measureAsync(timingsMs, 'settingsMs', getAllSettings);
+
+  // Defensive: ensure gatewayToken is never empty/falsy. An empty token causes
+  // OpenClaw CLI to omit the token override (empty string is falsy in
+  // `tokenRaw ? { token: tokenRaw } : {}`), which triggers canBootstrapToken
+  // and generates a *new* random token in the config file. The WebSocket
+  // handshake then uses the old empty token from the store → unauthorized.
+  if (!appSettings.gatewayToken || appSettings.gatewayToken.trim().length === 0) {
+    const regeneratedToken = generateToken();
+    await setSetting('gatewayToken', regeneratedToken);
+    appSettings.gatewayToken = regeneratedToken;
+    logger.warn('Gateway token was empty — regenerated to prevent auth mismatch');
+  }
+
   const prelaunchSummary = await measureAsync(timingsMs, 'prelaunchSyncMs', async () => (
     await syncGatewayConfigBeforeLaunch(appSettings, openclawDir)
   ));
+
+  // Diagnostic: verify the token we just synced into openclaw.json matches
+  // the settings token, so any mismatch is caught before the gateway starts.
+  try {
+    const syncedConfig = await readOpenClawConfig();
+    const openclawToken = (syncedConfig.gateway as Record<string, unknown> | undefined)?.auth
+      ? ((syncedConfig.gateway as Record<string, unknown>).auth as Record<string, unknown>)?.token as string | undefined
+      : undefined;
+    if (openclawToken !== appSettings.gatewayToken) {
+      logger.warn(
+        `Token mismatch detected: settings token=${appSettings.gatewayToken.slice(0, 8)}…, openclaw token=${openclawToken?.slice(0, 8) ?? '(missing)'}… — forcing sync again`
+      );
+      await batchSyncConfigFields(appSettings.gatewayToken);
+    } else {
+      logger.info(`Token sync verified: settings == openclaw (${appSettings.gatewayToken.slice(0, 8)}…)`);
+    }
+  } catch (diagErr) {
+    logger.warn('Failed to verify post-sync token consistency:', diagErr);
+  }
 
   if (!existsSync(entryScript)) {
     throw new Error(`OpenClaw entry script not found at: ${entryScript}`);
   }
 
   const gatewayArgs = ['gateway', '--port', String(port), '--token', appSettings.gatewayToken, '--allow-unconfigured'];
+  logger.info(`Gateway args token=${appSettings.gatewayToken.slice(0, 8)}…`);
   const mode = app.isPackaged ? 'packaged' : 'dev';
 
   const platform = process.platform;
@@ -618,6 +651,10 @@ export async function prepareGatewayLaunchContext(port: number): Promise<Gateway
     OPENCLAW_SKIP_CHANNELS: skipChannels ? '1' : '',
     CLAWDBOT_SKIP_CHANNELS: skipChannels ? '1' : '',
     OPENCLAW_NO_RESPAWN: '1',
+    // Force OpenClaw to use the canonical state dir so it reads the same
+    // config file that batchSyncConfigFields writes (prevents legacy
+    // ~/.clawdbot/openclaw.json from shadowing ~/.openclaw/openclaw.json).
+    OPENCLAW_STATE_DIR: join(homedir(), '.openclaw'),
   };
 
   // Ensure extension-specific packages (e.g. grammy from the telegram

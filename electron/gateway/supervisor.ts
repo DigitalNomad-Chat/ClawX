@@ -194,6 +194,66 @@ async function getListeningProcessIds(port: number): Promise<string[]> {
   return [...new Set(stdout.trim().split(/\r?\n/).map((value) => value.trim()).filter(Boolean))];
 }
 
+async function getWindowsParentPid(pid: number): Promise<number | null> {
+  try {
+    const cp = await import('child_process');
+    const { stdout } = await new Promise<{ stdout: string }>((resolve) => {
+      cp.exec(
+        `wmic process where ProcessId=${pid} get ParentProcessId /value`,
+        { timeout: 5000, windowsHide: true },
+        (err, stdout) => {
+          resolve({ stdout: err ? '' : stdout });
+        },
+      );
+    });
+    const match = stdout.match(/ParentProcessId=(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function windowsForceKill(pid: number): Promise<void> {
+  try {
+    const cp = await import('child_process');
+    await new Promise<void>((resolve, reject) => {
+      cp.exec(
+        `taskkill /F /PID ${pid} /T`,
+        { timeout: 5000, windowsHide: true },
+        (err, _stdout, stderr) => {
+          if (err) {
+            logger.warn(`taskkill /F /PID ${pid} /T failed: ${stderr || err.message}`);
+            reject(err);
+          } else {
+            resolve();
+          }
+        },
+      );
+    });
+  } catch {
+    // Fallback to PowerShell Stop-Process which sometimes works when taskkill doesn't
+    try {
+      const cp = await import('child_process');
+      await new Promise<void>((resolve, reject) => {
+        cp.exec(
+          `powershell.exe -Command "Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue"`,
+          { timeout: 5000, windowsHide: true },
+          (err, _stdout, stderr) => {
+            if (err) {
+              logger.warn(`PowerShell Stop-Process ${pid} failed: ${stderr || err.message}`);
+              reject(err);
+            } else {
+              resolve();
+            }
+          },
+        );
+      });
+    } catch {
+      // Both methods failed
+    }
+  }
+}
+
 async function terminateOrphanedProcessIds(port: number, pids: string[]): Promise<void> {
   logger.info(`Found orphaned process listening on port ${port} (PIDs: ${pids.join(', ')}), attempting to kill...`);
 
@@ -201,17 +261,22 @@ async function terminateOrphanedProcessIds(port: number, pids: string[]): Promis
     await unloadLaunchctlGatewayService();
   }
 
-  for (const pid of pids) {
+  // On Windows, also try to kill parent processes to stop watchdog respawn.
+  const pidsToKill = new Set<string>(pids);
+  if (process.platform === 'win32') {
+    for (const pid of pids) {
+      const parentPid = await getWindowsParentPid(parseInt(pid, 10));
+      if (parentPid && parentPid > 0 && !pidsToKill.has(String(parentPid))) {
+        logger.info(`Also targeting parent PID ${parentPid} of orphan ${pid} to prevent respawn`);
+        pidsToKill.add(String(parentPid));
+      }
+    }
+  }
+
+  for (const pid of pidsToKill) {
     try {
       if (process.platform === 'win32') {
-        const cp = await import('child_process');
-        await new Promise<void>((resolve) => {
-          cp.exec(
-            `taskkill /F /PID ${pid} /T`,
-            { timeout: 5000, windowsHide: true },
-            () => resolve(),
-          );
-        });
+        await windowsForceKill(parseInt(pid, 10));
       } else {
         process.kill(parseInt(pid, 10), 'SIGTERM');
       }
@@ -223,7 +288,7 @@ async function terminateOrphanedProcessIds(port: number, pids: string[]): Promis
   await new Promise((resolve) => setTimeout(resolve, process.platform === 'win32' ? 2000 : 3000));
 
   if (process.platform !== 'win32') {
-    for (const pid of pids) {
+    for (const pid of pidsToKill) {
       try {
         process.kill(parseInt(pid, 10), 0);
         process.kill(parseInt(pid, 10), 'SIGKILL');
@@ -242,22 +307,34 @@ export async function findExistingGatewayProcess(options: {
   const { port, ownedPid } = options;
 
   try {
-    try {
-      const pids = await getListeningProcessIds(port);
-      if (pids.length > 0 && (!ownedPid || !pids.includes(String(ownedPid)))) {
-        await terminateOrphanedProcessIds(port, pids);
-        if (process.platform === 'win32') {
+    const pids = await getListeningProcessIds(port);
+    if (pids.length > 0 && (!ownedPid || !pids.includes(String(ownedPid)))) {
+      await terminateOrphanedProcessIds(port, pids);
+      if (process.platform === 'win32') {
+        try {
           await waitForPortFree(port, 10000);
+        } catch (waitErr) {
+          // Port is still occupied — the orphan was not killed. Do NOT fall
+          // through to probeGatewayReady, because the old process would
+          // respond with a different token and cause a misleading
+          // "token mismatch" error. Propagate the port-conflict error so
+          // the startup sequence can retry or surface a clear message.
+          logger.error(`Port ${port} still occupied after killing orphans (PIDs: ${pids.join(', ')}). The orphaned gateway process could not be terminated.`);
+          throw waitErr;
         }
-        return null;
       }
-    } catch (err) {
-      logger.warn('Error checking for existing process on port:', err);
+      return null;
     }
 
     const ready = await probeGatewayReady(port, 5000);
     return ready ? { port } : null;
-  } catch {
+  } catch (err) {
+    // Only log + swallow unexpected probe errors; rethrow port-conflict
+    // and lifecycle errors so the caller can act on them.
+    if (err instanceof Error && err.message.includes('still occupied')) {
+      throw err;
+    }
+    logger.warn('Error checking for existing process on port:', err);
     return null;
   }
 }

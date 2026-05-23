@@ -31,6 +31,7 @@ import { dispatchJsonRpcNotification, dispatchProtocolEvent } from './event-disp
 import { GatewayStateController } from './state';
 import { prepareGatewayLaunchContext } from './config-sync';
 import { connectGatewaySocket, waitForGatewayReady } from './ws-client';
+import { generateToken, setSetting } from '../utils/store';
 import {
   findExistingGatewayProcess,
   runOpenClawDoctorRepair,
@@ -173,6 +174,9 @@ export class GatewayManager extends EventEmitter {
   private externalShutdownSupported: boolean | null = null;
   private reconnectAttemptsTotal = 0;
   private reconnectSuccessTotal = 0;
+  /** Token used for the most recent gateway launch — used by connect() to guarantee
+   *  the WebSocket handshake uses the exact same token that was passed on the CLI. */
+  private lastLaunchToken: string | null = null;
   private static readonly RELOAD_POLICY_REFRESH_MS = 15_000;
   private static readonly HEARTBEAT_INTERVAL_MS = 30_000;
   private static readonly HEARTBEAT_TIMEOUT_MS = 12_000;
@@ -992,6 +996,8 @@ export class GatewayManager extends EventEmitter {
    */
   private async startProcess(): Promise<void> {
     const launchContext = await prepareGatewayLaunchContext(this.status.port);
+    this.lastLaunchToken = launchContext.appSettings.gatewayToken;
+    logger.info(`startProcess: stored lastLaunchToken=${this.lastLaunchToken.slice(0, 8)}…`);
     await unloadLaunchctlGatewayService();
     this.processExitCode = null;
 
@@ -1077,7 +1083,23 @@ export class GatewayManager extends EventEmitter {
       deviceIdentity: this.deviceIdentity,
       platform: process.platform,
       pendingRequests: this.pendingRequests,
-      getToken: async () => await import('../utils/store').then(({ getSetting }) => getSetting('gatewayToken')),
+      getToken: async () => {
+        // Prefer the token used during the last launch so the WebSocket
+        // handshake is guaranteed to match the --token CLI argument.
+        if (this.lastLaunchToken && this.lastLaunchToken.trim().length > 0) {
+          logger.debug(`connect: using lastLaunchToken=${this.lastLaunchToken.slice(0, 8)}…`);
+          return this.lastLaunchToken;
+        }
+        const { getSetting } = await import('../utils/store');
+        let token = await getSetting('gatewayToken');
+        if (!token || token.trim().length === 0) {
+          token = generateToken();
+          await setSetting('gatewayToken', token);
+          logger.warn('connect: gatewayToken was empty — regenerated to prevent auth mismatch');
+        }
+        logger.debug(`connect: using store token=${token.slice(0, 8)}…`);
+        return token;
+      },
       onHandshakeComplete: (ws) => {
         this.ws = ws;
         ws.on('pong', () => {
