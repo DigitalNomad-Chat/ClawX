@@ -178,6 +178,14 @@ const electronAPI = {
         // License
         'license:activate',
         'license:get-machine-code',
+        // Auth / Member
+        'auth:login',
+        'auth:register',
+        'auth:logout',
+        'auth:getUser',
+        'auth:checkFeature',
+        'auth:recordUsage',
+        'auth:getUsageStats',
       ];
 
       if (validChannels.includes(channel)) {

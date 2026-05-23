@@ -55,6 +55,7 @@ import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { syncAllProviderAuthToRuntime } from '../services/providers/provider-runtime-sync';
 import { migrateLegacyUserData } from '../utils/paths';
+import { memberModule } from '../services/member';
 
 // Migrate legacy ~/.clawx user data to ~/.clawdock before any path-dependent
 // initialization runs. This is a one-time operation on first launch after rename.
@@ -375,8 +376,13 @@ async function startMainApp(): Promise<void> {
     },
   );
 
+  // Initialize member module (non-blocking)
+  await memberModule.init().catch((err) => {
+    logger.warn('Member module init failed:', err);
+  });
+
   // Register IPC handlers
-  registerIpcHandlers(gatewayManager, clawHubService, window);
+  registerIpcHandlers(gatewayManager, clawHubService, window, memberModule);
 
   // Initialize feature modules (errors are swallowed per-module)
   void initModules({

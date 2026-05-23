@@ -16,6 +16,9 @@ import { Badge } from '@/components/ui/badge';
 import { LlmConfigSection } from './LlmConfigSection';
 import { kernelClient } from '@/lib/kernel-client';
 import { MessageSquare, Clock } from 'lucide-react';
+import { useFeatureGuard } from '@/hooks/useFeatureGuard';
+import { UsageLimitModal } from '@/components/auth/UsageLimitModal';
+import { UsageBar } from '@/components/auth/UsageBar';
 
 interface AgentCardData {
   id: string;
@@ -71,6 +74,8 @@ export function Marketplace() {
     messageCount: number;
   }>>([]);
 
+  const { showLimitModal, closeLimitModal, recordAndCheck } = useFeatureGuard('marketplace');
+
   useEffect(() => {
     loadAgents();
     loadRecentSessions();
@@ -124,8 +129,11 @@ export function Marketplace() {
    * 雇佣 Agent — 纯 UI 跳转，不触发 IPC
    * Agent 配置在首次对话时按需加载（lazy-load）
    */
-  function hireAgent(agentId: string) {
-    navigate(`/agent-chat/${agentId}`);
+  async function hireAgent(agentId: string) {
+    const allowed = await recordAndCheck();
+    if (allowed) {
+      navigate(`/agent-chat/${agentId}`);
+    }
   }
 
   async function loadRecentSessions() {
@@ -174,14 +182,17 @@ export function Marketplace() {
   return (
     <div className="flex h-full flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Store className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold">Agent 广场</h1>
-          <p className="text-sm text-muted-foreground">
-            选择并雇佣专业的 Agent，让 AI 为您工作
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Store className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Agent 广场</h1>
+            <p className="text-sm text-muted-foreground">
+              选择并雇佣专业的 Agent，让 AI 为您工作
+            </p>
+          </div>
         </div>
+        <UsageBar feature="marketplace" />
       </div>
 
       {/* AI Model Config */}
@@ -311,6 +322,8 @@ export function Marketplace() {
           onHire={() => hireAgent(selectedAgent.id)}
         />
       )}
+
+      <UsageLimitModal feature="marketplace" open={showLimitModal} onClose={closeLimitModal} />
     </div>
   );
 }

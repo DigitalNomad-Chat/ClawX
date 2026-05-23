@@ -39,7 +39,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { hostApiFetch } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
 import { moduleNavItems } from '@/modules/registry';
-import logoSvg from '@/assets/logo.svg';
+import { UserBadge } from '@/components/auth/UserBadge';
+import logoPng from '@/assets/logo.png';
 
 interface NavItemProps {
   to: string;
@@ -249,7 +250,7 @@ export function Sidebar() {
       <div className={cn("flex items-center p-2 h-12", sidebarCollapsed ? "justify-center" : "justify-between")}>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-2 overflow-hidden">
-            <img src={logoSvg} alt="ClawDock" className="h-5 w-auto shrink-0" />
+            <img src={logoPng} alt="ClawDock" className="h-5 w-auto shrink-0" />
             <span className="text-sm font-semibold truncate whitespace-nowrap text-foreground/90">
               ClawDock
             </span>
@@ -472,7 +473,14 @@ export function Sidebar() {
       )}
 
       {/* Footer */}
-      <div className="p-2 mt-auto shrink-0">
+      <div className="p-2 mt-auto shrink-0 space-y-1">
+        <div className={cn(
+          'flex items-center',
+          sidebarCollapsed ? 'justify-center' : 'justify-start'
+        )}>
+          <UserBadge />
+        </div>
+
         <NavLink
             to="/settings"
             data-testid="sidebar-nav-settings"

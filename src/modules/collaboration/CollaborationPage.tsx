@@ -31,6 +31,9 @@ import { setCollabLang, getCollabLang, t, type I18nLang } from './i18n';
 import { TutorialPanel } from './components/TutorialPanel';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { useFeatureGuard } from '@/hooks/useFeatureGuard';
+import { UsageLimitModal } from '@/components/auth/UsageLimitModal';
+import { UsageBar } from '@/components/auth/UsageBar';
 
 const STAGE_LABELS: Record<string, string> = {
   discussion: '讨论中',
@@ -315,6 +318,8 @@ export function CollaborationPage() {
   const [lang, setLang] = useState<I18nLang>(getCollabLang());
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
+  const { showLimitModal, closeLimitModal, recordAndCheck } = useFeatureGuard('collaboration');
+
   // Member status tracking from SSE events
   const [memberStatusMap, setMemberStatusMap] = useState<Record<string, { status: MemberStatus; lastActivity: number }>>({});
 
@@ -405,6 +410,8 @@ export function CollaborationPage() {
 
   const handleCreateTask = useCallback(async () => {
     if (!newTaskTitle.trim() || !newTaskDesc.trim()) return;
+    const allowed = await recordAndCheck();
+    if (!allowed) return;
     try {
       await createTaskCard({
         title: newTaskTitle.trim(),
@@ -418,7 +425,7 @@ export function CollaborationPage() {
     } catch (err) {
       toast.error(`创建失败: ${String(err)}`);
     }
-  }, [newTaskTitle, newTaskDesc, createTaskCard, currentParticipant]);
+  }, [newTaskTitle, newTaskDesc, createTaskCard, currentParticipant, recordAndCheck]);
 
   const handleOpenDetail = useCallback((taskCardId: string) => {
     setDetailTaskCardId(taskCardId);
@@ -601,12 +608,15 @@ export function CollaborationPage() {
     <ModulePageLayout>
       <div className="flex h-full flex-col gap-6">
         {/* Header */}
-        <div className="flex items-center gap-3 shrink-0">
-          <Users className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">协作大厅</h1>
-            <p className="text-sm text-muted-foreground">多智能体协作与任务管理</p>
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <Users className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">协作大厅</h1>
+              <p className="text-sm text-muted-foreground">多智能体协作与任务管理</p>
+            </div>
           </div>
+          <UsageBar feature="collaboration" />
         </div>
 
         {error && (
@@ -774,6 +784,8 @@ export function CollaborationPage() {
       />
 
       <TutorialPanel open={tutorialOpen} onOpenChange={setTutorialOpen} />
+
+      <UsageLimitModal feature="collaboration" open={showLimitModal} onClose={closeLimitModal} />
     </ModulePageLayout>
   );
 }

@@ -23,7 +23,6 @@ import { toast } from 'sonner';
 import { useSettingsStore } from '@/stores/settings';
 import { useGatewayStore } from '@/stores/gateway';
 import { useUpdateStore } from '@/stores/update';
-import { UpdateSettings } from '@/components/settings/UpdateSettings';
 import {
   getGatewayWsDiagnosticEnabled,
   invokeIpc,
@@ -70,10 +69,6 @@ export function Settings() {
     setProxyHttpsServer,
     setProxyAllServer,
     setProxyBypassRules,
-    autoCheckUpdate,
-    setAutoCheckUpdate,
-    autoDownloadUpdate,
-    setAutoDownloadUpdate,
     devModeUnlocked,
     setDevModeUnlocked,
     telemetryEnabled,
@@ -82,7 +77,6 @@ export function Settings() {
 
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
   const currentVersion = useUpdateStore((state) => state.currentVersion);
-  const updateSetAutoDownload = useUpdateStore((state) => state.setAutoDownload);
   const [controlUiInfo, setControlUiInfo] = useState<ControlUiInfo | null>(null);
   const [openclawCliCommand, setOpenclawCliCommand] = useState('');
   const [openclawCliError, setOpenclawCliError] = useState<string | null>(null);
@@ -1029,46 +1023,7 @@ export function Settings() {
             </>
           )}
 
-          <Separator className="bg-muted" />
-
-          {/* Updates */}
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              {t('updates.title')}
-            </h2>
-            <div className="space-y-6">
-              <UpdateSettings />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium text-foreground">{t('updates.autoCheck')}</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t('updates.autoCheckDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={autoCheckUpdate}
-                  onCheckedChange={setAutoCheckUpdate}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium text-foreground">{t('updates.autoDownload')}</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t('updates.autoDownloadDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={autoDownloadUpdate}
-                  onCheckedChange={(value) => {
-                    setAutoDownloadUpdate(value);
-                    updateSetAutoDownload(value);
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+          {/* 更新模块已停用：项目经过深度二次开发，与原版差异较大，不支持直接升级 */}
 
           <Separator className="bg-muted" />
 
@@ -1083,29 +1038,7 @@ export function Settings() {
               </p>
               <p>{t('about.basedOn')}</p>
               <p>{t('about.version', { version: currentVersion })}</p>
-              <div className="flex gap-4 pt-3">
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-sm text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://claw-x.com')}
-                >
-                  {t('about.docs')}
-                </Button>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-sm text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://github.com/ValueCell-ai/ClawDock')}
-                >
-                  {t('about.github')}
-                </Button>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-sm text-blue-500 hover:text-blue-600 font-medium"
-                  onClick={() => window.electron.openExternal('https://icnnp7d0dymg.feishu.cn/wiki/UyfOwQ2cAiJIP6kqUW8cte5Bnlc')}
-                >
-                  {t('about.faq')}
-                </Button>
-              </div>
+              {/* 外部链接已移除 */}
             </div>
           </div>
 

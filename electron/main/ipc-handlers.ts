@@ -63,6 +63,8 @@ import {
 import { validateApiKeyWithProvider } from '../services/providers/provider-validation';
 import { appUpdater } from './updater';
 import { registerHostApiProxyHandlers } from './ipc/host-api-proxy';
+import { registerAuthIpcHandlers } from './ipc/auth-handlers';
+import { MemberModule } from '../services/member';
 import {
   isLaunchAtStartupKey,
   isProxyKey,
@@ -77,7 +79,8 @@ import {
 export function registerIpcHandlers(
   gatewayManager: GatewayManager,
   clawHubService: ClawHubService,
-  mainWindow: BrowserWindow
+  mainWindow: BrowserWindow,
+  memberModule?: MemberModule
 ): void {
   // Unified request protocol (non-breaking: legacy channels remain available)
   registerUnifiedRequestHandlers(gatewayManager);
@@ -120,6 +123,11 @@ export function registerIpcHandlers(
 
   // Usage handlers
   registerUsageHandlers();
+
+  // Auth / Member handlers
+  if (memberModule) {
+    registerAuthIpcHandlers(memberModule);
+  }
 
   // Skill config handlers (direct file access, no Gateway RPC)
   registerSkillConfigHandlers();

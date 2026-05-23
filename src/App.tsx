@@ -26,6 +26,7 @@ import ActivationPage from './pages/ActivationPage';
 import { useSettingsStore } from './stores/settings';
 import { useGatewayStore } from './stores/gateway';
 import { useProviderStore } from './stores/providers';
+import { useAuthStore } from './stores/auth';
 import { applyGatewayTransportPreference } from './lib/api-client';
 import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
@@ -107,10 +108,12 @@ function App() {
   const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
   const initGateway = useGatewayStore((state) => state.init);
   const initProviders = useProviderStore((state) => state.init);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
 
   useEffect(() => {
     initSettings();
-  }, [initSettings]);
+    refreshUser();
+  }, [initSettings, refreshUser]);
 
   // Sync i18n language with persisted settings on mount
   useEffect(() => {
