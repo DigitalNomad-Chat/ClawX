@@ -474,12 +474,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-2 mt-auto shrink-0 space-y-1">
-        <div className={cn(
-          'flex items-center',
-          sidebarCollapsed ? 'justify-center' : 'justify-start'
-        )}>
-          <UserBadge collapsed={sidebarCollapsed} />
-        </div>
+        <UserBadge collapsed={sidebarCollapsed} />
 
         <NavLink
             to="/settings"

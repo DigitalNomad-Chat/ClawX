@@ -89,15 +89,35 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
   if (!auth.isLoggedIn || !auth.userInfo) {
     return (
       <>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn('gap-1 text-xs', collapsed && 'px-0')}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={t('userBadge.login') || '登录 / 注册'}
           onClick={() => setShowLogin(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowLogin(true);
+            }
+          }}
+          className={cn(
+            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
+            'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
+            'border-l-[3px] border-l-transparent',
+            collapsed ? 'justify-center px-0 border-l-0' : ''
+          )}
         >
-          <User className="h-4 w-4 shrink-0" />
-          {!collapsed && (t('userBadge.login') || '登录 / 注册')}
-        </Button>
+          <div className={cn("flex items-center gap-2.5", collapsed ? "justify-center w-auto" : "w-full")}>
+            <div className="flex shrink-0 items-center justify-center text-muted-foreground">
+              <User className="h-[18px] w-[18px]" strokeWidth={2} />
+            </div>
+            {!collapsed && (
+              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {t('userBadge.login') || '登录 / 注册'}
+              </span>
+            )}
+          </div>
+        </div>
         <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
       </>
     );
