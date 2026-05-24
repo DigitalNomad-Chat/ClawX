@@ -103,9 +103,31 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
         }
         text = extracted.text;
       } else if (file.type.startsWith('image/')) {
-        toast.info('图片文件暂需手动粘贴 OCR 结果');
-        setStep('upload');
-        return;
+        // Stage image to disk then OCR via backend
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = () => reject(new Error('Failed to read image file'));
+          reader.readAsDataURL(file);
+        });
+        const staged = await hostApiFetch<{
+          id: string;
+          fileName: string;
+          mimeType: string;
+          fileSize: number;
+          stagedPath: string;
+        }>('/api/files/stage-buffer', {
+          method: 'POST',
+          body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type }),
+        });
+        const extracted = await hostApiFetch<{ success: boolean; text?: string; error?: string }>(
+          '/api/files/ocr-image',
+          { method: 'POST', body: JSON.stringify({ stagedPath: staged.stagedPath }) },
+        );
+        if (!extracted.success || extracted.text == null) {
+          throw new Error(extracted.error || '图片 OCR 失败');
+        }
+        text = extracted.text;
       } else {
         text = await file.text();
       }
@@ -166,7 +188,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
                   <span className="text-primary font-medium">点击上传</span> 或拖拽文件到此处
                 </div>
                 <div className="text-2xs text-muted-foreground/60">
-                  支持 .txt, .md, 图片（需OCR）, PDF（需OCR）
+                  支持 .txt, .md, 图片（自动OCR）, PDF（自动OCR）
                 </div>
               </div>
 

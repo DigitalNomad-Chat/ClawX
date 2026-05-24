@@ -284,6 +284,27 @@ export function desensitize(text: string): DesensitizeResult {
     result,
   );
 
+  // 香港手机号
+  result = replaceMatches(
+    'PHONE_HK',
+    /(?<!\d)(?:\+?852[-\s]?)?[2-9]\d{3}[-\s]?\d{4}(?!\d)/g,
+    result,
+  );
+
+  // 台湾手机号
+  result = replaceMatches(
+    'PHONE_TW',
+    /(?<!\d)(?:\+?886[-\s]?)?0?9\d{2}[-\s]?\d{3}[-\s]?\d{3}(?!\d)/g,
+    result,
+  );
+
+  // 澳门手机号
+  result = replaceMatches(
+    'PHONE_MO',
+    /(?<!\d)(?:\+?853[-\s]?)?[6]\d{3}[-\s]?\d{4}(?!\d)/g,
+    result,
+  );
+
   // 7. 邮箱
   result = replaceMatches('EMAIL', /[\w.-]+@[\w.-]+\.\w+/g, result);
 
@@ -339,6 +360,41 @@ export function desensitize(text: string): DesensitizeResult {
   result = replaceMatches(
     'POLICY_NUMBER',
     /(?<=(?:保单号|保险单号|投保单号|保险合同编号|保险编号|保单号码|保险单号码|投保单号码|保险凭证号|保险凭证编号|保险凭证号码)[:：\.\s号]*)[A-Za-z0-9\-]{6,30}(?=[\s\n,，。；;:、]|$)/g,
+    result,
+  );
+
+  // 英文 Policy Number
+  result = replaceMatches(
+    'POLICY_NUMBER',
+    /(?<=Policy\s*(?:No|Number|#)?[:\.\s]*)[A-Za-z0-9\-]{6,30}(?=[\s\n,，。；;:、]|$)/gi,
+    result,
+  );
+
+  // 香港/国际保险单号
+  result = replaceMatches(
+    'POLICY_NUMBER',
+    /\b(?:P|POL|INS|LIF)[\-\s]?\d{6,12}\b/gi,
+    result,
+  );
+
+  // 基金账号
+  result = replaceMatches(
+    'FUND_ACCOUNT',
+    /(?<=(?:基金账号|基金账户|基金帐号|基金戶口|Fund\s*(?:Acc|Account|#)?)[:：\.\s]*)[A-Za-z0-9]{8,20}(?=[\s\n,，。；;:、]|$)/gi,
+    result,
+  );
+
+  // 证券/股票账号
+  result = replaceMatches(
+    'STOCK_ACCOUNT',
+    /(?<=(?:证券账号|证券账户|股票账号|股票账户|证券帐号|股票帐号|证券戶口|股票戶口|Securities\s*(?:Acc|Account|#)?|Stock\s*(?:Acc|Account|#)?)[:：\.\s]*)[A-Za-z]\d{8,12}(?=[\s\n,，。；;:、]|$)/gi,
+    result,
+  );
+
+  // 社保号/公积金账号
+  result = replaceMatches(
+    'SOCIAL_SECURITY',
+    /(?<=(?:社保卡号|社保卡號|社保号|社保號|社会保障号|社会保障號|公积金账号|公積金賬號|公积金帐户|公積金帳戶|住房公积金号|住房公積金號)[:：\.\s]*)\d{9,18}(?=[\s\n,，。；;:、]|$)/g,
     result,
   );
 

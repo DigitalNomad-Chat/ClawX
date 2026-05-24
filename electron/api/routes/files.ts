@@ -5,6 +5,9 @@ import { extname, join } from 'node:path';
 import { homedir } from 'node:os';
 import type { HostApiContext } from '../context';
 import { parseJsonBody, sendJson } from '../route-utils';
+import { analyzePdf } from '../services/pdf-analyze';
+import { renderPdfPages } from '../services/pdf-render';
+import { recognizeImage, recognizeMultiple } from '../services/ocr';
 
 const EXT_MIME_MAP: Record<string, string> = {
   '.png': 'image/png',
@@ -220,22 +223,50 @@ export async function handleFileRoutes(
       }
       const fsP = await import('node:fs/promises');
       const data = await fsP.readFile(body.stagedPath);
-      const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
-      const loadingTask = getDocument({ data: new Uint8Array(data) });
-      const pdf = await loadingTask.promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: Record<string, unknown>) => item.str)
-          .join('');
-        fullText += pageText + '\n';
+
+      // Analyze PDF: text-based vs scanned/image-based
+      const analysis = await analyzePdf(data);
+
+      if (analysis.isTextBased) {
+        sendJson(res, 200, {
+          success: true,
+          text: analysis.text,
+          pageCount: analysis.pageCount,
+          source: 'text',
+        });
+        return true;
       }
-      sendJson(res, 200, { success: true, text: fullText, pageCount: pdf.numPages });
+
+      // Scanned/image-based PDF: render pages to images then OCR
+      const pageBuffers = await renderPdfPages(data, 2.0);
+      const ocrText = await recognizeMultiple(pageBuffers, 'chi_sim+eng');
+      sendJson(res, 200, {
+        success: true,
+        text: ocrText,
+        pageCount: analysis.pageCount || pageBuffers.length,
+        source: 'ocr',
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { success: false, error: `PDF text extraction failed: ${message}` });
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/files/ocr-image' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{ stagedPath: string }>(req);
+      if (!body.stagedPath || typeof body.stagedPath !== 'string') {
+        sendJson(res, 400, { success: false, error: 'stagedPath is required' });
+        return true;
+      }
+      const fsP = await import('node:fs/promises');
+      const data = await fsP.readFile(body.stagedPath);
+      const text = await recognizeImage(data, 'chi_sim+eng');
+      sendJson(res, 200, { success: true, text });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { success: false, error: `Image OCR failed: ${message}` });
     }
     return true;
   }
