@@ -188,6 +188,7 @@ export class ArtifactParser {
       md: 'document',
       markdown: 'document',
       txt: 'document',
+      html: 'html',
       svg: 'svg',
       mermaid: 'mermaid',
       typescript: 'code',

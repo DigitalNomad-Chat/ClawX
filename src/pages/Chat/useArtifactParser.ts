@@ -5,29 +5,51 @@ import { useArtifactPanel } from '@/stores/artifact-panel';
 import { ArtifactParser } from '@/lib/artifact/parser';
 import type { StreamArtifact, StreamArtifactStatus } from '@/lib/artifact/types';
 
+function extractAllText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return (content as Array<Record<string, unknown>>)
+      .filter((b) => b.type === 'text')
+      .map((b) => (b.text as string) ?? '')
+      .join('');
+  }
+  return '';
+}
+
 function extractTextDelta(
   current: unknown,
   previous: unknown,
 ): string | null {
-  if (typeof current === 'string' && typeof previous === 'string') {
-    return current.slice(previous.length);
+  const currentText = extractAllText(current);
+  const prevText = extractAllText(previous);
+
+  console.log('[ArtifactParser] extractTextDelta current:', JSON.stringify(currentText).slice(0, 200), 'prev:', JSON.stringify(prevText).slice(0, 200));
+
+  if (!currentText) {
+    console.log('[ArtifactParser] currentText empty, returning null');
+    return null;
   }
-  // ContentBlock[] 格式处理
-  if (Array.isArray(current) && Array.isArray(previous)) {
-    const currentText = current
-      .filter((b: unknown) => (b as Record<string, unknown>)?.type === 'text')
-      .map((b: unknown) => (b as Record<string, unknown>)?.text as string)
-      .join('');
-    const prevText = previous
-      .filter((b: unknown) => (b as Record<string, unknown>)?.type === 'text')
-      .map((b: unknown) => (b as Record<string, unknown>)?.text as string)
-      .join('');
-    return currentText.slice(prevText.length);
+  if (!prevText) {
+    console.log('[ArtifactParser] prevText empty, returning currentText');
+    return currentText;
   }
-  if (typeof current === 'string') {
-    return current;
+
+  // 累积格式: current 包含 previous
+  if (currentText.startsWith(prevText)) {
+    const delta = currentText.slice(prevText.length);
+    console.log('[ArtifactParser] cumulative format, delta:', JSON.stringify(delta).slice(0, 200));
+    return delta;
   }
-  return null;
+
+  // previous 包含 current（无新内容）
+  if (prevText.startsWith(currentText)) {
+    console.log('[ArtifactParser] retraction detected, returning null');
+    return null;
+  }
+
+  // 增量格式: current 是全新的文本
+  console.log('[ArtifactParser] incremental format, returning currentText');
+  return currentText;
 }
 
 export function useArtifactParser() {
@@ -55,8 +77,11 @@ export function useArtifactParser() {
           (prevState.streamingMessage as Record<string, unknown>)?.content,
         );
 
+        console.log('[ArtifactParser] delta extracted:', JSON.stringify(textDelta)?.slice(0, 200));
+
         if (parserRef.current && textDelta) {
           const result = parserRef.current.append(textDelta);
+          console.log('[ArtifactParser] parsed artifacts:', result.artifacts.length, 'plainText length:', result.plainText.length);
           syncArtifacts(result.artifacts, {
             runId: state.activeRunId,
             messageId: (state.streamingMessage as Record<string, unknown>)?.messageId as string | undefined,
@@ -68,6 +93,7 @@ export function useArtifactParser() {
       // 流结束
       if (!state.sending && prevState.sending && parserRef.current) {
         const result = parserRef.current.finalize();
+        console.log('[ArtifactParser] finalize artifacts:', result.artifacts.length);
         syncArtifacts(result.artifacts, {
           runId: state.activeRunId,
           status: 'complete',

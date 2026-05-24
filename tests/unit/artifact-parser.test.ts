@@ -112,4 +112,44 @@ More text
     expect(result.artifacts).toHaveLength(1);
     expect(result.artifacts[0].type).toBe('mermaid');
   });
+
+  it('infers html type from html code block', () => {
+    const text = '```html\n<div>Hello</div>\n```';
+    const result = ArtifactParser.parse(text, { treatCodeBlockAsArtifact: true });
+
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0].type).toBe('html');
+    expect(result.artifacts[0].meta.language).toBe('html');
+  });
+
+  it('handles streaming html code block across chunks', () => {
+    const parser = new ArtifactParser({ treatCodeBlockAsArtifact: true });
+
+    let result = parser.append('Here is some HTML:\n```html\n');
+    expect(result.artifacts).toHaveLength(0);
+    expect(result.plainText).toBe('Here is some HTML:\n');
+
+    result = parser.append('<div>Hello</div>\n');
+    expect(result.artifacts).toHaveLength(0);
+
+    result = parser.append('```\nAfter text');
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0].type).toBe('html');
+    expect(result.artifacts[0].content).toBe('<div>Hello</div>');
+    expect(result.plainText).toBe('Here is some HTML:\nAfter text');
+  });
+
+  it('handles code block start split across chunks', () => {
+    const parser = new ArtifactParser({ treatCodeBlockAsArtifact: true });
+
+    // First chunk contains incomplete fence start
+    let result = parser.append('```ht');
+    expect(result.artifacts).toHaveLength(0);
+
+    // Second chunk completes the fence start
+    result = parser.append('ml\n<div>Hello</div>\n```\n');
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0].type).toBe('html');
+    expect(result.artifacts[0].content).toBe('<div>Hello</div>');
+  });
 });
