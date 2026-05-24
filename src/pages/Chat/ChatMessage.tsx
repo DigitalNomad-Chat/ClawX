@@ -5,7 +5,7 @@
  * surfaced via ExecutionGraphCard, not inside message bubbles.
  */
 import { useState, useCallback, useEffect, memo } from 'react';
-import { Sparkles, Copy, Check, ChevronDown, ChevronRight, Wrench, FileText, Film, Music, FileArchive, File, X, FolderOpen, ZoomIn, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Sparkles, Copy, Check, ChevronDown, ChevronRight, Wrench, FileText, Film, Music, FileArchive, File, X, FolderOpen, ZoomIn, Loader2, CheckCircle2, AlertCircle, Play, Eye, EyeOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -17,7 +17,11 @@ import { invokeIpc, statFile } from '@/lib/api-client';
 import type { RawMessage, AttachedFileMeta } from '@/stores/chat';
 import { extractText, extractImages, extractToolUse, formatTimestamp } from './message-utils';
 import { repairMarkdown } from '@/lib/markdown-repair';
+import { restoreText } from '@/lib/desensitize';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useStreamArtifactStore } from '@/stores/stream-artifact';
+import { useArtifactPanel } from '@/stores/artifact-panel';
+import type { StreamArtifactType } from '@/lib/artifact/types';
 
 interface ChatMessageProps {
   message: RawMessage;
@@ -100,6 +104,16 @@ function fileNameFromPath(filePath: string): string {
 
 function trimPathTerminators(filePath: string): string {
   return filePath.replace(/[，。；;,.!?]+$/u, '');
+}
+
+const PREVIEWABLE_LANG_MAP: Record<string, StreamArtifactType> = {
+  html: 'html',
+  svg: 'svg',
+  mermaid: 'mermaid',
+};
+
+function getPreviewableType(lang: string): StreamArtifactType | null {
+  return PREVIEWABLE_LANG_MAP[lang.toLowerCase()] || null;
 }
 
 function extractPreviewDocumentPaths(text: string): AttachedFileMeta[] {
@@ -212,6 +226,12 @@ export const ChatMessage = memo(function ChatMessage({
   const role = typeof message.role === 'string' ? message.role.toLowerCase() : '';
   const isToolResult = role === 'toolresult' || role === 'tool_result';
   const text = textOverride ?? extractText(message);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const messageMap = (message as Record<string, unknown>)._desensitizeMap as Record<string, string> | undefined;
+  const hasDesensitized = !!messageMap && Object.keys(messageMap).length > 0;
+  const displayText = showOriginal && hasDesensitized && messageMap
+    ? restoreText(text, messageMap)
+    : text;
   // When text is folded into an ExecutionGraphCard, treat the message as
   // having no text for rendering purposes. Keeping this behind a flag (vs
   // blanking `text` outright) lets future hover affordances still read the
@@ -394,7 +414,7 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Main text bubble */}
         {hasText && (
           <MessageBubble
-            text={text}
+            text={displayText}
             isUser={isUser}
             isStreaming={isStreaming}
           />
@@ -450,16 +470,30 @@ export const ChatMessage = memo(function ChatMessage({
           </div>
         )}
 
-        {/* Hover row for user messages — timestamp only */}
-        {isUser && message.timestamp && (
-          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 select-none">
-            {formatTimestamp(message.timestamp)}
-          </span>
+        {/* Hover row for user messages — timestamp + desensitize toggle */}
+        {isUser && (
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 select-none">
+            {hasDesensitized && (
+              <button
+                onClick={() => setShowOriginal((prev) => !prev)}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                title={showOriginal ? '显示脱敏文本' : '显示原文'}
+              >
+                {showOriginal ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {showOriginal ? '脱敏' : '原文'}
+              </button>
+            )}
+            {message.timestamp && (
+              <span className="text-xs text-muted-foreground">
+                {formatTimestamp(message.timestamp)}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Hover row for assistant messages — only when there is real text content */}
         {!isUser && hasText && (
-          <AssistantHoverBar text={text} timestamp={message.timestamp} />
+          <AssistantHoverBar text={displayText} timestamp={message.timestamp} />
         )}
       </div>
 
@@ -558,6 +592,68 @@ function AssistantHoverBar({ text, timestamp }: { text: string; timestamp?: numb
 
 // ── Message Bubble ──────────────────────────────────────────────
 
+function CodeBlockToolbar({
+  code,
+  language,
+}: {
+  code: string;
+  language?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const previewType = language ? getPreviewableType(language) : null;
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [code]);
+
+  const handlePreview = useCallback(() => {
+    if (!previewType) return;
+    const content = code.replace(/\n$/, '');
+    const artifact = {
+      id: crypto.randomUUID(),
+      type: previewType,
+      title: `${previewType.toUpperCase()} 预览`,
+      content,
+      status: 'complete' as const,
+      meta: { language: language || undefined },
+      position: { start: 0, end: content.length },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sessionKey: 'manual-preview',
+    };
+    useStreamArtifactStore.getState().addArtifact(artifact);
+    useArtifactPanel.getState().openContent();
+  }, [code, language, previewType]);
+
+  return (
+    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 dark:bg-white/5 rounded-t-lg border-b border-border/30">
+      <span className="text-xs text-muted-foreground font-mono">{language || 'text'}</span>
+      <div className="flex items-center gap-1">
+        {previewType && (
+          <button
+            onClick={handlePreview}
+            className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 rounded transition-colors"
+            title="在面板中预览"
+          >
+            <Play className="h-3 w-3" />
+            <span>预览</span>
+          </button>
+        )}
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 rounded transition-colors"
+          title="复制"
+        >
+          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+          <span>{copied ? '已复制' : '复制'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MessageBubble({
   text,
   isUser,
@@ -590,6 +686,7 @@ function MessageBubble({
             components={{
               code({ className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '');
+                const language = match?.[1];
                 const isInline = !match && !className;
                 if (isInline) {
                   return (
@@ -598,12 +695,16 @@ function MessageBubble({
                     </code>
                   );
                 }
+                const codeText = String(children).replace(/\n$/, '');
                 return (
-                  <pre>
-                    <code className={cn(className)} {...props}>
-                      {children}
-                    </code>
-                  </pre>
+                  <div className="my-2 rounded-lg border border-border/30 overflow-hidden">
+                    <CodeBlockToolbar code={codeText} language={language} />
+                    <pre className="m-0 rounded-none bg-muted/30 dark:bg-white/5 px-4 py-3 overflow-x-auto">
+                      <code className={cn(className, 'text-sm font-mono leading-relaxed')} {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  </div>
                 );
               },
               a({ href, children }) {
