@@ -211,6 +211,35 @@ export async function handleFileRoutes(
     return true;
   }
 
+  if (url.pathname === '/api/files/extract-text' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{ stagedPath: string }>(req);
+      if (!body.stagedPath || typeof body.stagedPath !== 'string') {
+        sendJson(res, 400, { success: false, error: 'stagedPath is required' });
+        return true;
+      }
+      const fsP = await import('node:fs/promises');
+      const data = await fsP.readFile(body.stagedPath);
+      const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      const loadingTask = getDocument({ data: new Uint8Array(data) });
+      const pdf = await loadingTask.promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: Record<string, unknown>) => item.str)
+          .join('');
+        fullText += pageText + '\n';
+      }
+      sendJson(res, 200, { success: true, text: fullText, pageCount: pdf.numPages });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { success: false, error: `PDF text extraction failed: ${message}` });
+    }
+    return true;
+  }
+
   if (url.pathname === '/api/files/save-image' && req.method === 'POST') {
     try {
       const body = await parseJsonBody<{

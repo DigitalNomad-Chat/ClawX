@@ -74,9 +74,34 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
       if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
         text = await file.text();
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        toast.info('PDF 文件暂需手动粘贴文本内容');
-        setStep('upload');
-        return;
+        // Stage PDF file to disk then extract text via backend
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            resolve(dataUrl.split(',')[1]);
+          };
+          reader.onerror = () => reject(new Error('Failed to read PDF file'));
+          reader.readAsDataURL(file);
+        });
+        const staged = await hostApiFetch<{
+          id: string;
+          fileName: string;
+          mimeType: string;
+          fileSize: number;
+          stagedPath: string;
+        }>('/api/files/stage-buffer', {
+          method: 'POST',
+          body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type || 'application/pdf' }),
+        });
+        const extracted = await hostApiFetch<{ success: boolean; text?: string; pageCount?: number; error?: string }>(
+          '/api/files/extract-text',
+          { method: 'POST', body: JSON.stringify({ stagedPath: staged.stagedPath }) },
+        );
+        if (!extracted.success || extracted.text == null) {
+          throw new Error(extracted.error || 'PDF 文本提取失败');
+        }
+        text = extracted.text;
       } else if (file.type.startsWith('image/')) {
         toast.info('图片文件暂需手动粘贴 OCR 结果');
         setStep('upload');
