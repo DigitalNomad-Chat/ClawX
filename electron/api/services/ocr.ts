@@ -1,4 +1,22 @@
 import { createWorker, Worker } from 'tesseract.js';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function resolveTessdataDir(): string {
+  // Production: Electron app resources path
+  const prodPath = join(process.resourcesPath || '', 'tessdata');
+  if (existsSync(prodPath)) return prodPath;
+  // Development: relative to this file (electron/api/services -> project root)
+  const devPath = join(__dirname, '..', '..', '..', 'resources', 'tessdata');
+  if (existsSync(devPath)) return devPath;
+  // Fallback
+  return prodPath;
+}
+
+const TESSDATA_DIR = resolveTessdataDir();
 
 let worker: Worker | null = null;
 let workerLangs = '';
@@ -10,6 +28,10 @@ async function getWorker(langs: string): Promise<Worker> {
     }
     worker = await createWorker(langs, 1, {
       logger: () => {},
+      langPath: TESSDATA_DIR,
+      cachePath: TESSDATA_DIR,
+      cacheMethod: 'readOnly',
+      gzip: false,
     });
     workerLangs = langs;
   }
