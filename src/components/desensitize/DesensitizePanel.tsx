@@ -25,7 +25,6 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
   const [originalText, setOriginalText] = useState('');
   const [desensitizedText, setDesensitizedText] = useState('');
   const [sensitiveMap, setSensitiveMap] = useState<SensitiveMap>({});
-  const [isProcessing, setIsProcessing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +33,6 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
     setOriginalText('');
     setDesensitizedText('');
     setSensitiveMap({});
-    setIsProcessing(false);
     setDragOver(false);
   }, []);
 
@@ -48,7 +46,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
       toast.error('请输入或上传需要脱敏的内容');
       return;
     }
-    setIsProcessing(true);
+    setStep('processing');
     setOriginalText(text);
     try {
       const result = await hostApiFetch<{ success: boolean; text?: string; map?: SensitiveMap; error?: string }>(
@@ -63,26 +61,25 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
       setStep('preview');
     } catch (error) {
       toast.error(`脱敏失败: ${String(error)}`);
-    } finally {
-      setIsProcessing(false);
+      setStep('upload');
     }
   }, []);
 
   const handleFileSelect = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    setIsProcessing(true);
+    setStep('processing');
     try {
       let text = '';
       if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
         text = await file.text();
       } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
         toast.info('PDF 文件暂需手动粘贴文本内容');
-        setIsProcessing(false);
+        setStep('upload');
         return;
       } else if (file.type.startsWith('image/')) {
         toast.info('图片文件暂需手动粘贴 OCR 结果');
-        setIsProcessing(false);
+        setStep('upload');
         return;
       } else {
         text = await file.text();
@@ -90,7 +87,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
       await processText(text);
     } catch (error) {
       toast.error(`读取文件失败: ${String(error)}`);
-      setIsProcessing(false);
+      setStep('upload');
     }
   }, [processText]);
 

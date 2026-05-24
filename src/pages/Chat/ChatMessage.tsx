@@ -229,7 +229,7 @@ export const ChatMessage = memo(function ChatMessage({
   const text = textOverride ?? extractText(message);
   const [showOriginal, setShowOriginal] = useState(false);
   const globalShowOriginal = useDesensitizeViewStore((s) => s.globalShowOriginal);
-  const messageMap = (message as Record<string, unknown>)._desensitizeMap as Record<string, string> | undefined;
+  const messageMap = (message as unknown as Record<string, unknown>)._desensitizeMap as Record<string, string> | undefined;
   const hasDesensitized = !!messageMap && Object.keys(messageMap).length > 0;
   const effectiveShowOriginal = showOriginal || globalShowOriginal;
   const displayText = effectiveShowOriginal && hasDesensitized && messageMap
