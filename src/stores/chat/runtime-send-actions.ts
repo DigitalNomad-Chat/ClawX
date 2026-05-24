@@ -50,6 +50,7 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
       text: string,
       attachments?: Array<{ fileName: string; mimeType: string; fileSize: number; stagedPath: string; preview: string | null }>,
       targetAgentId?: string | null,
+      desensitizeMap?: Record<string, string>,
     ) => {
       const trimmed = text.trim();
       if (!trimmed && (!attachments || attachments.length === 0)) return;
@@ -102,6 +103,7 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
           filePath: a.stagedPath,
           source: 'user-upload',
         })),
+        _desensitizeMap: desensitizeMap,
       };
       set((s) => ({
         messages: [...s.messages, userMsg],

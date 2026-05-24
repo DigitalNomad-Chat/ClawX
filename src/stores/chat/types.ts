@@ -34,6 +34,8 @@ export interface RawMessage {
   error_message?: string;
   /** Local-only: file metadata for user-uploaded attachments (not sent to/from Gateway) */
   _attachedFiles?: AttachedFileMeta[];
+  /** Local-only: desensitize map for restoring original PII */
+  _desensitizeMap?: Record<string, string>;
 }
 
 /** Content block inside a message */
@@ -138,6 +140,7 @@ export interface ChatState {
       preview: string | null;
     }>,
     targetAgentId?: string | null,
+    desensitizeMap?: Record<string, string>,
   ) => Promise<void>;
   abortRun: () => Promise<void>;
   handleChatEvent: (event: Record<string, unknown>) => void;
