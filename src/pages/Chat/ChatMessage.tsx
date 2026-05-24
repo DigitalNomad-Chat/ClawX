@@ -21,6 +21,7 @@ import { restoreText } from '@/lib/desensitize';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useStreamArtifactStore } from '@/stores/stream-artifact';
 import { useArtifactPanel } from '@/stores/artifact-panel';
+import { useDesensitizeViewStore } from '@/stores/desensitize-view';
 import type { StreamArtifactType } from '@/lib/artifact/types';
 
 interface ChatMessageProps {
@@ -227,9 +228,11 @@ export const ChatMessage = memo(function ChatMessage({
   const isToolResult = role === 'toolresult' || role === 'tool_result';
   const text = textOverride ?? extractText(message);
   const [showOriginal, setShowOriginal] = useState(false);
+  const globalShowOriginal = useDesensitizeViewStore((s) => s.globalShowOriginal);
   const messageMap = (message as Record<string, unknown>)._desensitizeMap as Record<string, string> | undefined;
   const hasDesensitized = !!messageMap && Object.keys(messageMap).length > 0;
-  const displayText = showOriginal && hasDesensitized && messageMap
+  const effectiveShowOriginal = showOriginal || globalShowOriginal;
+  const displayText = effectiveShowOriginal && hasDesensitized && messageMap
     ? restoreText(text, messageMap)
     : text;
   // When text is folded into an ExecutionGraphCard, treat the message as
