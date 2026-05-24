@@ -835,7 +835,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               disabled={disabled}
               data-testid="chat-composer-input"
               className={cn(
-                'relative min-h-[48px] max-h-[240px] resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent p-0 text-sm leading-relaxed placeholder:text-muted-foreground/60',
+                'relative min-h-[48px] max-h-[240px] resize-none overflow-y-auto border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent p-0 text-sm leading-relaxed placeholder:text-muted-foreground/60',
                 skillTokenRanges.length > 0 ? 'z-0 text-transparent caret-foreground selection:bg-primary/20' : 'z-10',
               )}
               rows={1}
