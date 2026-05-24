@@ -17,7 +17,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { FilePreviewTarget } from '@/components/file-preview/types';
 
-export type ArtifactTab = 'changes' | 'preview' | 'browser';
+export type ArtifactTab = 'changes' | 'preview' | 'content' | 'browser';
 
 /** Width clamp (% of the chat container). */
 export const ARTIFACT_PANEL_MIN_WIDTH = 28;
@@ -44,6 +44,8 @@ interface ArtifactPanelState {
   openPreview: (file?: FilePreviewTarget | null) => void;
   /** Open the workspace browser tab. */
   openBrowser: () => void;
+  /** Open the content tab for stream artifacts. */
+  openContent: () => void;
   toggle: () => void;
   close: () => void;
   /** Update the panel width (clamped). */
@@ -73,6 +75,7 @@ export const useArtifactPanel = create<ArtifactPanelState>()(
       openChanges: (file = null) => set({ open: true, tab: 'changes', focusedFile: file ?? null }),
       openPreview: (file = null) => set({ open: true, tab: 'preview', focusedFile: file ?? null }),
       openBrowser: () => set({ open: true, tab: 'browser', focusedFile: get().focusedFile }),
+      openContent: () => set({ open: true, tab: 'content', focusedFile: get().focusedFile }),
       toggle: () => set((s) => ({ open: !s.open })),
       close: () => set({ open: false, focusedFile: null }),
       setWidthPct: (pct) => set({ widthPct: clampWidth(pct) }),

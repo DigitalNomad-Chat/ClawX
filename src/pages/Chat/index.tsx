@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useStickToBottomInstant } from '@/hooks/use-stick-to-bottom-instant';
 import { useMinLoading } from '@/hooks/use-min-loading';
+import { useArtifactParser } from './useArtifactParser';
 import { extractGeneratedFiles, generatedFileHasDiffPayload, type GeneratedFile } from '@/lib/generated-files';
 import { GeneratedFilesPanel } from '@/components/file-preview/GeneratedFilesPanel';
 import type { FilePreviewTarget } from '@/components/file-preview/types';
@@ -134,6 +135,7 @@ export function Chat() {
   const openPreview = useArtifactPanel((s) => s.openPreview);
   const closeArtifactPanel = useArtifactPanel((s) => s.close);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  useArtifactParser(); // 订阅流式事件，解析 artifact
   // Close the panel when the session changes — its contents would otherwise
   // be stale (file list belongs to the previous chat).
   useEffect(() => {
