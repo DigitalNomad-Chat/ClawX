@@ -37,7 +37,6 @@ export class ArtifactParser {
   private buffer = '';
   private fenceState: FenceState = { type: 'none' };
   private artifacts: StreamArtifact[] = [];
-  private errors: ParseError[] = [];
   private plainTextParts: string[] = [];
   private currentPlainTextStart = 0;
   private lastProcessedIndex = 0;
@@ -76,7 +75,6 @@ export class ArtifactParser {
     this.buffer = '';
     this.fenceState = { type: 'none' };
     this.artifacts = [];
-    this.errors = [];
     this.plainTextParts = [];
     this.currentPlainTextStart = 0;
     this.lastProcessedIndex = 0;
