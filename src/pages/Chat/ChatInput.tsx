@@ -7,7 +7,7 @@
  * are sent with the message (no base64 over WebSocket).
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown } from 'lucide-react';
+import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,6 +26,8 @@ import type { QuickAccessSkill } from '@/types/skill';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { rendererExtensionRegistry } from '@/extensions/registry';
+import { DesensitizePanel } from '@/components/desensitize/DesensitizePanel';
+import type { SensitiveMap } from '@/lib/desensitize';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ export interface FileAttachment {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, attachments?: FileAttachment[], targetAgentId?: string | null) => void;
+  onSend: (text: string, attachments?: FileAttachment[], targetAgentId?: string | null, desensitizeMap?: SensitiveMap) => void;
   onStop?: () => void;
   disabled?: boolean;
   sending?: boolean;
@@ -203,6 +205,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   const [selectedSkill, setSelectedSkill] = useState<QuickAccessSkill | null>(null);
   const [switchingModelRef, setSwitchingModelRef] = useState<string | null>(null);
   const [optimisticModelRef, setOptimisticModelRef] = useState<string | null>(null);
+  const [desensitizeOpen, setDesensitizeOpen] = useState(false);
+  const desensitizeMapRef = useRef<SensitiveMap | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const skillPickerRef = useRef<HTMLDivElement>(null);
@@ -625,7 +629,9 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    onSend(textToSend, attachmentsToSend, targetAgentId);
+    const desensitizeMap = desensitizeMapRef.current;
+    desensitizeMapRef.current = undefined;
+    onSend(textToSend, attachmentsToSend, targetAgentId, desensitizeMap);
     setTargetAgentId(null);
     setPickerOpen(false);
     setSkillPickerOpen(false);
@@ -854,6 +860,18 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               title={t('composer.attachFiles')}
             >
               <Paperclip className="h-3.5 w-3.5" />
+            </Button>
+
+            {/* Desensitize Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 h-8 w-8 rounded-lg text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-colors"
+              onClick={() => setDesensitizeOpen(true)}
+              disabled={disabled || sending}
+              title="脱敏工具"
+            >
+              <Shield className="h-3.5 w-3.5" />
             </Button>
 
             {showAgentPicker && (
@@ -1089,6 +1107,17 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
           )}
         </div>
       </div>
+
+      <DesensitizePanel
+        open={desensitizeOpen}
+        onClose={() => setDesensitizeOpen(false)}
+        onConfirm={(text, map) => {
+          setInput(text);
+          desensitizeMapRef.current = map;
+          setDesensitizeOpen(false);
+          textareaRef.current?.focus();
+        }}
+      />
     </div>
   );
 }
