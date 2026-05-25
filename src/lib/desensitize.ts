@@ -19,6 +19,29 @@ export function restoreText(text: string, map: SensitiveMap): string {
   return result;
 }
 
+export function markSensitive(
+  text: string,
+  existingMap: SensitiveMap,
+  selection: string,
+  type: string,
+): { text: string; map: SensitiveMap } {
+  const existingCounters = Object.keys(existingMap)
+    .map((k) => {
+      const m = k.match(/__PII_\w+_(\d+)__/);
+      return m ? parseInt(m[1], 10) : 0;
+    })
+    .filter((n) => !isNaN(n));
+  const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
+
+  const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
+  const idx = text.indexOf(selection);
+  if (idx === -1) return { text, map: existingMap };
+
+  const newText = text.slice(0, idx) + placeholder + text.slice(idx + selection.length);
+  const newMap = { ...existingMap, [placeholder]: selection };
+  return { text: newText, map: newMap };
+}
+
 export function hasPlaceholders(text: string): boolean {
   return /__PII_\w+_\d{8}__/.test(text);
 }

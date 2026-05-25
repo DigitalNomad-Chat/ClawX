@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Shield, Upload, X, Loader2, Check } from 'lucide-react';
+import { Shield, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,6 +26,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
   const [desensitizedText, setDesensitizedText] = useState('');
   const [sensitiveMap, setSensitiveMap] = useState<SensitiveMap>({});
   const [dragOver, setDragOver] = useState(false);
+  const [inputText, setInputText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = useCallback(() => {
@@ -34,6 +35,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
     setDesensitizedText('');
     setSensitiveMap({});
     setDragOver(false);
+    setInputText('');
   }, []);
 
   const handleClose = useCallback(() => {
@@ -145,7 +147,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col overflow-hidden">
         <SheetHeader className="shrink-0">
           <SheetTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
@@ -156,9 +158,9 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 min-h-0 mt-4 flex flex-col">
+        <div className="flex-1 min-h-0 mt-4 flex flex-col overflow-hidden">
           {step === 'upload' && (
-            <div className="flex flex-col gap-4 h-full">
+            <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
               {/* Drag & Drop Area */}
               <div
                 className={cn(
@@ -193,48 +195,47 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
               </div>
 
               {/* Text Paste */}
-              <div className="flex flex-col gap-2 flex-1 min-h-0">
-                <div className="text-sm font-medium text-muted-foreground">或直接粘贴文本</div>
+              <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
+                <div className="text-sm font-medium text-muted-foreground shrink-0">或直接粘贴文本</div>
                 <textarea
-                  className="flex-1 min-h-[120px] resize-none rounded-xl border border-border/60 bg-muted/20 p-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="flex-1 min-h-0 resize-none rounded-xl border border-border/60 bg-muted/20 p-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 overflow-y-auto"
                   placeholder="将需要脱敏的文本粘贴到此处..."
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData('text/plain');
-                    if (text) {
-                      e.preventDefault();
-                      void processText(text);
-                    }
-                  }}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
                 />
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="flex items-center justify-end gap-2 shrink-0 pt-3 border-t border-border/30">
+                <Button variant="outline" size="sm" onClick={handleClose}>
+                  关闭
+                </Button>
+                <Button size="sm" onClick={() => void processText(inputText)}>
+                  下一步
+                </Button>
               </div>
             </div>
           )}
 
           {step === 'processing' && (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="flex flex-col items-center justify-center flex-1 min-h-0 gap-3 overflow-hidden">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <span className="text-sm text-muted-foreground">正在进行脱敏处理...</span>
             </div>
           )}
 
           {step === 'preview' && (
-            <div className="flex flex-col gap-3 h-full min-h-0">
-              <DesensitizePreview
-                originalText={originalText}
-                desensitizedText={desensitizedText}
-                sensitiveMap={sensitiveMap}
-              />
-              <div className="flex items-center justify-end gap-2 shrink-0 pt-2 border-t border-border/30">
-                <Button variant="outline" size="sm" onClick={reset}>
-                  <X className="h-3.5 w-3.5 mr-1" />
-                  重新上传
-                </Button>
-                <Button size="sm" onClick={handleConfirm}>
-                  <Check className="h-3.5 w-3.5 mr-1" />
-                  填入输入框
-                </Button>
-              </div>
-            </div>
+            <DesensitizePreview
+              originalText={originalText}
+              desensitizedText={desensitizedText}
+              sensitiveMap={sensitiveMap}
+              onChange={(text, map) => {
+                setDesensitizedText(text);
+                setSensitiveMap(map);
+              }}
+              onConfirm={handleConfirm}
+              onReset={reset}
+            />
           )}
         </div>
       </SheetContent>
