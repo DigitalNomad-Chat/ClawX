@@ -238,7 +238,8 @@ export async function handleFileRoutes(
       }
 
       // Scanned/image-based PDF: render pages to images then OCR
-      const pageBuffers = await renderPdfPages(data, 2.0);
+      // Pass file path to the isolated worker process instead of buffer
+      const pageBuffers = await renderPdfPages(body.stagedPath, 2.0);
       const ocrText = await recognizeMultiple(pageBuffers, 'chi_sim+eng');
       sendJson(res, 200, {
         success: true,

@@ -1,144 +1,102 @@
-import { createCanvas, Canvas } from '@napi-rs/canvas';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import * as path from 'node:path';
+import { spawn } from 'node:child_process';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { readFile, unlink, rmdir } from 'node:fs/promises';
 
-/**
- * Create a pdfjs-dist-compatible canvas context wrapper.
- *
- * @napi-rs/canvas is not 100% API-compatible with the browser Canvas 2D
- * context. pdfjs-dist calls some methods in ways napi-rs does not accept
- * (e.g. ctx.fill() / ctx.stroke() with no arguments, Path2D usage).
- * This proxy intercepts those calls and adapts them.
- */
-function createPdfjsCompatibleContext(canvas: Canvas) {
-  const ctx = canvas.getContext('2d');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WORKER_PATH = join(__dirname, 'pdf-render-worker.mjs');
 
-  return new Proxy(ctx as any, {
-    get(target, prop) {
-      const value = target[prop];
-
-      if (prop === 'fill') {
-        return function (...args: any[]) {
-          // napi-rs/canvas requires fill(rule: string) or fill(path: Path)
-          // pdfjs-dist sometimes calls fill() with no args
-          if (args.length === 0) {
-            return target.fill('evenodd');
-          }
-          return target.fill(...args);
-        };
-      }
-
-      if (prop === 'stroke') {
-        return function (...args: any[]) {
-          // napi-rs/canvas requires stroke(path: Path) or no-arg
-          // pdfjs-dist sometimes passes extra args napi-rs rejects
-          if (args.length === 0) {
-            return target.stroke();
-          }
-          return target.stroke(...args);
-        };
-      }
-
-      if (prop === 'createPattern') {
-        return function (image: any, repetition: string) {
-          // napi-rs/canvas createPattern may not accept all image types
-          try {
-            return target.createPattern(image, repetition);
-          } catch {
-            // Fallback: return a dummy pattern object
-            return {
-              setTransform: () => {},
-            };
-          }
-        };
-      }
-
-      if (prop === 'setTransform') {
-        return function (...args: any[]) {
-          // Handle both DOMMatrix and 6-number signatures
-          if (args.length === 1 && args[0] != null && typeof args[0] === 'object') {
-            const m = args[0];
-            if (typeof m.a === 'number') {
-              return target.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
-            }
-          }
-          return target.setTransform(...args);
-        };
-      }
-
-      if (typeof value === 'function') {
-        return value.bind(target);
-      }
-
-      return value;
-    },
-  });
+interface WorkerMessage {
+  type: 'page' | 'done' | 'error';
+  index?: number;
+  pngPath?: string;
+  pageCount?: number;
+  pngPaths?: string[];
+  tmpDir?: string;
+  message?: string;
 }
 
 /**
- * Render a single PDF page to a PNG image buffer using pdfjs-dist + @napi-rs/canvas.
- * @param buffer Raw PDF bytes
- * @param pageNum 1-based page number
- * @param scale Render scale (default 2.0 for 144 DPI)
+ * Render a single PDF page to a PNG image buffer by spawning an isolated
+ * Node.js worker process. This prevents native canvas crashes from taking
+ * down the Electron main process.
  */
 export async function renderPdfPage(
-  buffer: Buffer,
+  pdfPath: string,
   pageNum: number,
-  scale = 2.0,
+  _scale = 2.0,
 ): Promise<Buffer> {
-  const cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps/') + '/';
-  const data = new Uint8Array(buffer);
-  const doc = await pdfjsLib.getDocument({
-    data,
-    cMapUrl,
-    cMapPacked: true,
-    useSystemFonts: true,
-  }).promise;
-
-  try {
-    const page = await doc.getPage(pageNum);
-    const viewport = page.getViewport({ scale });
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const ctx = createPdfjsCompatibleContext(canvas);
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    const pngBuffer = await canvas.encode('png');
-    return Buffer.from(pngBuffer);
-  } finally {
-    await doc.destroy();
-  }
+  const pages = await renderPdfPages(pdfPath, _scale);
+  return pages[pageNum - 1];
 }
 
 /**
- * Render all pages of a PDF to PNG image buffers.
+ * Render all pages of a PDF to PNG image buffers via an isolated worker.
  */
 export async function renderPdfPages(
-  buffer: Buffer,
+  pdfPath: string,
   scale = 2.0,
 ): Promise<Buffer[]> {
-  const cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps/') + '/';
-  const data = new Uint8Array(buffer);
-  const doc = await pdfjsLib.getDocument({
-    data,
-    cMapUrl,
-    cMapPacked: true,
-    useSystemFonts: true,
-  }).promise;
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [WORKER_PATH], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
 
-  try {
-    const pages: Buffer[] = [];
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale });
-      const canvas = createCanvas(viewport.width, viewport.height);
-      const ctx = createPdfjsCompatibleContext(canvas);
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      const pngBuffer = await canvas.encode('png');
-      pages.push(Buffer.from(pngBuffer));
-    }
-    return pages;
-  } finally {
-    await doc.destroy();
-  }
+    const pngPaths: string[] = [];
+    let tmpDir = '';
+    let stderrData = '';
+
+    child.stderr.on('data', (chunk) => {
+      stderrData += chunk.toString();
+    });
+
+    child.stdout.on('data', (chunk) => {
+      const lines = chunk.toString().split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const msg: WorkerMessage = JSON.parse(line);
+          if (msg.type === 'page' && msg.pngPath) {
+            pngPaths.push(msg.pngPath);
+          } else if (msg.type === 'done') {
+            tmpDir = msg.tmpDir || '';
+          } else if (msg.type === 'error') {
+            reject(new Error(msg.message || 'PDF render worker error'));
+            return;
+          }
+        } catch {
+          // Ignore non-JSON lines (e.g. warnings)
+        }
+      }
+    });
+
+    child.on('close', async (code) => {
+      if (code !== 0) {
+        reject(new Error(`PDF render worker exited with code ${code}: ${stderrData}`));
+        return;
+      }
+      try {
+        const buffers = await Promise.all(
+          pngPaths.map((p) => readFile(p)),
+        );
+        // Clean up temp files
+        for (const p of pngPaths) {
+          try { await unlink(p); } catch { /* ignore */ }
+        }
+        if (tmpDir) {
+          try { await rmdir(tmpDir); } catch { /* ignore */ }
+        }
+        resolve(buffers);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    child.on('error', (error) => {
+      reject(new Error(`Failed to spawn PDF render worker: ${error.message}`));
+    });
+
+    // Send input to worker
+    child.stdin.write(JSON.stringify({ pdfPath, scale }));
+    child.stdin.end();
+  });
 }
