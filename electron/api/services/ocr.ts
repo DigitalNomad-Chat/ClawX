@@ -1,19 +1,16 @@
 import { createWorker, Worker } from 'tesseract.js';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 function resolveTessdataDir(): string {
-  // Production: Electron app resources path
-  const prodPath = join(process.resourcesPath || '', 'tessdata');
-  if (existsSync(prodPath)) return prodPath;
-  // Development: relative to this file (electron/api/services -> project root)
-  const devPath = join(__dirname, '..', '..', '..', 'resources', 'tessdata');
+  const { app } = require('electron');
+  if (app?.isPackaged) {
+    return join(process.resourcesPath, 'tessdata');
+  }
+  // Dev mode: project root / resources / tessdata
+  const devPath = join(process.cwd(), 'resources', 'tessdata');
   if (existsSync(devPath)) return devPath;
-  // Fallback
-  return prodPath;
+  return join(process.resourcesPath, 'tessdata');
 }
 
 const TESSDATA_DIR = resolveTessdataDir();
