@@ -32,7 +32,8 @@
     "artifactPanel": {
         "tabs": {
             "changes": "变更",
-            "preview": "预览",
+            "preview": "源码",
+            "content": "预览",
             "browser": "工作空间"
         },
         "actions": {

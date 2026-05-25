@@ -3,17 +3,48 @@
  * Lives directly under the ExecutionGraphCard for each user trigger
  * (see Chat/index.tsx).
  */
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, MonitorPlay } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { invokeIpc } from '@/lib/api-client';
+import { invokeIpc, readTextFile } from '@/lib/api-client';
 import {
   computeLineStats,
   supportsInlineDiff,
   supportsRichDocumentPreview,
   type GeneratedFile,
 } from '@/lib/generated-files';
+import { useArtifactPanel } from '@/stores/artifact-panel';
+import { useStreamArtifactStore } from '@/stores/stream-artifact';
+import type { StreamArtifact, StreamArtifactType } from '@/lib/artifact/types';
+
+/** File extensions that can be rendered as stream artifacts. */
+const RENDERABLE_EXTENSIONS = new Set<string>([
+  '.html', '.htm', '.svg', '.md', '.markdown', '.mermaid', '.mmd',
+]);
+
+function extToArtifactType(ext: string): StreamArtifactType | null {
+  switch (ext.toLowerCase()) {
+    case '.html':
+    case '.htm':
+      return 'html';
+    case '.svg':
+      return 'svg';
+    case '.md':
+    case '.markdown':
+      return 'document';
+    case '.mermaid':
+    case '.mmd':
+      return 'mermaid';
+    default:
+      return null;
+  }
+}
+
+function isRenderable(ext: string): boolean {
+  return RENDERABLE_EXTENSIONS.has(ext.toLowerCase());
+}
 
 export interface GeneratedFilesPanelProps {
   files: GeneratedFile[];
@@ -29,6 +60,41 @@ export function GeneratedFilesPanel({
   className,
 }: GeneratedFilesPanelProps) {
   const { t } = useTranslation('chat');
+  const openContent = useArtifactPanel((s) => s.openContent);
+
+  const handleRenderPreview = useCallback(async (file: GeneratedFile) => {
+    const artifactType = extToArtifactType(file.ext);
+    if (!artifactType) return;
+
+    let content = file.fullContent ?? '';
+
+    if (!content) {
+      try {
+        const res = await readTextFile(file.filePath);
+        if (!res.ok) return;
+        content = res.content ?? '';
+      } catch {
+        return;
+      }
+    }
+
+    const artifact: StreamArtifact = {
+      id: `file-card-${file.filePath}-${Date.now()}`,
+      type: artifactType,
+      title: file.fileName,
+      content,
+      status: 'complete',
+      meta: { filename: file.fileName, language: file.ext },
+      position: { start: 0, end: content.length },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sessionKey: `file-card-${Date.now()}`,
+    };
+
+    useStreamArtifactStore.getState().addArtifact(artifact);
+    useStreamArtifactStore.getState().selectArtifact(artifact.id);
+    openContent();
+  }, [openContent]);
 
   if (!files.length) return null;
 
@@ -52,6 +118,7 @@ export function GeneratedFilesPanel({
           const lineStats = computeLineStats(file);
           const clickable = supportsInlineDiff(file);
           const revealOnly = supportsRichDocumentPreview(file.ext);
+          const renderable = isRenderable(file.ext);
           if (revealOnly) {
             return (
               <button
@@ -113,6 +180,19 @@ export function GeneratedFilesPanel({
                   ? t('generatedFiles.created', 'Created')
                   : t('generatedFiles.modified', 'Modified')}
               </Badge>
+              {renderable && (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 cursor-pointer rounded-full border border-blue-500/20 bg-blue-500/10 px-1.5 py-0.5 text-2xs text-blue-600 transition-colors hover:bg-blue-500/20 dark:text-blue-400 dark:border-blue-400/20 dark:bg-blue-400/10 dark:hover:bg-blue-400/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleRenderPreview(file);
+                  }}
+                >
+                  <MonitorPlay className="mr-1 h-3 w-3" />
+                  {t('generatedFiles.renderPreview', '渲染预览')}
+                </Badge>
+              )}
             </button>
           );
         })}

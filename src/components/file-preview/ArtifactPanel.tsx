@@ -16,16 +16,18 @@
  * `useArtifactPanel` zustand store so any part of the page (file cards,
  * toolbar buttons, "View file changes →" links) can drive it.
  */
-import { useLayoutEffect, useMemo } from 'react';
-import { Eye, FileEdit, FolderOpen, FolderTree, X, FileText } from 'lucide-react';
+import { useLayoutEffect, useMemo, useCallback } from 'react';
+import { Eye, FileEdit, FolderOpen, FolderTree, X, Code2, MonitorPlay } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supportsRichDocumentPreview, type GeneratedFile } from '@/lib/generated-files';
-import { invokeIpc } from '@/lib/api-client';
+import { invokeIpc, readTextFile } from '@/lib/api-client';
 import type { AgentSummary } from '@/types/agent';
 import { useArtifactPanel } from '@/stores/artifact-panel';
+import { useStreamArtifactStore } from '@/stores/stream-artifact';
+import type { StreamArtifact, StreamArtifactType } from '@/lib/artifact/types';
 import type { FilePreviewTarget } from './types';
 import { FilePreviewBody } from './FilePreviewBody';
 import { WorkspaceBrowserBody } from './WorkspaceBrowserBody';
@@ -84,15 +86,15 @@ export function ArtifactPanel({ files, agent, runStartedAt, refreshSignal }: Art
           )}
           <PanelTabButton
             testId="artifact-panel-tab-preview"
-            icon={<Eye className="h-3.5 w-3.5" />}
-            label={t('artifactPanel.tabs.preview', 'Preview')}
+            icon={<Code2 className="h-3.5 w-3.5" />}
+            label={t('artifactPanel.tabs.preview', '源码')}
             active={visibleTab === 'preview'}
             onClick={() => setTab('preview')}
           />
           <PanelTabButton
             testId="artifact-panel-tab-content"
-            icon={<FileText className="h-3.5 w-3.5" />}
-            label={t('artifactPanel.tabs.content', 'Content')}
+            icon={<Eye className="h-3.5 w-3.5" />}
+            label={t('artifactPanel.tabs.content', '预览')}
             active={visibleTab === 'content'}
             onClick={() => setTab('content')}
           />
@@ -236,12 +238,78 @@ function ChangesTab({ files, focusedFile, onFocus }: ChangesTabProps) {
   );
 }
 
+/** File extensions that can be rendered as stream artifacts in the Preview tab. */
+const RENDERABLE_EXTENSIONS = new Set<string>([
+  '.html', '.htm', '.svg', '.md', '.markdown', '.mermaid', '.mmd',
+]);
+
+/** Map file extension to the corresponding StreamArtifact type. */
+function extToArtifactType(ext: string): StreamArtifactType | null {
+  switch (ext.toLowerCase()) {
+    case '.html':
+    case '.htm':
+      return 'html';
+    case '.svg':
+      return 'svg';
+    case '.md':
+    case '.markdown':
+      return 'document';
+    case '.mermaid':
+    case '.mmd':
+      return 'mermaid';
+    default:
+      return null;
+  }
+}
+
 interface PreviewTabProps {
   focusedFile: FilePreviewTarget | null;
 }
 
 function PreviewTab({ focusedFile }: PreviewTabProps) {
   const { t } = useTranslation('chat');
+  const openContent = useArtifactPanel((s) => s.openContent);
+
+  const handleRenderInPreview = useCallback(async () => {
+    if (!focusedFile) return;
+    const artifactType = extToArtifactType(focusedFile.ext);
+    if (!artifactType) return;
+
+    let content = focusedFile.fullContent ?? '';
+
+    // If fullContent is not available (e.g. opened from workspace), read from disk.
+    if (!content) {
+      try {
+        const res = await readTextFile(focusedFile.filePath);
+        if (!res.ok) {
+          toast.error(t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: res.error }));
+          return;
+        }
+        content = res.content ?? '';
+      } catch (err) {
+        toast.error(t('filePreview.errors.loadFailed', { defaultValue: 'Load failed: {{error}}', error: String(err) }));
+        return;
+      }
+    }
+
+    const artifact: StreamArtifact = {
+      id: `file-preview-${focusedFile.filePath}-${Date.now()}`,
+      type: artifactType,
+      title: focusedFile.fileName,
+      content,
+      status: 'complete',
+      meta: { filename: focusedFile.fileName, language: focusedFile.ext },
+      position: { start: 0, end: content.length },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sessionKey: `file-preview-${Date.now()}`,
+    };
+
+    useStreamArtifactStore.getState().addArtifact(artifact);
+    useStreamArtifactStore.getState().selectArtifact(artifact.id);
+    openContent();
+  }, [focusedFile, openContent, t]);
+
   if (!focusedFile) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -257,7 +325,34 @@ function PreviewTab({ focusedFile }: PreviewTabProps) {
       </div>
     );
   }
-  return <FilePreviewBody key={focusedFile.filePath} file={focusedFile} compact mode="preview" />;
+
+  const canRender = RENDERABLE_EXTENSIONS.has(focusedFile.ext.toLowerCase());
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {canRender && (
+        <div className="flex shrink-0 items-center justify-end border-b border-black/5 px-3 py-1.5 dark:border-white/10">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={handleRenderInPreview}
+          >
+            <MonitorPlay className="h-3.5 w-3.5" />
+            {t('artifactPanel.preview.renderInPreview', '渲染预览')}
+          </Button>
+        </div>
+      )}
+      <div className="min-h-0 flex-1">
+        <FilePreviewBody
+          key={focusedFile.filePath}
+          file={focusedFile}
+          compact
+          mode="preview"
+        />
+      </div>
+    </div>
+  );
 }
 
 export default ArtifactPanel;

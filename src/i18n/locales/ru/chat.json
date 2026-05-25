@@ -32,7 +32,8 @@
     "artifactPanel": {
         "tabs": {
             "changes": "Изменения",
-            "preview": "Просмотр",
+            "preview": "Исходный код",
+            "content": "Просмотр",
             "browser": "Рабочая область"
         },
         "actions": {

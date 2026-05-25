@@ -32,7 +32,8 @@
     "artifactPanel": {
         "tabs": {
             "changes": "Changes",
-            "preview": "Preview",
+            "preview": "Source",
+            "content": "Preview",
             "browser": "Workspace"
         },
         "actions": {
