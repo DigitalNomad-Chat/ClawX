@@ -24,6 +24,10 @@ extraResources:
       - "!icons/*.svg"
       - "!bin/**"
       - "!screenshot/**"
+  - from: electron/api/services/rapidocr-worker.py
+    to: rapidocr-worker.py
+  - from: resources/ocr-env/
+    to: ocr-env/
   - from: resources/tessdata/
     to: tessdata/
   # OpenClaw package (node_modules copied separately by afterPack hook

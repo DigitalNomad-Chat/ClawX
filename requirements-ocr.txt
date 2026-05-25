@@ -1,0 +1,7 @@
+# RapidOCR dependencies for Python OCR worker
+# Install: pip install -r requirements-ocr.txt
+
+rapidocr-onnxruntime>=1.4.0
+pymupdf>=1.24.0
+pillow>=10.0.0
+numpy>=1.26.0

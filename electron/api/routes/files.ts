@@ -7,7 +7,7 @@ import type { HostApiContext } from '../context';
 import { parseJsonBody, sendJson } from '../route-utils';
 import { analyzePdf } from '../services/pdf-analyze';
 import { renderPdfPages } from '../services/pdf-render';
-import { recognizeImage, recognizeMultiple } from '../services/ocr';
+import { recognizeImage, recognizeMultiple, recognizePdf } from '../services/rapidocr';
 
 const EXT_MIME_MAP: Record<string, string> = {
   '.png': 'image/png',
@@ -240,7 +240,7 @@ export async function handleFileRoutes(
       // Scanned/image-based PDF: render pages to images then OCR
       // Pass file path to the isolated worker process instead of buffer
       const pageBuffers = await renderPdfPages(body.stagedPath, 2.0);
-      const ocrText = await recognizeMultiple(pageBuffers, 'chi_sim+eng');
+      const ocrText = await recognizeMultiple(pageBuffers);
       sendJson(res, 200, {
         success: true,
         text: ocrText,
@@ -263,7 +263,7 @@ export async function handleFileRoutes(
       }
       const fsP = await import('node:fs/promises');
       const data = await fsP.readFile(body.stagedPath);
-      const text = await recognizeImage(data, 'chi_sim+eng');
+      const text = await recognizeImage(data);
       sendJson(res, 200, { success: true, text });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
