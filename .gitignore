@@ -88,3 +88,4 @@ tools/license-generator/issued-licenses.json
 scripts/issued-licenses.json
 native/build/
 native/*.node
+.worktrees/
