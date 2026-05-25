@@ -184,7 +184,12 @@
         "gatewayStatus": "шлюз {{state}} | порт: {{port}} {{pid}}",
         "retryFailedAttachments": "Повторить неудавшиеся вложения",
         "skillPreviewTooltip": "Предпросмотр SKILL.md",
-        "skillPreviewNotFound": "Skill не найден. Откройте список Skill, чтобы обновить его."
+        "skillPreviewNotFound": "Skill не найден. Откройте список Skill, чтобы обновить его.",
+        "quickCmdButton": "Команды",
+        "pickQuickCmd": "Выбрать быструю команду",
+        "quickCmdPickerTitle": "Быстрые команды OpenClaw",
+        "quickCmdSearchPlaceholder": "Поиск команд",
+        "quickCmdEmpty": "Подходящие команды не найдены"
     },
     "historyBuckets": {
         "today": "Сегодня",

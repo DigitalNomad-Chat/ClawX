@@ -7,7 +7,7 @@
  * are sent with the message (no base64 over WebSocket).
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown, Shield } from 'lucide-react';
+import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown, Shield, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -94,6 +94,71 @@ function removeSkillToken(value: string, skillName: string): string {
 
 const SKILL_TOKEN_BUTTON_CLASS =
   'rounded-md bg-skill-bg/14 text-skill-fg [-webkit-box-decoration-break:clone] [box-decoration-break:clone] [text-shadow:0_0_10px_rgba(47,107,255,0.38)] dark:bg-skill-bg/18 dark:text-skill-fg-dark dark:[text-shadow:0_0_12px_rgba(37,99,235,0.42)]';
+
+interface QuickCommand {
+  name: string;
+  description: string;
+  category: string;
+}
+
+const QUICK_COMMANDS: QuickCommand[] = [
+  // Session management
+  { name: 'new', description: '开始一个新会话', category: 'session' },
+  { name: 'reset', description: '重置当前会话', category: 'session' },
+  { name: 'compact', description: '压缩会话上下文', category: 'session' },
+  { name: 'stop', description: '停止当前运行', category: 'session' },
+  // Model & reasoning
+  { name: 'model', description: '显示或切换模型', category: 'model' },
+  { name: 'models', description: '列出可用模型', category: 'model' },
+  { name: 'think', description: '设置思考级别', category: 'model' },
+  { name: 'fast', description: '切换快速模式', category: 'model' },
+  { name: 'reasoning', description: '切换推理可见性', category: 'model' },
+  { name: 'verbose', description: '切换详细模式', category: 'model' },
+  { name: 'usage', description: '显示用量摘要', category: 'model' },
+  // Status
+  { name: 'help', description: '显示帮助', category: 'status' },
+  { name: 'commands', description: '列出所有指令', category: 'status' },
+  { name: 'status', description: '显示当前状态', category: 'status' },
+  { name: 'tasks', description: '列出后台任务', category: 'status' },
+  { name: 'tools', description: '列出可用工具', category: 'status' },
+  { name: 'whoami', description: '显示发送者 ID', category: 'status' },
+  // Agent / Subagent
+  { name: 'subagents', description: '管理子代理', category: 'agent' },
+  { name: 'kill', description: '终止子代理', category: 'agent' },
+  { name: 'steer', description: '向子代理发送指令', category: 'agent' },
+  { name: 'acp', description: '管理 ACP 会话', category: 'agent' },
+  { name: 'focus', description: '绑定话题到目标', category: 'agent' },
+  { name: 'unfocus', description: '移除话题绑定', category: 'agent' },
+  { name: 'agents', description: '列出线程绑定代理', category: 'agent' },
+  // System config
+  { name: 'config', description: '查看或修改配置', category: 'config' },
+  { name: 'mcp', description: '查看或配置 MCP', category: 'config' },
+  { name: 'plugins', description: '管理插件', category: 'config' },
+  { name: 'debug', description: '设置调试覆盖', category: 'config' },
+  { name: 'exec', description: '设置执行默认值', category: 'config' },
+  { name: 'queue', description: '调整队列设置', category: 'config' },
+  { name: 'allowlist', description: '管理白名单', category: 'config' },
+  { name: 'approve', description: '批准执行请求', category: 'config' },
+  { name: 'activation', description: '设置群组激活模式', category: 'config' },
+  { name: 'send', description: '设置发送策略', category: 'config' },
+  { name: 'restart', description: '重启 OpenClaw', category: 'config' },
+  // Tools & export
+  { name: 'skill', description: '运行指定 skill', category: 'tools' },
+  { name: 'btw', description: '旁支提问（不改变上下文）', category: 'tools' },
+  { name: 'bash', description: '运行 shell 命令', category: 'tools' },
+  { name: 'tts', description: '控制文本转语音', category: 'tools' },
+  { name: 'export-session', description: '导出会话为 HTML', category: 'tools' },
+  { name: 'export-trajectory', description: '导出轨迹包', category: 'tools' },
+];
+
+const QUICK_COMMAND_CATEGORIES: Record<string, string> = {
+  session: '会话管理',
+  model: '模型与推理',
+  status: '状态查询',
+  agent: 'Agent 管理',
+  config: '系统配置',
+  tools: '工具与导出',
+};
 
 function renderHighlightedComposerText(
   value: string,
@@ -198,6 +263,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   const [pickerOpen, setPickerOpen] = useState(false);
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [quickCmdPickerOpen, setQuickCmdPickerOpen] = useState(false);
+  const [quickCmdQuery, setQuickCmdQuery] = useState('');
   const [skillQuery, setSkillQuery] = useState('');
   const [quickSkills, setQuickSkills] = useState<QuickAccessSkill[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
@@ -210,6 +277,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const skillPickerRef = useRef<HTMLDivElement>(null);
+  const quickCmdPickerRef = useRef<HTMLDivElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
   const gatewayStatus = useGatewayStore((s) => s.status);
@@ -252,6 +320,14 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       || skill.sourceLabel.toLowerCase().includes(query),
     );
   }, [quickSkills, skillQuery]);
+  const filteredQuickCommands = useMemo(() => {
+    const query = quickCmdQuery.trim().toLowerCase();
+    if (!query) return QUICK_COMMANDS;
+    return QUICK_COMMANDS.filter((cmd) =>
+      cmd.name.toLowerCase().includes(query)
+      || cmd.description.toLowerCase().includes(query),
+    );
+  }, [quickCmdQuery]);
   const showAgentPicker = mentionableAgents.length > 0;
   const showModelPicker = modelOptions.length > 1;
   const chatComposerStatusComponents = rendererExtensionRegistry.getChatComposerStatusComponents();
@@ -312,15 +388,17 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   }, [agents, currentAgentId, targetAgentId]);
 
   useEffect(() => {
-    if (!pickerOpen && !skillPickerOpen && !modelPickerOpen) return;
+    if (!pickerOpen && !skillPickerOpen && !modelPickerOpen && !quickCmdPickerOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       const insideAgentPicker = pickerRef.current?.contains(target);
       const insideSkillPicker = skillPickerRef.current?.contains(target);
+      const insideQuickCmdPicker = quickCmdPickerRef.current?.contains(target);
       const insideModelPicker = modelPickerRef.current?.contains(target);
-      if (!insideAgentPicker && !insideSkillPicker && !insideModelPicker) {
+      if (!insideAgentPicker && !insideSkillPicker && !insideQuickCmdPicker && !insideModelPicker) {
         setPickerOpen(false);
         setSkillPickerOpen(false);
+        setQuickCmdPickerOpen(false);
         setModelPickerOpen(false);
       }
     };
@@ -328,7 +406,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
     };
-  }, [modelPickerOpen, pickerOpen, skillPickerOpen]);
+  }, [modelPickerOpen, pickerOpen, quickCmdPickerOpen, skillPickerOpen]);
 
   useEffect(() => {
     setSelectedSkill((prev) => {
@@ -699,6 +777,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       if (e.key === 'Escape') {
         setPickerOpen(false);
         setSkillPickerOpen(false);
+        setQuickCmdPickerOpen(false);
         return;
       }
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -886,6 +965,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
                   )}
                   onClick={() => {
                     setSkillPickerOpen(false);
+                    setQuickCmdPickerOpen(false);
                     setPickerOpen((open) => !open);
                   }}
                   disabled={disabled || sending}
@@ -927,6 +1007,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
                 )}
                 onClick={() => {
                   setPickerOpen(false);
+                  setQuickCmdPickerOpen(false);
                   setSkillPickerOpen((open) => !open);
                 }}
                 disabled={disabled || sending}
@@ -998,6 +1079,93 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               )}
             </div>
 
+            {/* Quick Commands Button */}
+            <div ref={quickCmdPickerRef} className="relative shrink-0">
+              <button
+                type="button"
+                data-testid="chat-composer-quickcmd"
+                className={cn(
+                  'inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50',
+                  quickCmdPickerOpen && 'text-foreground',
+                )}
+                onClick={() => {
+                  setPickerOpen(false);
+                  setSkillPickerOpen(false);
+                  setModelPickerOpen(false);
+                  setQuickCmdPickerOpen((open) => !open);
+                }}
+                disabled={disabled || sending}
+                title={t('composer.pickQuickCmd')}
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>{t('composer.quickCmdButton')}</span>
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', quickCmdPickerOpen && 'rotate-180')} />
+              </button>
+              {quickCmdPickerOpen && (
+                <div className="absolute left-0 bottom-full z-20 mb-2 w-80 overflow-hidden rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-card">
+                  <div className="flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
+                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      value={quickCmdQuery}
+                      onChange={(event) => setQuickCmdQuery(event.target.value)}
+                      placeholder={t('composer.quickCmdSearchPlaceholder')}
+                      className="w-full bg-transparent text-meta outline-none placeholder:text-muted-foreground/70"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="px-3 py-2 text-tiny font-medium text-muted-foreground/80">
+                    {t('composer.quickCmdPickerTitle')}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {filteredQuickCommands.length === 0 ? (
+                      <div className="px-3 py-4 text-xs text-muted-foreground">
+                        {t('composer.quickCmdEmpty')}
+                      </div>
+                    ) : (
+                      Object.entries(
+                        filteredQuickCommands.reduce<Record<string, QuickCommand[]>>((acc, cmd) => {
+                          (acc[cmd.category] ??= []).push(cmd);
+                          return acc;
+                        }, {}),
+                      ).map(([category, cmds]) => (
+                        <div key={category}>
+                          <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                            {QUICK_COMMAND_CATEGORIES[category] ?? category}
+                          </div>
+                          {cmds.map((cmd) => (
+                            <QuickCommandPickerItem
+                              key={cmd.name}
+                              command={cmd}
+                              onSelect={() => {
+                                const textarea = textareaRef.current;
+                                const nextToken = `/${cmd.name}`;
+                                const selectionStart = textarea?.selectionStart ?? input.length;
+                                const selectionEnd = textarea?.selectionEnd ?? input.length;
+                                let nextValue = input;
+                                let adjustedStart = selectionStart;
+                                let adjustedEnd = selectionEnd;
+
+                                const leadingSpace = needsLeadingSkillSpace(nextValue, adjustedStart) ? ' ' : '';
+                                nextValue = `${nextValue.slice(0, adjustedStart)}${leadingSpace}${nextToken}${nextValue.slice(adjustedEnd)}`;
+                                setInput(nextValue);
+                                setQuickCmdPickerOpen(false);
+                                setQuickCmdQuery('');
+                                requestAnimationFrame(() => {
+                                  textareaRef.current?.focus();
+                                  const cursorPosition = adjustedStart + leadingSpace.length + nextToken.length;
+                                  textareaRef.current?.setSelectionRange(cursorPosition, cursorPosition);
+                                });
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {showModelPicker && (
               <div ref={modelPickerRef} className="relative shrink-0">
                 <button
@@ -1010,6 +1178,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
                   onClick={() => {
                     setPickerOpen(false);
                     setSkillPickerOpen(false);
+                    setQuickCmdPickerOpen(false);
                     setModelPickerOpen((open) => !open);
                   }}
                   disabled={sending || !currentAgent || !!switchingModelRef}
@@ -1244,6 +1413,41 @@ function SkillPickerItem({
       </TooltipTrigger>
       <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
         {skill.description}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function QuickCommandPickerItem({
+  command,
+  onSelect,
+}: {
+  command: QuickCommand;
+  onSelect: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          data-testid={`chat-composer-quickcmd-option-${command.name}`}
+          onClick={onSelect}
+          className={cn(
+            'flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5',
+          )}
+        >
+          <div className="min-w-0">
+            <div className="truncate text-meta font-semibold text-foreground">
+              <span className="font-mono">/{command.name}</span>
+            </div>
+            <div className="truncate text-tiny text-muted-foreground">
+              {command.description}
+            </div>
+          </div>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
+        {command.description}
       </TooltipContent>
     </Tooltip>
   );

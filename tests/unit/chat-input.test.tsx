@@ -95,6 +95,16 @@ function translate(key: string, vars?: Record<string, unknown>): string {
       return 'Preview SKILL.md';
     case 'composer.skillPreviewNotFound':
       return 'Skill not found';
+    case 'composer.quickCmdButton':
+      return 'Commands';
+    case 'composer.pickQuickCmd':
+      return 'Choose quick command';
+    case 'composer.quickCmdPickerTitle':
+      return 'OpenClaw Quick Commands';
+    case 'composer.quickCmdSearchPlaceholder':
+      return 'Search commands';
+    case 'composer.quickCmdEmpty':
+      return 'No matching commands found';
     default:
       return key;
   }
@@ -211,7 +221,7 @@ describe('ChatInput agent targeting', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hello direct agent' } });
     fireEvent.click(screen.getByTitle('Send'));
 
-    expect(onSend).toHaveBeenCalledWith('Hello direct agent', undefined, 'research');
+    expect(onSend).toHaveBeenCalledWith('Hello direct agent', undefined, 'research', undefined);
   });
 
   it('renders the skill trigger after the @ agent picker', () => {
@@ -295,7 +305,7 @@ describe('ChatInput agent targeting', () => {
 
     fireEvent.click(screen.getByTitle('Send'));
 
-    expect(onSend).toHaveBeenCalledWith('Draft /create-skill  a new helper', undefined, null);
+    expect(onSend).toHaveBeenCalledWith('Draft /create-skill  a new helper', undefined, null, undefined);
     expect(hostApiFetch).toHaveBeenCalledWith(
       '/api/skills/quick-access',
       expect.objectContaining({

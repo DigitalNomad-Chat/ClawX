@@ -184,7 +184,12 @@
         "gatewayStatus": "gateway {{state}} | port: {{port}} {{pid}}",
         "retryFailedAttachments": "Retry failed attachments",
         "skillPreviewTooltip": "Preview SKILL.md",
-        "skillPreviewNotFound": "Could not find this skill. Open the skill picker to refresh the list."
+        "skillPreviewNotFound": "Could not find this skill. Open the skill picker to refresh the list.",
+        "quickCmdButton": "Commands",
+        "pickQuickCmd": "Choose quick command",
+        "quickCmdPickerTitle": "OpenClaw Quick Commands",
+        "quickCmdSearchPlaceholder": "Search commands",
+        "quickCmdEmpty": "No matching commands found"
     },
     "historyBuckets": {
         "today": "Today",

@@ -184,7 +184,12 @@
         "gatewayStatus": "gateway {{state}} | port: {{port}} {{pid}}",
         "retryFailedAttachments": "重试失败的附件",
         "skillPreviewTooltip": "预览 SKILL.md",
-        "skillPreviewNotFound": "找不到该技能。请打开技能列表以刷新。"
+        "skillPreviewNotFound": "找不到该技能。请打开技能列表以刷新。",
+        "quickCmdButton": "快捷指令",
+        "pickQuickCmd": "选择快捷指令",
+        "quickCmdPickerTitle": "OpenClaw 快捷指令",
+        "quickCmdSearchPlaceholder": "搜索快捷指令",
+        "quickCmdEmpty": "未找到匹配的快捷指令"
     },
     "historyBuckets": {
         "today": "今天",
