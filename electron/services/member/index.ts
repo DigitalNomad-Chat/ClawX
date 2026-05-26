@@ -1,3 +1,7 @@
+/**
+ * MemberModule Facade (Local-First)
+ * Wires together local authentication, subscription, and usage tracking.
+ */
 import { machineId } from 'node-machine-id';
 import { createHash } from 'node:crypto';
 import { platform } from 'node:os';
@@ -6,24 +10,17 @@ import { TokenManager, tokenManager } from './token-manager';
 import { UsageCounter, usageCounter } from './usage-counter';
 import { NetworkDetector, networkDetector } from './network-detector';
 import { memberEventBus } from './event-bus';
-import { MemberEvent, type MemberState, type Feature, type UsageInfo, type Tier } from './types';
+import { MemberEvent, type MemberState, type Feature, type UsageInfo } from './types';
 import { logger } from '../../utils/logger';
-import { resolveApiBaseUrl } from '../../config/server';
+import { initMemberDatabase } from './database';
+import { getTierConfig } from './subscription';
 
-/** Generate a stable device id from machine-id + platform + sha256 */
 async function generateDeviceId(): Promise<string> {
   const raw = await machineId();
   const plat = platform();
   return createHash('sha256').update(`${raw}:${plat}`).digest('hex');
 }
 
-/**
- * MemberModule is the facade that wires together:
- * - MemberManager   (login / register / user state)
- * - TokenManager    (feature token lifecycle)
- * - UsageCounter    (local offline usage counting)
- * - NetworkDetector (online / offline probing)
- */
 export class MemberModule {
   readonly manager: MemberManager;
   readonly token: TokenManager;
@@ -34,16 +31,16 @@ export class MemberModule {
   private _initialized = false;
 
   constructor() {
-    const apiBaseUrl = resolveApiBaseUrl();
-    this.manager = new MemberManager(apiBaseUrl);
+    this.manager = new MemberManager();
     this.token = tokenManager;
     this.usage = usageCounter;
     this.network = networkDetector;
   }
 
-  /** Initialize all sub-services and wire event listeners */
   async init(): Promise<void> {
     if (this._initialized) return;
+
+    initMemberDatabase();
 
     this._deviceId = await generateDeviceId();
 
@@ -51,43 +48,19 @@ export class MemberModule {
     await this.token.init();
     await this.usage.init();
 
-    // Wire network status into member state
-    memberEventBus.on(MemberEvent.NETWORK_ONLINE, () => {
-      logger.debug('[MemberModule] Network online');
+    memberEventBus.on(MemberEvent.LOGIN_SUCCESS, () => {
+      this._onLoginSuccess();
     });
-    memberEventBus.on(MemberEvent.NETWORK_OFFLINE, () => {
-      logger.debug('[MemberModule] Network offline');
-    });
-
-    // On login success: issue feature token and start auto-renewal
-    memberEventBus.on(MemberEvent.LOGIN_SUCCESS, async () => {
-      try {
-        const jwt = this.manager.getJwtToken();
-        if (jwt && this._deviceId) {
-          await this.token.issueToken(jwt, this._deviceId);
-          this.token.startAutoRenewal(
-            () => this.manager.getJwtToken() ?? '',
-            () => this._deviceId ?? '',
-          );
-        }
-      } catch (err) {
-        logger.warn('[MemberModule] Failed to issue feature token after login:', err);
-      }
-    });
-
-    // On logout: stop auto-renewal and clear token
     memberEventBus.on(MemberEvent.LOGOUT, () => {
       this.token.stopAutoRenewal();
     });
 
-    // Start network probing
     this.network.start();
 
     this._initialized = true;
-    logger.info('[MemberModule] Initialized');
+    logger.info('[MemberModule] Initialized (local-first mode)');
   }
 
-  /** Aggregated member state for the renderer */
   get state(): MemberState {
     return {
       ...this.manager.state,
@@ -96,87 +69,73 @@ export class MemberModule {
     };
   }
 
-  /** Current device id (stable per machine) */
   get deviceId(): string | null {
     return this._deviceId;
   }
 
-  /**
-   * Check whether a feature is available.
-   * Online  -> hit backend /usage/check
-   * Offline -> validate against feature token + local usage counter
-   */
   async checkFeature(feature: Feature): Promise<UsageInfo | null> {
-    const jwt = this.manager.getJwtToken();
-    if (!jwt) {
+    const userId = this.manager.getUserId();
+    if (!userId) {
       return null;
     }
 
-    // Online path
-    if (this.network.isOnline) {
-      try {
-        const apiBaseUrl = resolveApiBaseUrl();
-        const query = new URLSearchParams({ feature });
-        const res = await fetch(`${apiBaseUrl}/api/v1/usage/check?${query.toString()}`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-          },
-        });
-        if (res.ok) {
-          const data = (await res.json()) as {
-            allowed: boolean;
-            used: number;
-            limit: number;
-          };
-          return {
-            feature,
-            used: data.used,
-            limit: data.limit,
-            remaining: Math.max(0, data.limit - data.used),
-            tier: this.manager.state.subscriptionTier ?? 'free',
-            allowed: data.allowed,
-          };
-        }
-      } catch (err) {
-        logger.warn('[MemberModule] Online feature check failed, falling back to offline:', err);
-      }
+    const userInfo = this.manager.state.userInfo;
+    if (!userInfo) {
+      return null;
     }
 
-    // Offline path
-    const snapshot = this.token.getUsageSnapshot(feature);
-    if (!snapshot) {
-      return null;
-    }
-    const offlineBudget = this.token.getOfflineBudget();
-    const allowed = this.usage.checkOfflineBudget(feature, snapshot, offlineBudget);
-    if (!allowed) {
-      return null;
-    }
+    const tier = userInfo.subscriptionTier ?? 'free';
+    const config = getTierConfig(tier);
+    const used = this.usage.getCount(userId, feature);
+    const limit = config.monthlyQuota;
+    const allowed = limit === 0 || used < limit;
 
     return {
       feature,
-      used: snapshot.used + this.usage.getCount(feature),
-      limit: snapshot.limit,
-      remaining: Math.max(0, snapshot.limit - snapshot.used - this.usage.getCount(feature)),
-      tier: this.token.getPayload()?.tier ?? 'free',
-      allowed: true,
+      used,
+      limit,
+      remaining: limit === 0 ? 999999 : Math.max(0, limit - used),
+      tier,
+      allowed,
     };
   }
 
-  /** Record a local usage increment for a feature */
   recordUsage(feature: Feature): void {
-    this.usage.increment(feature);
+    const userId = this.manager.getUserId();
+    if (!userId) return;
+    this.usage.increment(userId, feature);
   }
 
-  /** Graceful shutdown of all sub-services */
   async shutdown(): Promise<void> {
     this.network.stop();
     this.token.stopAutoRenewal();
     this._initialized = false;
     logger.info('[MemberModule] Shutdown complete');
   }
+
+  private _onLoginSuccess(): void {
+    const userInfo = this.manager.state.userInfo;
+    const jwt = this.manager.getJwtToken();
+    if (!userInfo || !jwt || !this._deviceId) return;
+
+    try {
+      this.token.issueToken(
+        userInfo.id,
+        userInfo.username,
+        userInfo.email,
+        userInfo.subscriptionTier,
+        this._deviceId,
+        (feature) => this.usage.getCount(userInfo.id, feature),
+      );
+      this.token.startAutoRenewal(
+        () => this.manager.state.userInfo,
+        () => this._deviceId,
+        (feature) => this.usage.getCount(userInfo.id, feature),
+      );
+    } catch (err) {
+      logger.warn('[MemberModule] Failed to issue token after login:', err);
+    }
+  }
 }
 
-/** Singleton instance */
 export const memberModule = new MemberModule();
