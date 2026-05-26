@@ -42,6 +42,14 @@ export class MemberModule {
 
     initMemberDatabase();
 
+    // Migrate legacy data (one-time)
+    try {
+      const { migrateLegacyMemberData } = await import('./migrate');
+      await migrateLegacyMemberData();
+    } catch {
+      // Ignore migration errors
+    }
+
     this._deviceId = await generateDeviceId();
 
     await this.manager.init();
