@@ -5,7 +5,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../../utils/logger';
@@ -23,7 +23,23 @@ function getJwtSecret(): string {
 
   try {
     if (fs.existsSync(secretPath)) {
-      jwtSecret = fs.readFileSync(secretPath, 'utf8');
+      const raw = fs.readFileSync(secretPath);
+      if (safeStorage.isEncryptionAvailable()) {
+        try {
+          jwtSecret = safeStorage.decryptString(raw);
+          return jwtSecret;
+        } catch {
+          // Legacy plaintext file from before this change — auto-migrate to encrypted
+          jwtSecret = raw.toString('utf8').trim();
+          try {
+            const encrypted = safeStorage.encryptString(jwtSecret);
+            fs.writeFileSync(secretPath, encrypted, { mode: 0o600 });
+          } catch { /* ignore migration failure */ }
+          return jwtSecret;
+        }
+      }
+      // Fallback: plaintext (Linux without keyring, etc.)
+      jwtSecret = raw.toString('utf8').trim();
       return jwtSecret;
     }
   } catch {
@@ -32,7 +48,12 @@ function getJwtSecret(): string {
 
   jwtSecret = crypto.randomBytes(32).toString('hex');
   try {
-    fs.writeFileSync(secretPath, jwtSecret, { mode: 0o600 });
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(jwtSecret);
+      fs.writeFileSync(secretPath, encrypted, { mode: 0o600 });
+    } else {
+      fs.writeFileSync(secretPath, jwtSecret, { mode: 0o600 });
+    }
   } catch (err) {
     logger.warn('[LocalAuth] Failed to persist JWT secret to disk:', err);
   }

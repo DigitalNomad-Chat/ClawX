@@ -4,6 +4,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import {
   Crown,
   Zap,
   Building2,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -66,6 +68,7 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
   const [showLogin, setShowLogin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -83,6 +86,11 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
   const handleLogout = async () => {
     setMenuOpen(false);
     await auth.logout();
+  };
+
+  const handleActivate = () => {
+    setMenuOpen(false);
+    navigate('/activation');
   };
 
   // 未登录状态
@@ -214,6 +222,17 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
 
             {/* 操作 */}
             <div className="border-t pt-2">
+              {tier === 'free' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 mb-1"
+                  onClick={handleActivate}
+                >
+                  <Key className="h-3.5 w-3.5" />
+                  {t('userBadge.activateLicense') || '激活 License'}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

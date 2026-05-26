@@ -16,6 +16,11 @@ export interface RegisterResult {
   reason?: string;
 }
 
+export interface ActivateResult {
+  success: boolean;
+  reason?: string;
+}
+
 interface AuthState {
   isLoggedIn: boolean;
   isGuest: boolean;
@@ -31,9 +36,10 @@ interface AuthState {
   refreshUser: () => Promise<void>;
   checkFeature: (feature: string) => Promise<UsageInfo>;
   recordUsage: (feature: string, triggerAction?: string) => Promise<void>;
+  activateLicense: (licenseKey: string) => Promise<ActivateResult>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   isLoggedIn: false,
   isGuest: false,
   userInfo: null,
@@ -123,5 +129,38 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   recordUsage: async (feature, triggerAction) => {
     await invokeIpc('auth:recordUsage', { feature, triggerAction });
+  },
+
+  activateLicense: async (licenseKey) => {
+    const user = get().userInfo;
+    if (!user) {
+      return { success: false, reason: 'Not logged in' };
+    }
+
+    set({ isLoading: true });
+    try {
+      const result = await invokeIpc<{ success: boolean; tier?: string; expiresAt?: number; reason?: string }>(
+        'auth:activate',
+        { licenseKey, userId: user.id },
+      );
+      if (result?.success) {
+        // Re-fetch user info to pick up new tier
+        const updatedUser = await invokeIpc<UserInfo>('auth:getUser');
+        const usageStats = await invokeIpc<UsageInfo[]>('auth:getUsageStats');
+        set({
+          userInfo: updatedUser,
+          tier: updatedUser?.subscriptionTier ?? null,
+          usageStats,
+          isLoggedIn: !!updatedUser,
+          isGuest: !updatedUser,
+        });
+        return { success: true };
+      }
+      return { success: false, reason: result?.reason || 'Activation failed' };
+    } catch (err: any) {
+      return { success: false, reason: err?.message || 'Network error' };
+    } finally {
+      set({ isLoading: false });
+    }
   },
 }));
