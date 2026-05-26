@@ -186,6 +186,7 @@ const electronAPI = {
         'auth:checkFeature',
         'auth:recordUsage',
         'auth:getUsageStats',
+        'auth:activate',
       ];
 
       if (validChannels.includes(channel)) {

@@ -109,5 +109,19 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
     }
   });
 
+  ipcMain.handle('auth:activate', async (_, { licenseKey, userId }: { licenseKey: string; userId: string }) => {
+    try {
+      const { activationService } = await import('../../services/member/activation');
+      const result = await activationService.activate(userId, licenseKey, memberModule.deviceId ?? 'unknown');
+      if (result.success) {
+        await memberModule.manager.refreshUser();
+      }
+      return result;
+    } catch (err: any) {
+      logger.error('[IPC auth:activate] error:', err);
+      return { success: false, reason: err.message || 'Activation failed' };
+    }
+  });
+
   logger.info('[IPC] Auth handlers registered');
 }
