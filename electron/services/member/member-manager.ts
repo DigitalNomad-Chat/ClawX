@@ -1,24 +1,54 @@
-import type { LoginCredentials, RegisterCredentials, UserInfo, MemberState, Tier } from './types';
+/**
+ * MemberManager (Local)
+ * Handles local user registration, login, logout, and profile management.
+ * All data stored in SQLite (via database.ts).
+ */
+import type { LoginCredentials, RegisterCredentials, UserInfo, MemberState } from './types';
 import { MemberEvent } from './types';
 import { memberEventBus } from './event-bus';
-import { resolveApiBaseUrl } from '../../config/server';
+import { getMemberDatabase } from './database';
+import { hashPassword, verifyPassword, signJwt, verifyJwt, generateId } from './local-auth';
+import { isSubscriptionActive } from './subscription';
+import { logger } from '../../utils/logger';
+import type { DbUser, DbSubscription } from './types';
 
 export class MemberManager {
   private jwtToken: string | null = null;
   private userInfo: UserInfo | null = null;
-  private store: any = null; // electron-store 延迟加载
-  private readonly apiBaseUrl: string;
+  private _initialized = false;
 
-  constructor(apiBaseUrl?: string) {
-    this.apiBaseUrl = apiBaseUrl ?? resolveApiBaseUrl();
+  constructor(_apiBaseUrl?: string) {
+    // Local mode: apiBaseUrl is no longer used
   }
 
   async init(): Promise<void> {
+    if (this._initialized) return;
+
+    // Restore session from persisted JWT in electron-store
     const Store = (await import('electron-store')).default;
-    this.store = new Store({ name: 'clawdock-member' });
-    // 恢复缓存的登录状态
-    this.jwtToken = this.store.get('jwtToken', null);
-    this.userInfo = this.store.get('userInfo', null);
+    const store = new Store({ name: 'clawdock-member' });
+    const cachedToken = store.get('jwtToken', null) as string | null;
+
+    if (cachedToken) {
+      const payload = verifyJwt(cachedToken);
+      if (payload) {
+        this.jwtToken = cachedToken;
+        // Fetch full user info from DB
+        try {
+          const db = getMemberDatabase();
+          const row = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.sub) as DbUser | undefined;
+          if (row) {
+            this.userInfo = this.mapDbUserToUserInfo(row);
+          }
+        } catch {
+          // DB not ready yet, will retry on next refreshUser
+        }
+      } else {
+        store.delete('jwtToken');
+      }
+    }
+
+    this._initialized = true;
   }
 
   get state(): MemberState {
@@ -27,87 +57,145 @@ export class MemberManager {
       isGuest: !this.jwtToken,
       userInfo: this.userInfo ?? null,
       tier: this.userInfo?.subscriptionTier ?? null,
-      isOnline: false, // 由 NetworkDetector 设置
-      featureToken: null, // 由 TokenManager 设置
+      isOnline: false,
+      featureToken: null,
     };
-  }
-
-  async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: UserInfo; reason?: string }> {
-    try {
-      const res = await fetch(`${this.apiBaseUrl}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, reason: data.message || 'Login failed' };
-      }
-      this.jwtToken = data.access_token ?? data.accessToken ?? null;
-      // login 返回的 user 可能缺少 subscriptionTier，优先用 profile 补齐
-      const profile = await this.refreshUser();
-      if (!profile && data.user) {
-        this.userInfo = this.mapUser(data.user);
-        this.persist();
-      }
-      memberEventBus.emit(MemberEvent.LOGIN_SUCCESS, this.userInfo);
-      return { success: true, user: this.userInfo ?? undefined };
-    } catch (err: any) {
-      return { success: false, reason: err.message || 'Network error' };
-    }
   }
 
   async register(credentials: RegisterCredentials): Promise<{ success: boolean; user?: UserInfo; reason?: string }> {
     try {
-      const res = await fetch(`${this.apiBaseUrl}/api/v1/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, reason: data.message || 'Registration failed' };
+      const db = getMemberDatabase();
+
+      const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(
+        credentials.username,
+        credentials.email,
+      ) as { id: string } | undefined;
+
+      if (existingUser) {
+        return { success: false, reason: 'Username or email already exists' };
       }
-      this.jwtToken = data.access_token ?? data.accessToken ?? null;
-      // register 返回的 user 可能缺少 subscriptionTier，优先用 profile 补齐
-      const profile = await this.refreshUser();
-      if (!profile && data.user) {
-        this.userInfo = this.mapUser(data.user);
-        this.persist();
-      }
+
+      const now = Date.now();
+      const userId = generateId();
+      const passwordHash = hashPassword(credentials.password);
+
+      db.prepare(
+        `INSERT INTO users (id, username, email, password_hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(userId, credentials.username, credentials.email, passwordHash, now, now);
+
+      const subId = generateId();
+      db.prepare(
+        `INSERT INTO subscriptions (id, user_id, tier, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(subId, userId, 'free', 'active', now, now);
+
+      const userInfo: UserInfo = {
+        id: userId,
+        username: credentials.username,
+        email: credentials.email,
+        subscriptionTier: 'free',
+        balance: 0,
+      };
+
+      this.userInfo = userInfo;
+      this.jwtToken = signJwt(userId, credentials.username, credentials.email, 'free');
+      this.persist();
+
       memberEventBus.emit(MemberEvent.LOGIN_SUCCESS, this.userInfo);
-      return { success: true, user: this.userInfo ?? undefined };
+      return { success: true, user: userInfo };
     } catch (err: any) {
-      return { success: false, reason: err.message || 'Network error' };
+      logger.error('[MemberManager] Registration error:', err);
+      return { success: false, reason: err.message || 'Registration failed' };
+    }
+  }
+
+  async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: UserInfo; reason?: string }> {
+    try {
+      const db = getMemberDatabase();
+
+      const row = db.prepare('SELECT * FROM users WHERE username = ?').get(credentials.username) as
+        | DbUser
+        | undefined;
+
+      if (!row) {
+        return { success: false, reason: 'Invalid username or password' };
+      }
+
+      const valid = verifyPassword(credentials.password, row.password_hash);
+      if (!valid) {
+        return { success: false, reason: 'Invalid username or password' };
+      }
+
+      const tier = this.resolveUserTier(row.id);
+
+      const userInfo: UserInfo = {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        avatarUrl: row.avatar_url ?? undefined,
+        subscriptionTier: tier,
+        balance: 0,
+      };
+
+      this.userInfo = userInfo;
+      this.jwtToken = signJwt(row.id, row.username, row.email, tier);
+      this.persist();
+
+      memberEventBus.emit(MemberEvent.LOGIN_SUCCESS, this.userInfo);
+      return { success: true, user: userInfo };
+    } catch (err: any) {
+      logger.error('[MemberManager] Login error:', err);
+      return { success: false, reason: err.message || 'Login failed' };
     }
   }
 
   async logout(): Promise<void> {
     this.jwtToken = null;
     this.userInfo = null;
-    if (this.store) {
-      this.store.clear();
-    }
+
+    const Store = (await import('electron-store')).default;
+    const store = new Store({ name: 'clawdock-member' });
+    store.delete('jwtToken');
+    store.delete('userInfo');
+
     memberEventBus.emit(MemberEvent.LOGOUT);
   }
 
   async refreshUser(): Promise<UserInfo | null> {
     if (!this.jwtToken) return null;
+
+    const payload = verifyJwt(this.jwtToken);
+    if (!payload) {
+      await this.logout();
+      return null;
+    }
+
     try {
-      const res = await fetch(`${this.apiBaseUrl}/api/v1/user/profile`, {
-        headers: { Authorization: `Bearer ${this.jwtToken}` },
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
-          await this.logout();
-        }
+      const db = getMemberDatabase();
+      const row = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.sub) as DbUser | undefined;
+
+      if (!row) {
+        await this.logout();
         return null;
       }
-      const data = await res.json();
-      this.userInfo = this.mapUser(data);
+
+      const tier = this.resolveUserTier(row.id);
+      this.userInfo = {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        avatarUrl: row.avatar_url ?? undefined,
+        subscriptionTier: tier,
+        balance: 0,
+      };
+
+      this.jwtToken = signJwt(row.id, row.username, row.email, tier);
       this.persist();
+
       return this.userInfo;
-    } catch {
+    } catch (err: any) {
+      logger.error('[MemberManager] refreshUser error:', err);
       return null;
     }
   }
@@ -116,21 +204,39 @@ export class MemberManager {
     return this.jwtToken;
   }
 
-  private mapUser(raw: any): UserInfo {
+  getUserId(): string | null {
+    return this.userInfo?.id ?? null;
+  }
+
+  private resolveUserTier(userId: string): import('./types').Tier {
+    const db = getMemberDatabase();
+    const sub = db
+      .prepare("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY expires_at DESC LIMIT 1")
+      .get(userId) as DbSubscription | undefined;
+
+    if (sub && isSubscriptionActive(sub)) {
+      return sub.tier;
+    }
+
+    return 'free';
+  }
+
+  private mapDbUserToUserInfo(row: DbUser): UserInfo {
+    const tier = this.resolveUserTier(row.id);
     return {
-      id: raw.id,
-      username: raw.username,
-      email: raw.email,
-      avatarUrl: raw.avatarUrl,
-      subscriptionTier: raw.subscriptionTier || 'free',
-      balance: raw.balance ?? 0,
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      avatarUrl: row.avatar_url ?? undefined,
+      subscriptionTier: tier,
+      balance: 0,
     };
   }
 
-  private persist(): void {
-    if (this.store) {
-      this.store.set('jwtToken', this.jwtToken);
-      this.store.set('userInfo', this.userInfo);
-    }
+  private async persist(): Promise<void> {
+    const Store = (await import('electron-store')).default;
+    const store = new Store({ name: 'clawdock-member' });
+    store.set('jwtToken', this.jwtToken);
+    store.set('userInfo', this.userInfo);
   }
 }
