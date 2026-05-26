@@ -12,6 +12,16 @@ import { isSubscriptionActive } from './subscription';
 import { logger } from '../../utils/logger';
 import type { DbUser, DbSubscription } from './types';
 
+// Lazy-load electron-store to avoid issues in non-Electron contexts (tests, etc.)
+let _storeInstance: any = null;
+async function getStore() {
+  if (!_storeInstance) {
+    const Store = (await import('electron-store')).default;
+    _storeInstance = new Store({ name: 'clawdock-member' });
+  }
+  return _storeInstance;
+}
+
 export class MemberManager {
   private jwtToken: string | null = null;
   private userInfo: UserInfo | null = null;
@@ -25,8 +35,7 @@ export class MemberManager {
     if (this._initialized) return;
 
     // Restore session from persisted JWT in electron-store
-    const Store = (await import('electron-store')).default;
-    const store = new Store({ name: 'clawdock-member' });
+    const store = await getStore();
     const cachedToken = store.get('jwtToken', null) as string | null;
 
     if (cachedToken) {
@@ -154,8 +163,7 @@ export class MemberManager {
     this.jwtToken = null;
     this.userInfo = null;
 
-    const Store = (await import('electron-store')).default;
-    const store = new Store({ name: 'clawdock-member' });
+    const store = await getStore();
     store.delete('jwtToken');
     store.delete('userInfo');
 
@@ -234,8 +242,7 @@ export class MemberManager {
   }
 
   private async persist(): Promise<void> {
-    const Store = (await import('electron-store')).default;
-    const store = new Store({ name: 'clawdock-member' });
+    const store = await getStore();
     store.set('jwtToken', this.jwtToken);
     store.set('userInfo', this.userInfo);
   }
