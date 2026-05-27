@@ -187,6 +187,10 @@ const electronAPI = {
         'auth:recordUsage',
         'auth:getUsageStats',
         'auth:activate',
+        // Read-Write Workspace
+        'rw-workspace:read',
+        'rw-workspace:set',
+        'rw-workspace:clear',
       ];
 
       if (validChannels.includes(channel)) {

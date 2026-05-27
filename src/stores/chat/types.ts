@@ -123,6 +123,11 @@ export interface ChatState {
   // Thinking
   thinkingLevel: string | null;
 
+  // Read-Write Workspace (agent-scoped, persists across sessions within same agent)
+  rwWorkDir: string | null;
+  agentRwWorkDirs: Record<string, string | null>;
+  setRwWorkDir: (dir: string | null) => void;
+
   // Actions
   loadSessions: () => Promise<void>;
   switchSession: (key: string) => void;

@@ -2179,6 +2179,64 @@ function registerDialogHandlers(): void {
     const result = await dialog.showMessageBox(options);
     return result;
   });
+
+  // ── Read-Write Workspace: read / set / clear marker in AGENTS.md ──
+
+  const RW_MARKER_RE = /<!-- openclaw:rw-workspace:(.*?) -->/s;
+
+  function resolveAgentsMdPath(workspaceDir: string): string {
+    return require('path').join(expandPath(workspaceDir), 'AGENTS.md');
+  }
+
+  ipcMain.handle('rw-workspace:read', async (_, workspaceDir: string) => {
+    const fsP = await import('fs/promises');
+    const filePath = resolveAgentsMdPath(workspaceDir);
+    try {
+      const content = await fsP.readFile(filePath, 'utf-8');
+      const match = content.match(RW_MARKER_RE);
+      return match ? match[1].split('\n')[0].trim() : null;
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('rw-workspace:set', async (_, workspaceDir: string, dirPath: string) => {
+    console.log('[rw-workspace:set] workspaceDir:', workspaceDir, 'dirPath:', dirPath);
+    const fsP = await import('fs/promises');
+    const path = await import('path');
+    const filePath = resolveAgentsMdPath(workspaceDir);
+    console.log('[rw-workspace:set] filePath:', filePath);
+    let content = '';
+    try {
+      content = await fsP.readFile(filePath, 'utf-8');
+    } catch {
+      // AGENTS.md may not exist yet — will be created
+    }
+    const marker = `<!-- openclaw:rw-workspace:${dirPath}\n读写空间：后续文件读写默认使用此目录，除非用户明确指定其他路径。\n如需清除，请勿手动删除此标记，由系统自动管理。 -->`;
+    if (RW_MARKER_RE.test(content)) {
+      content = content.replace(RW_MARKER_RE, marker);
+    } else {
+      content = content.trimEnd() + '\n\n' + marker + '\n';
+    }
+    await fsP.mkdir(path.dirname(filePath), { recursive: true });
+    await fsP.writeFile(filePath, content, 'utf-8');
+    return true;
+  });
+
+  ipcMain.handle('rw-workspace:clear', async (_, workspaceDir: string) => {
+    const fsP = await import('fs/promises');
+    const filePath = resolveAgentsMdPath(workspaceDir);
+    try {
+      let content = await fsP.readFile(filePath, 'utf-8');
+      if (RW_MARKER_RE.test(content)) {
+        content = content.replace(RW_MARKER_RE, '').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+        await fsP.writeFile(filePath, content, 'utf-8');
+      }
+    } catch {
+      // File doesn't exist, nothing to clear
+    }
+    return true;
+  });
 }
 
 /**

@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand';
 import { hostApiFetch } from '@/lib/host-api';
+import { invokeIpc } from '@/lib/api-client';
 import { useGatewayStore } from './gateway';
 import { useAgentsStore } from './agents';
 import { buildBaselineRunKey, captureBaseline, clearBaselines } from './baseline-cache';
@@ -1014,7 +1015,7 @@ function clearSessionEntryFromMap<T extends Record<string, unknown>>(entries: T,
 function buildSessionSwitchPatch(
   state: Pick<
     ChatState,
-    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity'
+    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity' | 'agentRwWorkDirs'
   >,
   nextSessionKey: string,
 ): Partial<ChatState> {
@@ -1031,9 +1032,11 @@ function buildSessionSwitchPatch(
     ? state.sessions.filter((session) => session.key !== state.currentSessionKey)
     : state.sessions;
 
+  const nextAgentId = getAgentIdFromSessionKey(nextSessionKey);
+
   return {
     currentSessionKey: nextSessionKey,
-    currentAgentId: getAgentIdFromSessionKey(nextSessionKey),
+    currentAgentId: nextAgentId,
     sessions: ensureSessionEntry(nextSessions, nextSessionKey),
     sessionLabels: leavingEmpty
       ? clearSessionEntryFromMap(state.sessionLabels, state.currentSessionKey)
@@ -1050,6 +1053,7 @@ function buildSessionSwitchPatch(
     pendingFinal: false,
     lastUserMessageAt: null,
     pendingToolImages: [],
+    rwWorkDir: state.agentRwWorkDirs[nextAgentId] ?? null,
   };
 }
 
@@ -1472,6 +1476,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   thinkingLevel: null,
 
+  rwWorkDir: null,
+  agentRwWorkDirs: {},
+
   // ── Load sessions via sessions.list ──
 
   loadSessions: async () => {
@@ -1558,6 +1565,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
             },
           }));
 
+          // Restore rwWorkDir from AGENTS.md marker for current agent
+          const agentId = getAgentIdFromSessionKey(nextSessionKey);
+          const workspace = useAgentsStore.getState().agents.find((a) => a.id === agentId)?.workspace;
+          if (workspace) {
+            invokeIpc('rw-workspace:read', workspace).then((dir) => {
+              const dirStr = dir as string | null;
+              if (dirStr) {
+                set((s) => ({
+                  rwWorkDir: dirStr,
+                  agentRwWorkDirs: { ...s.agentRwWorkDirs, [agentId]: dirStr },
+                }));
+              }
+            }).catch(() => { /* ignore */ });
+          }
+
           if (currentSessionKey !== nextSessionKey) {
             void get().loadHistory();
           }
@@ -1588,6 +1610,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     clearBaselines();
     set((s) => buildSessionSwitchPatch(s, key));
     get().loadHistory();
+
+    // Restore rwWorkDir from AGENTS.md marker for the new agent
+    const newAgentId = getAgentIdFromSessionKey(key);
+    const workspace = useAgentsStore.getState().agents.find((a) => a.id === newAgentId)?.workspace;
+    if (workspace) {
+      invokeIpc('rw-workspace:read', workspace).then((dir) => {
+        const dirStr = dir as string | null;
+        set((s) => ({
+          rwWorkDir: dirStr,
+          agentRwWorkDirs: { ...s.agentRwWorkDirs, [newAgentId]: dirStr },
+        }));
+      }).catch(() => { /* ignore read failures */ });
+    }
   },
 
   // ── Delete session ──
@@ -1640,6 +1675,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         pendingToolImages: [],
         currentSessionKey: next?.key ?? DEFAULT_SESSION_KEY,
         currentAgentId: getAgentIdFromSessionKey(next?.key ?? DEFAULT_SESSION_KEY),
+        rwWorkDir: s.agentRwWorkDirs[getAgentIdFromSessionKey(next?.key ?? DEFAULT_SESSION_KEY)] ?? null,
       }));
       if (next) {
         get().loadHistory();
@@ -1651,6 +1687,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionLastActivity: Object.fromEntries(Object.entries(s.sessionLastActivity).filter(([k]) => k !== key)),
       }));
     }
+  },
+
+  setRwWorkDir: (dir: string | null) => {
+    const agentId = get().currentAgentId;
+    set((s) => ({
+      rwWorkDir: dir,
+      agentRwWorkDirs: { ...s.agentRwWorkDirs, [agentId]: dir },
+    }));
   },
 
   // ── New session ──
@@ -1694,6 +1738,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       pendingFinal: false,
       lastUserMessageAt: null,
       pendingToolImages: [],
+      rwWorkDir: s.agentRwWorkDirs[getAgentIdFromSessionKey(newKey)] ?? null,
     }));
   },
 
