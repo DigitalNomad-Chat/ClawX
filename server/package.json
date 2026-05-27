@@ -1,0 +1,21 @@
+{
+  "name": "clawx-license-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClawX License Key verification service (Cloudflare Workers + D1)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply clawx-license --local",
+    "db:migrate:remote": "wrangler d1 migrations apply clawx-license --remote",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "itty-router": "^5.0.18"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250509.0",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.4.0"
+  }
+}

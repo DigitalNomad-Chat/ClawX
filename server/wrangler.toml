@@ -1,0 +1,16 @@
+name = "clawx-license-server"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+# After running `wrangler d1 create clawx-license`, update the database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "clawx-license"
+database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+
+# Environment variables (secrets should use `wrangler secret put`)
+[vars]
+ADMIN_API_KEY = "dev-admin-key-change-in-production"
+JWT_SECRET = "dev-jwt-secret-change-in-production-use-wrangler-secret-put"
