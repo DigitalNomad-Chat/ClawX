@@ -171,7 +171,14 @@ export function Chat() {
   const [graphExpandedOverrides, setGraphExpandedOverrides] = useState<Record<string, boolean>>({});
   const graphStepCache: Record<string, GraphStepCacheEntry> = graphStepCacheStore.get(currentSessionKey) ?? {};
   const minLoading = useMinLoading(loading && messages.length > 0);
-  const { contentRef, scrollRef } = useStickToBottomInstant(currentSessionKey);
+  const { contentRef, scrollRef, scrollToBottom } = useStickToBottomInstant(currentSessionKey);
+
+  // Wrap sendMessage so that every user send forces a scroll-to-bottom,
+  // even when the user had previously scrolled up to read older messages.
+  const handleSend = useCallback((...args: Parameters<typeof sendMessage>) => {
+    scrollToBottom("instant");
+    return sendMessage(...args);
+  }, [scrollToBottom, sendMessage]);
 
   // Load data when gateway is running.
   // When the store already holds messages for this session (i.e. the user
@@ -857,7 +864,7 @@ export function Chat() {
 
       {/* Input Area */}
       <ChatInput
-        onSend={sendMessage}
+        onSend={handleSend}
         onStop={abortRun}
         disabled={!isGatewayRunning}
         sending={sending || hasActiveExecutionGraph}

@@ -17,7 +17,7 @@ export function useStickToBottomInstant(resetKey?: string) {
     resize: "smooth",
   });
 
-  const { scrollRef } = result;
+  const { scrollRef, scrollToBottom } = result;
 
   // Reset initialization when key changes
   useEffect(() => {
@@ -54,5 +54,5 @@ export function useStickToBottomInstant(resetKey?: string) {
     return () => cancelAnimationFrame(frame1);
   }, [scrollRef, resetKey]);
 
-  return result;
+  return { contentRef: result.contentRef, scrollRef, scrollToBottom };
 }
