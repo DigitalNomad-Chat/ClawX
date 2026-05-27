@@ -519,9 +519,9 @@ export function WorkspaceBrowserBody({
         <aside className="min-h-0 overflow-hidden border-r border-black/5 dark:border-white/10">
           <div className="h-full overflow-y-auto py-2 text-sm">{renderTree()}</div>
         </aside>
-        <section className="min-h-0 overflow-hidden">
+        <section className="flex min-h-0 flex-col overflow-hidden">
           {selectedNode && !selectedNode.isDir && (
-            <div className="flex items-center justify-between gap-3 border-b border-black/5 px-4 py-1.5 text-xs text-muted-foreground dark:border-white/10">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/5 px-4 py-1.5 text-xs text-muted-foreground dark:border-white/10">
               <div className="flex min-w-0 items-center gap-2">
                 <FilePreviewIcon
                   contentType={selectedNode.contentType}
@@ -539,7 +539,7 @@ export function WorkspaceBrowserBody({
               <span className="shrink-0">{formatFileSize(selectedNode.size ?? 0)}</span>
             </div>
           )}
-          <div className="h-[calc(100%-2rem)] min-h-0">{renderBody()}</div>
+          <div className="min-h-0 flex-1">{renderBody()}</div>
         </section>
       </div>
     </div>
