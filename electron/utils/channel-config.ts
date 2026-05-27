@@ -80,6 +80,103 @@ const CHANNEL_UNIQUE_CREDENTIAL_KEY: Record<string, string> = {
 // ── Helpers ──────────────────────────────────────────────────────
 
 /**
+ * Known boolean config keys across all channel types.
+ * Used by coerceConfigTypes() to convert string values ("true"/"false")
+ * back to proper booleans when no existing value is available for type
+ * inference.
+ */
+const BOOLEAN_CONFIG_KEYS = new Set([
+    'requireMention',
+    'streaming',
+    'blockStreaming',
+    'typingIndicator',
+    'resolveSenderNames',
+    'reactionNotifications',
+]);
+
+/**
+ * Known number config keys across all channel types.
+ */
+const NUMBER_CONFIG_KEYS = new Set([
+    'webhookPort',
+    'mediaMaxMb',
+]);
+
+/**
+ * Known array config keys (stored as arrays, edited as newline-separated strings).
+ */
+const ARRAY_CONFIG_KEYS = new Set([
+    'allowFrom',
+    'groupAllowFrom',
+]);
+
+/**
+ * Coerce string-based form values back to their proper JSON types before
+ * writing to the config file.
+ *
+ * Priority:
+ * 1. Match the type of the existing value in the config section.
+ * 2. Fall back to known field names (BOOLEAN_CONFIG_KEYS, etc.).
+ *
+ * This fixes the bug where HTML form serialization converts booleans
+ * to strings ("true"/"false"), which are then written to openclaw.json
+ * and break channel runtime behavior.
+ */
+function coerceConfigTypes(
+    config: ChannelConfigData,
+    existingSection?: ChannelConfigData,
+): ChannelConfigData {
+    const result: ChannelConfigData = {};
+
+    for (const [key, value] of Object.entries(config)) {
+        if (key === 'accounts' || key === 'defaultAccount') continue;
+
+        // Only coerce string values — non-strings are already the right type
+        if (typeof value !== 'string') {
+            result[key] = value;
+            continue;
+        }
+
+        // Priority 1: match existing value type
+        const existingValue = existingSection?.[key];
+        if (existingValue !== undefined) {
+            if (typeof existingValue === 'boolean') {
+                result[key] = value === 'true';
+                continue;
+            }
+            if (typeof existingValue === 'number') {
+                const num = Number(value);
+                result[key] = isNaN(num) ? value : num;
+                continue;
+            }
+            if (Array.isArray(existingValue)) {
+                result[key] = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                continue;
+            }
+        }
+
+        // Priority 2: known field names
+        if (BOOLEAN_CONFIG_KEYS.has(key)) {
+            result[key] = value === 'true';
+            continue;
+        }
+        if (NUMBER_CONFIG_KEYS.has(key)) {
+            const num = Number(value);
+            result[key] = isNaN(num) ? value : num;
+            continue;
+        }
+        if (ARRAY_CONFIG_KEYS.has(key)) {
+            result[key] = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            continue;
+        }
+
+        result[key] = value;
+    }
+
+    return result;
+}
+
+/**
  * Strip `defaultAccount` from channel sections whose plugin schema
  * declares additionalProperties:false without listing `defaultAccount`.
  * Call right before every `writeOpenClawConfig` in channel-config
@@ -609,19 +706,26 @@ function transformChannelConfig(
     }
 
     if (channelType === 'feishu' || channelType === 'wecom') {
-        const existingDmPolicy = existingAccountConfig.dmPolicy === 'pairing' ? 'open' : existingAccountConfig.dmPolicy;
-        transformedConfig.dmPolicy = transformedConfig.dmPolicy ?? existingDmPolicy ?? 'open';
+        // Preserve the user's explicit dmPolicy choice.
+        // Only fall back to the existing value or default when not provided.
+        // Default to 'pairing' which is the standard OpenClaw default.
+        transformedConfig.dmPolicy = transformedConfig.dmPolicy ?? existingAccountConfig.dmPolicy ?? 'pairing';
 
-        let allowFrom = (transformedConfig.allowFrom ?? existingAccountConfig.allowFrom ?? ['*']) as string[];
-        if (!Array.isArray(allowFrom)) {
-            allowFrom = [allowFrom] as string[];
+        // Only manage allowFrom when the user explicitly set dmPolicy to 'open'.
+        // Otherwise, preserve existing value or leave unset.
+        if (transformedConfig.dmPolicy === 'open') {
+            let allowFrom = (transformedConfig.allowFrom ?? existingAccountConfig.allowFrom ?? ['*']) as string[];
+            if (!Array.isArray(allowFrom)) {
+                allowFrom = [allowFrom] as string[];
+            }
+            if (!allowFrom.includes('*')) {
+                allowFrom = [...allowFrom, '*'];
+            }
+            transformedConfig.allowFrom = allowFrom;
+        } else if (existingAccountConfig.allowFrom) {
+            // For non-open modes, preserve existing allowFrom without forcing '*'
+            transformedConfig.allowFrom = existingAccountConfig.allowFrom;
         }
-
-        if (transformedConfig.dmPolicy === 'open' && !allowFrom.includes('*')) {
-            allowFrom = [...allowFrom, '*'];
-        }
-
-        transformedConfig.allowFrom = allowFrom;
     }
 
     if (channelType === 'dingtalk') {
@@ -784,6 +888,9 @@ export async function saveChannelConfig(
 
         const existingAccountConfig = resolveAccountConfig(channelSection, resolvedAccountId);
         const transformedConfig = transformChannelConfig(resolvedChannelType, config, existingAccountConfig);
+        // Coerce string form values back to proper JSON types (boolean, number, array)
+        // before writing to the config file.
+        const coercedConfig = coerceConfigTypes(transformedConfig, channelSection);
         const uniqueKey = CHANNEL_UNIQUE_CREDENTIAL_KEY[resolvedChannelType];
         if (uniqueKey && typeof transformedConfig[uniqueKey] === 'string') {
             const rawCredentialValue = transformedConfig[uniqueKey] as string;
@@ -794,7 +901,7 @@ export async function saveChannelConfig(
                     accountId: resolvedAccountId,
                     key: uniqueKey,
                 });
-                transformedConfig[uniqueKey] = normalizedCredentialValue;
+                coercedConfig[uniqueKey] = normalizedCredentialValue;
             }
         }
 
@@ -806,13 +913,13 @@ export async function saveChannelConfig(
                 : resolvedAccountId;
         accounts[resolvedAccountId] = {
             ...accounts[resolvedAccountId],
-            ...transformedConfig,
-            enabled: transformedConfig.enabled ?? true,
+            ...coercedConfig,
+            enabled: coercedConfig.enabled ?? true,
         };
 
         // Keep channel-level enabled explicit so callers/tests that
         // read channels.<type>.enabled still work.
-        channelSection.enabled = transformedConfig.enabled ?? channelSection.enabled ?? true;
+        channelSection.enabled = coercedConfig.enabled ?? channelSection.enabled ?? true;
 
         // Most OpenClaw channel plugins/built-ins also read the default
         // account's credentials from the top level of `channels.<type>`
@@ -831,8 +938,10 @@ export async function saveChannelConfig(
 
         // Write public settings (access/connection/advanced) to the channel
         // top-level so they are shared across all accounts.
+        // Coerce string form values to proper JSON types before writing.
         if (publicSettings) {
-            for (const [key, value] of Object.entries(publicSettings)) {
+            const coercedSettings = coerceConfigTypes(publicSettings, channelSection);
+            for (const [key, value] of Object.entries(coercedSettings)) {
                 if (key === 'accounts' || key === 'defaultAccount') continue;
                 channelSection[key] = value;
             }
@@ -845,7 +954,7 @@ export async function saveChannelConfig(
             accountId: resolvedAccountId,
             configFile: CONFIG_FILE,
             rawKeys: Object.keys(config),
-            transformedKeys: Object.keys(transformedConfig),
+            transformedKeys: Object.keys(coercedConfig),
         });
         console.log(`Saved channel config for ${resolvedChannelType} account ${resolvedAccountId}`);
     });
