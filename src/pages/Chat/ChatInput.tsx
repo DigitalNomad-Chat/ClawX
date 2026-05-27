@@ -7,7 +7,7 @@
  * are sent with the message (no base64 over WebSocket).
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown, Shield, Zap } from 'lucide-react';
+import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, Loader2, AtSign, Search, ChevronDown, Shield, Zap, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -160,6 +160,12 @@ const QUICK_COMMAND_CATEGORIES: Record<string, string> = {
   tools: '工具与导出',
 };
 
+type SlashOption =
+  | { type: 'command'; data: QuickCommand }
+  | { type: 'skill'; data: QuickAccessSkill };
+
+const SLASH_SKILL_CATEGORY_LABEL = 'Skills';
+
 function renderHighlightedComposerText(
   value: string,
   tokenRanges: SkillTokenRange[],
@@ -266,6 +272,9 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   const [quickCmdPickerOpen, setQuickCmdPickerOpen] = useState(false);
   const [quickCmdQuery, setQuickCmdQuery] = useState('');
   const [skillQuery, setSkillQuery] = useState('');
+
+  // ── Slash command mode (triggered by typing `/` in textarea) ────
+  const [slashMode, setSlashMode] = useState<{ active: boolean; startIndex: number; selectedIndex: number }>({ active: false, startIndex: -1, selectedIndex: 0 });
   const [quickSkills, setQuickSkills] = useState<QuickAccessSkill[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState<string | null>(null);
@@ -274,6 +283,10 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   const [optimisticModelRef, setOptimisticModelRef] = useState<string | null>(null);
   const [desensitizeOpen, setDesensitizeOpen] = useState(false);
   const desensitizeMapRef = useRef<SensitiveMap | undefined>(undefined);
+  const rwWorkDir = useChatStore((s) => s.rwWorkDir);
+  const setRwWorkDir = useChatStore((s) => s.setRwWorkDir);
+  const [rwPickerOpen, setRwPickerOpen] = useState(false);
+  const rwPickerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const skillPickerRef = useRef<HTMLDivElement>(null);
@@ -320,6 +333,14 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       || skill.sourceLabel.toLowerCase().includes(query),
     );
   }, [quickSkills, skillQuery]);
+  // Slash-mode query: derive from textarea content between `/` and cursor
+  const slashQuery = useMemo(() => {
+    if (!slashMode.active || !textareaRef.current) return '';
+    const cursor = textareaRef.current.selectionStart ?? input.length;
+    if (cursor <= slashMode.startIndex + 1) return '';
+    return input.slice(slashMode.startIndex + 1, cursor).trim().toLowerCase();
+  }, [slashMode.active, slashMode.startIndex, input]);
+
   const filteredQuickCommands = useMemo(() => {
     const query = quickCmdQuery.trim().toLowerCase();
     if (!query) return QUICK_COMMANDS;
@@ -328,6 +349,33 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       || cmd.description.toLowerCase().includes(query),
     );
   }, [quickCmdQuery]);
+
+  const filteredSlashOptions = useMemo(() => {
+    const query = slashMode.active ? slashQuery : quickCmdQuery.trim().toLowerCase();
+    const options: SlashOption[] = [];
+
+    // Skills first
+    const matchedSkills = query
+      ? quickSkills.filter((s) =>
+          s.name.toLowerCase().includes(query)
+          || s.description.toLowerCase().includes(query)
+          || s.sourceLabel.toLowerCase().includes(query),
+        )
+      : quickSkills;
+    matchedSkills.forEach((s) => options.push({ type: 'skill', data: s }));
+
+    // Then commands
+    const matchedCommands = query
+      ? QUICK_COMMANDS.filter((cmd) =>
+          cmd.name.toLowerCase().includes(query)
+          || cmd.description.toLowerCase().includes(query),
+        )
+      : QUICK_COMMANDS;
+    matchedCommands.forEach((c) => options.push({ type: 'command', data: c }));
+
+    return options;
+  }, [quickCmdQuery, slashMode.active, slashQuery, quickSkills]);
+
   const showAgentPicker = mentionableAgents.length > 0;
   const showModelPicker = modelOptions.length > 1;
   const chatComposerStatusComponents = rendererExtensionRegistry.getChatComposerStatusComponents();
@@ -388,25 +436,31 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   }, [agents, currentAgentId, targetAgentId]);
 
   useEffect(() => {
-    if (!pickerOpen && !skillPickerOpen && !modelPickerOpen && !quickCmdPickerOpen) return;
+    if (!pickerOpen && !skillPickerOpen && !modelPickerOpen && !quickCmdPickerOpen && !rwPickerOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       const insideAgentPicker = pickerRef.current?.contains(target);
       const insideSkillPicker = skillPickerRef.current?.contains(target);
       const insideQuickCmdPicker = quickCmdPickerRef.current?.contains(target);
       const insideModelPicker = modelPickerRef.current?.contains(target);
-      if (!insideAgentPicker && !insideSkillPicker && !insideQuickCmdPicker && !insideModelPicker) {
+      const insideRwPicker = rwPickerRef.current?.contains(target);
+      if (!insideAgentPicker && !insideSkillPicker && !insideQuickCmdPicker && !insideModelPicker && !insideRwPicker) {
         setPickerOpen(false);
         setSkillPickerOpen(false);
         setQuickCmdPickerOpen(false);
         setModelPickerOpen(false);
+        setRwPickerOpen(false);
+      }
+      // Clicking outside the textarea while in slash mode exits it
+      if (slashMode.active && target !== textareaRef.current && !textareaRef.current?.contains(target)) {
+        setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
       }
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
     };
-  }, [modelPickerOpen, pickerOpen, quickCmdPickerOpen, skillPickerOpen]);
+  }, [modelPickerOpen, pickerOpen, quickCmdPickerOpen, rwPickerOpen, skillPickerOpen, slashMode.active]);
 
   useEffect(() => {
     setSelectedSkill((prev) => {
@@ -431,7 +485,27 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
 
   const handleInputChange = useCallback((value: string) => {
     setInput(value);
-  }, []);
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const cursor = textarea.selectionStart ?? value.length;
+
+    if (slashMode.active) {
+      // If user backspaced before or on the `/`, exit slash mode
+      if (cursor <= slashMode.startIndex || value[slashMode.startIndex] !== '/') {
+        setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+        return;
+      }
+      // Reset selection index when query changes
+      setSlashMode((prev) => ({ ...prev, selectedIndex: 0 }));
+      return;
+    }
+
+    // Detect entering slash mode: `/` typed only as the very first character
+    if (value[cursor - 1] === '/' && cursor === 1) {
+      setSlashMode({ active: true, startIndex: cursor - 1, selectedIndex: 0 });
+    }
+  }, [slashMode.active, slashMode.startIndex]);
 
   const moveCaretTo = useCallback((position: number) => {
     textareaRef.current?.focus();
@@ -443,17 +517,24 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
   }, []);
 
   const normalizeSelectionAroundSkill = useCallback(() => {
-    if (skillTokenRanges.length === 0) return;
     const textarea = textareaRef.current;
     if (!textarea) return;
     const selectionStart = textarea.selectionStart ?? 0;
     const selectionEnd = textarea.selectionEnd ?? 0;
+
+    // Exit slash mode if caret moved before the `/`
+    if (slashMode.active && selectionStart <= slashMode.startIndex) {
+      setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+      return;
+    }
+
+    if (skillTokenRanges.length === 0) return;
     if (selectionStart !== selectionEnd) return;
     const tokenRange = skillTokenRanges.find((range) => selectionStart > range.start && selectionStart < range.end);
     if (tokenRange) {
       moveCaretTo(tokenRange.end);
     }
-  }, [moveCaretTo, skillTokenRanges]);
+  }, [moveCaretTo, skillTokenRanges, slashMode.active, slashMode.startIndex]);
 
   const loadQuickSkills = useCallback(async (): Promise<QuickAccessSkill[]> => {
     if (!currentAgent) {
@@ -489,6 +570,13 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       setSkillsLoading(false);
     }
   }, [currentAgent]);
+
+  // Auto-load skills when slash mode activates
+  useEffect(() => {
+    if (slashMode.active && quickSkills.length === 0 && currentAgent) {
+      void loadQuickSkills();
+    }
+  }, [slashMode.active, quickSkills.length, currentAgent, loadQuickSkills]);
 
   const handleSkillTokenPreview = useCallback(async (skillName: string) => {
     let list = quickSkills;
@@ -673,6 +761,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
 
   const handleSend = useCallback(async () => {
     if (!canSend) return;
+    // If slash command picker is open, don't send; user is still choosing
+    if (slashMode.active) return;
     const readyAttachments = attachments.filter(a => a.status === 'ready');
     const textToSend = input.trim();
     const attachmentsToSend = readyAttachments.length > 0 ? readyAttachments : undefined;
@@ -713,7 +803,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
     setTargetAgentId(null);
     setPickerOpen(false);
     setSkillPickerOpen(false);
-  }, [input, attachments, canSend, onSend, targetAgentId]);
+  }, [input, attachments, canSend, onSend, targetAgentId, slashMode.active]);
 
   const handleStop = useCallback(() => {
     if (!canStop) return;
@@ -722,6 +812,78 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Slash-mode keyboard navigation takes priority
+      if (slashMode.active) {
+        const total = filteredSlashOptions.length;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setSlashMode((prev) => ({ ...prev, selectedIndex: (prev.selectedIndex + 1) % Math.max(total, 1) }));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setSlashMode((prev) => ({ ...prev, selectedIndex: (prev.selectedIndex - 1 + Math.max(total, 1)) % Math.max(total, 1) }));
+          return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const option = filteredSlashOptions[slashMode.selectedIndex];
+          if (option) {
+            let replacement: string;
+            let cursorOffset: number;
+            if (option.type === 'skill') {
+              replacement = getSkillPrefix(option.data.name);
+              cursorOffset = replacement.length;
+            } else {
+              replacement = `/${option.data.name} `;
+              cursorOffset = replacement.length;
+            }
+            const before = input.slice(0, slashMode.startIndex);
+            const after = input.slice(textareaRef.current?.selectionStart ?? input.length);
+            const newValue = `${before}${replacement}${after}`;
+            setInput(newValue);
+            setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+            requestAnimationFrame(() => {
+              const pos = slashMode.startIndex + cursorOffset;
+              textareaRef.current?.focus();
+              textareaRef.current?.setSelectionRange(pos, pos);
+            });
+          }
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const option = filteredSlashOptions[slashMode.selectedIndex];
+          if (option) {
+            let replacement: string;
+            let cursorOffset: number;
+            if (option.type === 'skill') {
+              replacement = getSkillPrefix(option.data.name);
+              cursorOffset = replacement.length;
+            } else {
+              replacement = `/${option.data.name} `;
+              cursorOffset = replacement.length;
+            }
+            const before = input.slice(0, slashMode.startIndex);
+            const after = input.slice(textareaRef.current?.selectionStart ?? input.length);
+            const newValue = `${before}${replacement}${after}`;
+            setInput(newValue);
+            setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+            requestAnimationFrame(() => {
+              const pos = slashMode.startIndex + cursorOffset;
+              textareaRef.current?.focus();
+              textareaRef.current?.setSelectionRange(pos, pos);
+            });
+          }
+          return;
+        }
+      }
+
       if (e.key === 'Backspace') {
         const textarea = textareaRef.current;
         const selectionStart = textarea?.selectionStart ?? 0;
@@ -789,7 +951,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
         handleSend();
       }
     },
-    [handleSend, input, moveCaretTo, selectedSkill, skillTokenRanges],
+    [handleSend, input, moveCaretTo, selectedSkill, skillTokenRanges, slashMode, filteredSlashOptions],
   );
 
   // Handle paste (Ctrl/Cmd+V with files)
@@ -902,6 +1064,99 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
                 })}
               </div>
             )}
+
+            {/* Slash Command Picker — floats above textarea */}
+            {slashMode.active && (
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-80 overflow-hidden rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-card">
+                <div className="px-3 py-2 text-tiny font-medium text-muted-foreground/80">
+                  {t('composer.slashPickerTitle', '快捷命令 & Skills')}
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {skillsLoading && quickSkills.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-muted-foreground">
+                      {t('composer.skillLoading', 'Loading skills...')}
+                    </div>
+                  ) : filteredSlashOptions.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-muted-foreground">
+                      {t('composer.slashEmpty', '无匹配命令或 Skill')}
+                    </div>
+                  ) : (
+                    (() => {
+                      const groups: { title: string; items: { option: SlashOption; index: number }[] }[] = [];
+                      let currentGroup: typeof groups[0] | null = null;
+                      filteredSlashOptions.forEach((option, index) => {
+                        const title = option.type === 'skill'
+                          ? SLASH_SKILL_CATEGORY_LABEL
+                          : (QUICK_COMMAND_CATEGORIES[option.data.category] ?? option.data.category);
+                        if (!currentGroup || currentGroup.title !== title) {
+                          currentGroup = { title, items: [] };
+                          groups.push(currentGroup);
+                        }
+                        currentGroup.items.push({ option, index });
+                      });
+                      return groups.map((group) => (
+                        <div key={group.title}>
+                          <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                            {group.title}
+                          </div>
+                          {group.items.map(({ option, index }) => {
+                            const isActive = index === slashMode.selectedIndex;
+                            const name = option.type === 'skill' ? option.data.name : option.data.name;
+                            const desc = option.type === 'skill' ? option.data.description : option.data.description;
+                            return (
+                              <button
+                                key={`${option.type}-${name}`}
+                                type="button"
+                                onClick={() => {
+                                  let replacement: string;
+                                  let cursorOffset: number;
+                                  if (option.type === 'skill') {
+                                    replacement = getSkillPrefix(name);
+                                    cursorOffset = replacement.length;
+                                  } else {
+                                    replacement = `/${name} `;
+                                    cursorOffset = replacement.length;
+                                  }
+                                  const before = input.slice(0, slashMode.startIndex);
+                                  const after = input.slice(textareaRef.current?.selectionStart ?? input.length);
+                                  const newValue = `${before}${replacement}${after}`;
+                                  setInput(newValue);
+                                  setSlashMode({ active: false, startIndex: -1, selectedIndex: 0 });
+                                  requestAnimationFrame(() => {
+                                    const pos = slashMode.startIndex + cursorOffset;
+                                    textareaRef.current?.focus();
+                                    textareaRef.current?.setSelectionRange(pos, pos);
+                                  });
+                                }}
+                                className={cn(
+                                  'flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition-colors',
+                                  isActive ? 'bg-primary/10 text-foreground' : 'hover:bg-black/5 dark:hover:bg-white/5',
+                                )}
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-meta font-semibold text-foreground">
+                                    <span className="font-mono">/{name}</span>
+                                    {option.type === 'skill' && (
+                                      <span className="ml-1.5 rounded-full border border-black/10 bg-black/[0.03] px-1.5 py-0.5 text-2xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                                        {option.data.sourceLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="truncate text-tiny text-muted-foreground">
+                                    {desc}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ));
+                    })()
+                  )}
+                </div>
+              </div>
+            )}
+
             <Textarea
               ref={textareaRef}
               value={input}
@@ -1222,6 +1477,137 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               </div>
             )}
 
+            {/* Read-Write Workspace */}
+            <div ref={rwPickerRef} className="relative shrink-0 ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-7 gap-1.5 rounded-lg px-2 text-tiny font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-colors',
+                  rwWorkDir && 'bg-primary/10 text-primary hover:bg-primary/20',
+                )}
+                onClick={() => {
+                  setPickerOpen(false);
+                  setSkillPickerOpen(false);
+                  setQuickCmdPickerOpen(false);
+                  setModelPickerOpen(false);
+                  setRwPickerOpen((open) => !open);
+                }}
+                disabled={disabled || sending}
+                title={rwWorkDir ? `${t('composer.rwWorkDirSet', '读写空间')}: ${rwWorkDir}` : t('composer.rwWorkDir', '设置读写空间')}
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                {t('composer.rwWorkDir', '读写空间')}
+              </Button>
+              {rwPickerOpen && (
+                <div className="absolute right-0 bottom-full z-20 mb-2 w-72 overflow-hidden rounded-2xl border border-black/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-card">
+                  <div className="px-3 py-2 text-tiny font-medium text-muted-foreground/80">
+                    {t('composer.rwWorkDirTitle', '读写空间')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!currentAgent?.workspace) return;
+                      const docsDir = `${currentAgent.workspace}/docs`;
+                      try {
+                        await invokeIpc('rw-workspace:set', currentAgent.workspace, docsDir);
+                        setRwWorkDir(docsDir);
+                      } catch (err) {
+                        console.error('[rw-workspace] set (docs) failed:', err);
+                        toast.error(t('composer.rwWorkDirSetFailed', '设置读写空间失败'));
+                        return;
+                      }
+                      setRwPickerOpen(false);
+                    }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <FolderOpen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <div className="text-meta font-medium text-foreground">
+                        {currentAgentName} Workspace/docs
+                      </div>
+                      <div className="truncate text-tiny text-muted-foreground">
+                        {currentAgent?.workspace ? `${currentAgent.workspace}/docs` : '—'}
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const result = await invokeIpc('dialog:open', {
+                          properties: ['openDirectory'],
+                        }) as { canceled: boolean; filePaths?: string[] };
+                        if (result.canceled || !result.filePaths?.[0]) return;
+                        const selectedDir = result.filePaths[0];
+                        if (!currentAgent?.workspace) {
+                          toast.error(t('composer.rwWorkDirNoAgent', '当前无 Agent，无法设置'));
+                          return;
+                        }
+                        await invokeIpc('rw-workspace:set', currentAgent.workspace, selectedDir);
+                        setRwWorkDir(selectedDir);
+                        setRwPickerOpen(false);
+                      } catch (err) {
+                        console.error('[rw-workspace] set failed:', err);
+                        toast.error(t('composer.rwWorkDirPickFailed', '选择目录失败'));
+                      }
+                    }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    <Search className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <div className="text-meta font-medium text-foreground">
+                        {t('composer.rwWorkDirCustom', '自定义目录...')}
+                      </div>
+                      <div className="text-tiny text-muted-foreground">
+                        {t('composer.rwWorkDirCustomHint', '选择任意本地文件夹')}
+                      </div>
+                    </div>
+                  </button>
+                  {rwWorkDir && (
+                    <>
+                      <div className="my-1 border-t border-black/5 dark:border-white/10" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-2 rounded-xl px-3 py-2">
+                            <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+                            <div className="min-w-0">
+                              <div className="text-meta font-medium text-primary">
+                                {t('composer.rwWorkDirCurrent', '当前目录')}
+                              </div>
+                              <div className="truncate text-tiny text-muted-foreground">
+                                {rwWorkDir}
+                              </div>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs break-all text-xs">
+                          {rwWorkDir}
+                        </TooltipContent>
+                      </Tooltip>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await invokeIpc('rw-workspace:clear', currentAgent!.workspace!);
+                            setRwWorkDir(null);
+                          } catch (err) {
+                            toast.error(t('composer.rwWorkDirClearFailed', '清除读写空间失败'));
+                            return;
+                          }
+                          setRwPickerOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-meta text-destructive transition-colors hover:bg-destructive/5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        {t('composer.rwWorkDirClear', '清除设置')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Send Button — pushed to the right */}
             <Button
               onClick={sending ? handleStop : handleSend}
@@ -1229,7 +1615,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
               size="icon"
               data-testid="chat-composer-send"
               className={cn(
-                'ml-auto shrink-0 h-8 w-8 rounded-lg transition-all duration-200',
+                'shrink-0 h-8 w-8 rounded-lg transition-all duration-200',
                 sending || canSend
                   ? 'bg-primary text-white shadow-sm hover:bg-primary/90 hover:shadow-md hover:shadow-primary/20 hover:-translate-y-px active:translate-y-0'
                   : 'text-muted-foreground/40 bg-transparent hover:bg-transparent'
