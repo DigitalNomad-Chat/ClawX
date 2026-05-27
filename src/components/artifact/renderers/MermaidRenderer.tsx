@@ -71,7 +71,7 @@ export function MermaidRenderer({ artifact }: StreamArtifactRendererProps) {
   return (
     <div
       ref={containerRef}
-      className="p-4 overflow-auto flex justify-center"
+      className="h-full p-4 overflow-auto flex justify-center"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
