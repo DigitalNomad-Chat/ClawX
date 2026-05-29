@@ -5,8 +5,11 @@ import {
   ChevronRight,
   X,
   Brain,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GlobalDefaultModelCard } from '@/components/models/GlobalDefaultModelCard';
+import { AgentModelAssignmentsView } from '@/components/models/AgentModelAssignmentsView';
 import { useGatewayStore } from '@/stores/gateway';
 import { useSettingsStore } from '@/stores/settings';
 import { hostApiFetch } from '@/lib/host-api';
@@ -49,6 +52,7 @@ export function Models() {
   const [usagePage, setUsagePage] = useState(1);
   const [selectedUsageEntry, setSelectedUsageEntry] = useState<UsageHistoryEntry | null>(null);
   const [usageRefreshNonce, setUsageRefreshNonce] = useState(0);
+  const [showAssignmentsView, setShowAssignmentsView] = useState(false);
   function formatUsageSource(source?: string): string | undefined {
     if (!source) return undefined;
 
@@ -272,6 +276,12 @@ export function Models() {
   const usageLoading = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length === 0;
   const usageRefreshing = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length > 0;
 
+  if (showAssignmentsView) {
+    return (
+      <AgentModelAssignmentsView onBack={() => setShowAssignmentsView(false)} />
+    );
+  }
+
   return (
     <div data-testid="models-page" className="flex h-full flex-col gap-6">
       {/* Header */}
@@ -288,9 +298,21 @@ export function Models() {
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-8">
-          
+
           {/* AI Providers Section */}
           <ProvidersSettings />
+
+          {/* Global Default Model */}
+          <GlobalDefaultModelCard />
+
+          {/* Agent Model Assignments */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">{t('agents:agentModelAssignments.sectionTitle')}</h2>
+            <Button variant="outline" size="sm" onClick={() => setShowAssignmentsView(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              {t('agents:agentModelAssignments.manageAssignments')}
+            </Button>
+          </div>
 
           {/* Token Usage History Section */}
           <div>
