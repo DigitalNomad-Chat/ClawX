@@ -48,6 +48,7 @@ import {
 } from '@/lib/channel-alias';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { FeishuGroupsEditor } from './FeishuGroupsEditor';
 import telegramIcon from '@/assets/channels/telegram.svg';
 import discordIcon from '@/assets/channels/discord.svg';
 import whatsappIcon from '@/assets/channels/whatsapp.svg';
@@ -503,6 +504,14 @@ export function ChannelConfigModal({
 
       const credentials: Record<string, unknown> = { ...configValues, enabled };
       const settings: Record<string, unknown> = { ...settingsValues };
+      // Parse groups JSON string into object before sending to backend
+      if (typeof settings.groups === 'string' && settings.groups.trim()) {
+        try {
+          settings.groups = JSON.parse(settings.groups);
+        } catch {
+          // leave as string if invalid JSON; backend will handle it
+        }
+      }
       const saveResult = await hostApiFetch<{
         success?: boolean;
         error?: string;
@@ -1181,7 +1190,7 @@ function SettingsGroupPanel({
 }) {
   // Determine which fields are "compact" (can sit side-by-side)
   const isCompact = (f: ChannelSettingsField) => f.type === 'checkbox' || f.type === 'number';
-  const isFullWidth = (f: ChannelSettingsField) => f.type === 'textarea' || f.type === 'password' || f.key === 'proxy';
+  const isFullWidth = (f: ChannelSettingsField) => f.type === 'textarea' || f.type === 'password' || f.type === 'custom' || f.key === 'proxy';
 
   // Group consecutive compact fields into pairs
   const rows: Array<{ kind: 'single' | 'pair'; fields: ChannelSettingsField[] }> = [];
@@ -1217,7 +1226,7 @@ function SettingsGroupPanel({
             ))}
           </div>
         ) : (
-          <SettingsField
+          <SingleSettingsField
             key={row.fields[0].key}
             field={row.fields[0]}
             value={settingsValues[row.fields[0].key] ?? String(row.fields[0].defaultValue ?? '')}
@@ -1228,6 +1237,27 @@ function SettingsGroupPanel({
         )
       )}
     </div>
+  );
+}
+
+function SingleSettingsField({
+  field,
+  value,
+  onChange,
+  showSecret,
+  onToggleSecret,
+}: SettingsFieldProps) {
+  if (field.type === 'custom' && field.key === 'groups') {
+    return <FeishuGroupsEditor value={value} onChange={onChange} />;
+  }
+  return (
+    <SettingsField
+      field={field}
+      value={value}
+      onChange={onChange}
+      showSecret={showSecret}
+      onToggleSecret={onToggleSecret}
+    />
   );
 }
 

@@ -458,6 +458,14 @@
             "label": "群组白名单 (groupAllowFrom)",
             "placeholder": "每行一个群组 ID"
         },
+        "groupSenderAllowFrom": {
+            "label": "全局群组发送者白名单 (groupSenderAllowFrom)",
+            "placeholder": "每行一个用户 open_id，例如 ou_xxxxxx",
+            "description": "配置后，仅这些用户能在任何群组内触发机器人回复；留空表示不限制。单群组的 allowFrom 优先级更高。"
+        },
+        "resolveSenderNames": {
+            "label": "解析发送者显示名称 (resolveSenderNames)"
+        },
         "requireMention": {
             "label": "群组需要 @机器人 (requireMention)"
         },
@@ -530,7 +538,8 @@
         },
         "groups": {
             "label": "群组精细配置 (groups)",
-            "placeholder": "JSON 格式，例如 {\"oc_xxx\":{\"requireMention\":true,\"groupPolicy\":\"allowlist\"}}"
+            "placeholder": "JSON 格式，例如 {\"oc_xxx\":{\"requireMention\":true,\"allowFrom\":[\"ou_user1\",\"ou_user2\"]}}",
+            "description": "可为每个群组单独设置 requireMention、allowFrom 等策略。"
         },
         "groupCommandMentionBypass": {
             "label": "群聊命令绕过 @策略 (groupCommandMentionBypass)",
@@ -614,6 +623,45 @@
         "proactivePermissionHint": {
             "label": "主动权限提示 (proactivePermissionHint)"
         }
+    },
+    "groups": {
+        "addGroup": "添加群组",
+        "emptyHint": "暂无群组配置，点击右上角添加",
+        "groupIdPlaceholder": "群组 ID，例如 oc_xxxxxx",
+        "enabled": "启用",
+        "enabledTooltip": "关闭后，机器人在此群组中不会响应任何消息",
+        "requireMention": "需@机器人",
+        "requireMentionTooltip": "开启后，用户必须@机器人，机器人才会回复",
+        "policy": {
+            "allowlist": "白名单",
+            "open": "开放",
+            "disabled": "禁用"
+        },
+        "policyTooltip": "白名单：仅允许白名单中的用户触发；开放：任何人均可触发；禁用：该群组完全禁用",
+        "allowFrom": "发送者白名单 (allowFrom)",
+        "allowFromPlaceholder": "每行一个用户 open_id，例如 ou_xxxxxx",
+        "fetchUsers": "显示已交互用户",
+        "scanUsers": "扫描日志",
+        "fetchUsersLoading": "正在加载...",
+        "fetchUsersError": "加载失败",
+        "fetchUsersRetry": "重试",
+        "noUsers": "暂无交互用户。点击「扫描日志」从 OpenClaw 日志中提取",
+        "noSearchResults": "未找到匹配的用户，请尝试其他关键词",
+        "selectAgent": "选择 Agent",
+        "allAgents": "全部 Agent",
+        "userSearchPlaceholder": "搜索用户姓名、ID 或消息内容..."
+    },
+    "pairing": {
+        "button": "配对码",
+        "title": "填写配对码",
+        "description": "请填写配对码，或直接粘贴完整命令。",
+        "placeholder": "openclaw pairing approve feishu UZM4NXNC --notify",
+        "hint": "支持粘贴完整命令（含 --notify），系统会自动提取配对码。",
+        "emptyCode": "请先填写有效配对码",
+        "success": "配对成功：已添加用户 {{openId}}",
+        "failed": "配对失败：{{error}}",
+        "submitting": "配对中...",
+        "confirm": "确认配对"
     },
     "bindingManage": {
         "entry": "绑定管理",

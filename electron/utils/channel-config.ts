@@ -108,6 +108,7 @@ const NUMBER_CONFIG_KEYS = new Set([
 const ARRAY_CONFIG_KEYS = new Set([
     'allowFrom',
     'groupAllowFrom',
+    'groupSenderAllowFrom',
 ]);
 
 /**
@@ -168,6 +169,19 @@ function coerceConfigTypes(
         if (ARRAY_CONFIG_KEYS.has(key)) {
             result[key] = value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
             continue;
+        }
+
+        // JSON object fields (e.g. feishu groups config)
+        if (key === 'groups') {
+            try {
+                const parsed = JSON.parse(value);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    result[key] = parsed;
+                    continue;
+                }
+            } catch {
+                // fall through to keep as string if invalid JSON
+            }
         }
 
         result[key] = value;
@@ -917,6 +931,17 @@ export async function saveChannelConfig(
             enabled: coercedConfig.enabled ?? true,
         };
 
+        // Prevent stale public-settings keys from lingering in ANY account
+        // config and overriding the top-level values at runtime.
+        if (publicSettings) {
+            for (const accountKey of Object.keys(accounts)) {
+                for (const key of Object.keys(publicSettings)) {
+                    if (key === 'accounts' || key === 'defaultAccount' || key === 'enabled') continue;
+                    delete accounts[accountKey][key];
+                }
+            }
+        }
+
         // Keep channel-level enabled explicit so callers/tests that
         // read channels.<type>.enabled still work.
         channelSection.enabled = coercedConfig.enabled ?? channelSection.enabled ?? true;
@@ -941,6 +966,48 @@ export async function saveChannelConfig(
         // Coerce string form values to proper JSON types before writing.
         if (publicSettings) {
             const coercedSettings = coerceConfigTypes(publicSettings, channelSection);
+
+            // Fix for Feishu/Lark SDK behavior: resolveChannelGroupPolicy treats
+            // any non-empty `groups` as a group-level allowlist. When the global
+            // groupPolicy is "open", we inject a wildcard "*" entry so that
+            // unlisted groups aren't blocked at SDK Layer 1; per-group settings
+            // (requireMention, allowFrom, etc.) still apply to explicitly listed
+            // groups. When groupPolicy switches away from "open", remove an
+            // empty auto-added wildcard so the allowlist behaves correctly.
+            if (resolvedChannelType === 'feishu' || resolvedChannelType === 'lark') {
+                const groups = coercedSettings.groups;
+                const effectiveGroupPolicy =
+                    coercedSettings.groupPolicy ?? channelSection.groupPolicy ?? 'open';
+                if (
+                    effectiveGroupPolicy === 'open' &&
+                    groups &&
+                    typeof groups === 'object' &&
+                    !Array.isArray(groups)
+                ) {
+                    const groupKeys = Object.keys(groups);
+                    if (groupKeys.length > 0 && !Object.hasOwn(groups, '*')) {
+                        coercedSettings.groups = { '*': {}, ...groups };
+                    }
+                }
+                if (
+                    effectiveGroupPolicy !== 'open' &&
+                    groups &&
+                    typeof groups === 'object' &&
+                    !Array.isArray(groups)
+                ) {
+                    const star = (groups as Record<string, unknown>)['*'];
+                    if (
+                        star &&
+                        typeof star === 'object' &&
+                        !Array.isArray(star) &&
+                        Object.keys(star).length === 0
+                    ) {
+                        const { '*': _, ...rest } = groups as Record<string, unknown>;
+                        coercedSettings.groups = rest;
+                    }
+                }
+            }
+
             for (const [key, value] of Object.entries(coercedSettings)) {
                 if (key === 'accounts' || key === 'defaultAccount') continue;
                 channelSection[key] = value;
@@ -1005,6 +1072,8 @@ function extractFormValues(channelType: string, saved: ChannelConfigData): Recor
             values[key] = String(value);
         } else if (Array.isArray(value)) {
             values[key] = value.join('\n');
+        } else if (typeof value === 'object' && value !== null) {
+            values[key] = JSON.stringify(value);
         }
     }
 

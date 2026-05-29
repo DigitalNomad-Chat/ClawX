@@ -13,6 +13,7 @@ import {
   type ProviderConfig,
 } from '../utils/secure-storage';
 import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir, expandPath } from '../utils/paths';
+import { extractAndCacheFeishuUser } from '../utils/feishu-user-cache';
 import { getOpenClawCliCommand } from '../utils/openclaw-cli';
 import { getAllSettings, getSetting, resetSettings, setSetting, type AppSettings } from '../utils/store';
 import {
@@ -1420,7 +1421,13 @@ function registerGatewayHandlers(
   });
 
   gatewayManager.on('notification', (notification) => {
+    // Also try to extract sender info from notification events (e.g. agent events).
+    extractAndCacheFeishuUser(notification);
+
     if (!mainWindow.isDestroyed()) {
+      // DEBUG: send raw event to renderer for diagnostics
+      const keys = notification && typeof notification === 'object' ? Object.keys(notification as object) : [];
+      mainWindow.webContents.send('feishu-debug', { source: 'notification', keys });
       mainWindow.webContents.send('gateway:notification', notification);
     }
   });
@@ -1444,7 +1451,13 @@ function registerGatewayHandlers(
   });
 
   gatewayManager.on('chat:message', (data) => {
+    // Extract sender info from OpenClaw messages to build a local user cache.
+    // This avoids requiring Feishu contact API permissions.
+    extractAndCacheFeishuUser(data);
+
     if (!mainWindow.isDestroyed()) {
+      // DEBUG: send raw event to renderer for diagnostics
+      mainWindow.webContents.send('feishu-debug', { source: 'chat:message', keys: Object.keys(data as object) });
       mainWindow.webContents.send('gateway:chat-message', data);
     }
   });

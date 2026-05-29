@@ -111,6 +111,9 @@ function maybeLoadHistory(
 }
 
 function handleGatewayNotification(notification: { method?: string; params?: Record<string, unknown> } | undefined): void {
+  // DEBUG: log incoming notification events
+  console.log('[gateway:notification] received:', JSON.stringify(notification).slice(0, 500));
+
   const payload = notification;
   if (!payload || payload.method !== 'agent' || !payload.params || typeof payload.params !== 'object') {
     return;
@@ -197,6 +200,9 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
 }
 
 function handleGatewayChatMessage(data: unknown): void {
+  // DEBUG: log incoming chat:message events to help diagnose Feishu sender extraction
+  console.log('[gateway:chat-message] received:', JSON.stringify(data).slice(0, 500));
+
   import('./chat').then(({ useChatStore }) => {
     const chatData = data as Record<string, unknown>;
     const payload = ('message' in chatData && typeof chatData.message === 'object')

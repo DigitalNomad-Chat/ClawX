@@ -454,6 +454,14 @@
             "label": "Group Allowlist (groupAllowFrom)",
             "placeholder": "One group ID per line"
         },
+        "groupSenderAllowFrom": {
+            "label": "Global Group Sender Allowlist (groupSenderAllowFrom)",
+            "placeholder": "One open_id per line, e.g. ou_xxxxxx",
+            "description": "When set, only these users can trigger the bot in any group chat. Leave empty to allow all. Per-group allowFrom takes precedence."
+        },
+        "resolveSenderNames": {
+            "label": "Resolve Sender Display Names (resolveSenderNames)"
+        },
         "requireMention": {
             "label": "Require @mention in groups (requireMention)"
         },
@@ -526,7 +534,8 @@
         },
         "groups": {
             "label": "Group Fine-grained Config (groups)",
-            "placeholder": "JSON, e.g. {\"oc_xxx\":{\"requireMention\":true,\"groupPolicy\":\"allowlist\"}}"
+            "placeholder": "JSON, e.g. {\"oc_xxx\":{\"requireMention\":true,\"allowFrom\":[\"ou_user1\",\"ou_user2\"]}}",
+            "description": "Set requireMention, allowFrom, etc. per group."
         },
         "groupCommandMentionBypass": {
             "label": "Group Command Mention Bypass (groupCommandMentionBypass)",
@@ -610,5 +619,44 @@
         "proactivePermissionHint": {
             "label": "Proactive Permission Hint (proactivePermissionHint)"
         }
+    },
+    "pairing": {
+        "button": "Pairing Code",
+        "title": "Enter Pairing Code",
+        "description": "Enter the pairing code, or paste the full command.",
+        "placeholder": "openclaw pairing approve feishu UZM4NXNC --notify",
+        "hint": "Supports pasting the full command (including --notify). The system will automatically extract the pairing code.",
+        "emptyCode": "Please enter a valid pairing code",
+        "success": "Pairing successful: added user {{openId}}",
+        "failed": "Pairing failed: {{error}}",
+        "submitting": "Pairing...",
+        "confirm": "Confirm Pairing"
+    },
+    "groups": {
+        "addGroup": "Add Group",
+        "emptyHint": "No group configs yet. Click the button above to add one.",
+        "groupIdPlaceholder": "Group ID, e.g. oc_xxxxxx",
+        "enabled": "Enabled",
+        "enabledTooltip": "When disabled, the bot will not respond in this group",
+        "requireMention": "Require @mention",
+        "requireMentionTooltip": "When enabled, users must @mention the bot to trigger a response",
+        "policy": {
+            "allowlist": "Allowlist",
+            "open": "Open",
+            "disabled": "Disabled"
+        },
+        "policyTooltip": "Allowlist: only allowlisted users can trigger; Open: anyone can trigger; Disabled: completely disabled for this group",
+        "allowFrom": "Sender Allowlist (allowFrom)",
+        "allowFromPlaceholder": "One open_id per line, e.g. ou_xxxxxx",
+        "fetchUsers": "Show interacted users",
+        "scanUsers": "Scan logs",
+        "fetchUsersLoading": "Loading...",
+        "fetchUsersError": "Failed to load",
+        "fetchUsersRetry": "Retry",
+        "noUsers": "No users yet. Click \"Scan logs\" to extract from OpenClaw logs.",
+        "noSearchResults": "No matching users found. Try a different keyword.",
+        "selectAgent": "Select Agent",
+        "allAgents": "All Agents",
+        "userSearchPlaceholder": "Search by name, ID or message..."
     }
 }

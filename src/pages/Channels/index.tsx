@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, Settings2, Zap } from 'lucide-react';
+import { RefreshCw, Trash2, AlertCircle, Plus, Copy, RotateCcw, ChevronDown, ChevronUp, Radio, Settings2, Zap, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useGatewayStore } from '@/stores/gateway';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -151,6 +152,10 @@ export function Channels() {
   const [initialConfigValuesForModal, setInitialConfigValuesForModal] = useState<Record<string, string> | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [quickBindAgentId, setQuickBindAgentId] = useState<string | undefined>();
+  const [showPairingModal, setShowPairingModal] = useState(false);
+  const [pairingAccountId, setPairingAccountId] = useState<string | undefined>(undefined);
+  const [pairingCodeInput, setPairingCodeInput] = useState('');
+  const [pairingLoading, setPairingLoading] = useState(false);
   const convergenceRefreshTimersRef = useRef<number[]>([]);
   const fetchInFlightRef = useRef(false);
   const queuedFetchOptionsRef = useRef<FetchPageDataOptions | null>(null);
@@ -476,6 +481,51 @@ export function Channels() {
       toast.success(t('toast.bindingUpdated'));
     } catch (bindError) {
       toast.error(t('toast.configFailed', { error: String(bindError) }));
+    }
+  };
+
+  const handleOpenPairingModal = (accountId: string) => {
+    setPairingAccountId(accountId);
+    setPairingCodeInput('');
+    setShowPairingModal(true);
+  };
+
+  const handleClosePairingModal = () => {
+    if (pairingLoading) return;
+    setShowPairingModal(false);
+    setPairingAccountId(undefined);
+    setPairingCodeInput('');
+  };
+
+  const handleSubmitPairing = async () => {
+    const code = pairingCodeInput.trim();
+    if (!code) {
+      toast.error(t('pairing.emptyCode'));
+      return;
+    }
+    if (!pairingAccountId) return;
+
+    setPairingLoading(true);
+    try {
+      const result = await hostApiFetch<{
+        success: boolean;
+        openId?: string;
+        accountId?: string;
+        error?: string;
+      }>('/api/channels/feishu/pairing/approve', {
+        method: 'POST',
+        body: JSON.stringify({ accountId: pairingAccountId, pairingCode: code }),
+      });
+      if (!result.success) {
+        throw new Error(result.error || '配对失败');
+      }
+      setShowPairingModal(false);
+      setPairingCodeInput('');
+      toast.success(t('pairing.success', { openId: result.openId || '' }));
+    } catch (error) {
+      toast.error(t('pairing.failed', { error: String(error) }));
+    } finally {
+      setPairingLoading(false);
     }
   };
 
@@ -837,6 +887,16 @@ export function Channels() {
                                   <option key={agent.id} value={agent.id}>{agent.name}</option>
                                 ))}
                               </select>
+                              {group.channelType === 'feishu' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenPairingModal(account.accountId)}
+                                >
+                                  <KeyRound className="h-3.5 w-3.5 mr-1" />
+                                  {t('pairing.button')}
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -980,6 +1040,44 @@ export function Channels() {
         }}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {showPairingModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePairingModal();
+          }}
+        >
+          <div className="mx-4 w-full max-w-md rounded-lg border bg-card p-6 shadow-lg">
+            <h2 className="text-lg font-semibold">{t('pairing.title')}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{t('pairing.description')}</p>
+            <div className="mt-4">
+              <Input
+                value={pairingCodeInput}
+                onChange={(e) => setPairingCodeInput(e.target.value)}
+                placeholder={t('pairing.placeholder')}
+                disabled={pairingLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void handleSubmitPairing();
+                  }
+                }}
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">{t('pairing.hint')}</p>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={handleClosePairingModal} disabled={pairingLoading}>
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button onClick={() => { void handleSubmitPairing(); }} disabled={pairingLoading}>
+                {pairingLoading ? t('pairing.submitting') : t('pairing.confirm')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

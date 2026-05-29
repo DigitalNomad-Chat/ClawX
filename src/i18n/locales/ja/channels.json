@@ -424,5 +424,47 @@
             ]
         }
     },
+    "fields": {
+        "groupSenderAllowFrom": {
+            "label": "グローバルグループ送信者許可リスト (groupSenderAllowFrom)",
+            "placeholder": "1行に1つの open_id、例: ou_xxxxxx",
+            "description": "設定すると、これらのユーザーのみが任意のグループでボットをトリガーできます。空の場合は制限なし。グループごとの allowFrom の方が優先されます。"
+        },
+        "resolveSenderNames": {
+            "label": "送信者表示名を解決 (resolveSenderNames)"
+        },
+        "groups": {
+            "label": "グループ詳細設定 (groups)",
+            "placeholder": "JSON形式、例: {\"oc_xxx\":{\"requireMention\":true,\"allowFrom\":[\"ou_user1\",\"ou_user2\"]}}",
+            "description": "グループごとに requireMention や allowFrom を設定できます。"
+        }
+    },
+    "groups": {
+        "addGroup": "グループを追加",
+        "emptyHint": "グループ設定がありません。右上のボタンをクリックして追加してください。",
+        "groupIdPlaceholder": "グループ ID、例: oc_xxxxxx",
+        "enabled": "有効",
+        "enabledTooltip": "無効にすると、このグループでボットは応答しません",
+        "requireMention": "@ボットが必要",
+        "requireMentionTooltip": "有効にすると、ユーザーは@ボットをメンションする必要があります",
+        "policy": {
+            "allowlist": "許可リスト",
+            "open": "公開",
+            "disabled": "無効"
+        },
+        "policyTooltip": "許可リスト: 許可リストのユーザーのみトリガー可能; 公開: 誰でもトリガー可能; 無効: このグループは完全に無効",
+        "allowFrom": "送信者許可リスト (allowFrom)",
+        "allowFromPlaceholder": "1行に1つの open_id、例: ou_xxxxxx",
+        "fetchUsers": "連絡したユーザーを表示",
+        "scanUsers": "ログをスキャン",
+        "fetchUsersLoading": "読み込み中...",
+        "fetchUsersError": "読み込みに失敗しました",
+        "fetchUsersRetry": "再試行",
+        "noUsers": "まだユーザーがいません。「ログをスキャン」をクリックしてOpenClawログから抽出します。",
+        "noSearchResults": "一致するユーザーが見つかりません。別のキーワードをお試しください。",
+        "selectAgent": "エージェントを選択",
+        "allAgents": "すべてのエージェント",
+        "userSearchPlaceholder": "名前、ID、またはメッセージで検索..."
+    },
     "viewDocs": "ドキュメントを表示"
 }

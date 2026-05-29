@@ -399,5 +399,47 @@
             ]
         }
     },
+    "fields": {
+        "groupSenderAllowFrom": {
+            "label": "Глобальный белый список отправителей в группах (groupSenderAllowFrom)",
+            "placeholder": "По одному open_id на строку, например ou_xxxxxx",
+            "description": "При указании только эти пользователи могут взаимодействовать с ботом в любых группах. Оставьте пустым, чтобы разрешить всем. Приоритет у allowFrom конкретной группы."
+        },
+        "resolveSenderNames": {
+            "label": "Разрешать отображаемые имена отправителей (resolveSenderNames)"
+        },
+        "groups": {
+            "label": "Детальная настройка групп (groups)",
+            "placeholder": "JSON, например {\"oc_xxx\":{\"requireMention\":true,\"allowFrom\":[\"ou_user1\",\"ou_user2\"]}}",
+            "description": "Можно задать requireMention, allowFrom и др. для каждой группы."
+        }
+    },
+    "groups": {
+        "addGroup": "Добавить группу",
+        "emptyHint": "Нет настроек групп. Нажмите кнопку выше, чтобы добавить.",
+        "groupIdPlaceholder": "ID группы, например oc_xxxxxx",
+        "enabled": "Включено",
+        "enabledTooltip": "При отключении бот не будет отвечать в этой группе",
+        "requireMention": "Требовать @упоминание",
+        "requireMentionTooltip": "При включении пользователи должны @упомянуть бота для получения ответа",
+        "policy": {
+            "allowlist": "Белый список",
+            "open": "Открытый",
+            "disabled": "Отключено"
+        },
+        "policyTooltip": "Белый список: только пользователи из списка могут взаимодействовать; Открытый: любой может взаимодействовать; Отключено: полностью отключено для этой группы",
+        "allowFrom": "Белый список отправителей (allowFrom)",
+        "allowFromPlaceholder": "По одному open_id на строку, например ou_xxxxxx",
+        "fetchUsers": "Показать взаимодействующих пользователей",
+        "scanUsers": "Сканировать журналы",
+        "fetchUsersLoading": "Загрузка...",
+        "fetchUsersError": "Не удалось загрузить",
+        "fetchUsersRetry": "Повторить",
+        "noUsers": "Пока нет пользователей. Нажмите «Сканировать журналы» для извлечения из журналов OpenClaw.",
+        "noSearchResults": "Пользователи не найдены. Попробуйте другой запрос.",
+        "selectAgent": "Выбрать агента",
+        "allAgents": "Все агенты",
+        "userSearchPlaceholder": "Поиск по имени, ID или сообщению..."
+    },
     "viewDocs": "Просмотреть документацию"
 }

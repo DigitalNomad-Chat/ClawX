@@ -102,6 +102,22 @@ describe('channel credential normalization and duplicate checks', () => {
       expect.objectContaining({ channelType: 'feishu', accountId: 'agent-a', key: 'appId' }),
     );
   });
+
+  it('coerces groupSenderAllowFrom textarea to array on save', async () => {
+    const { saveChannelConfig } = await import('@electron/utils/channel-config');
+
+    await saveChannelConfig(
+      'feishu',
+      { appId: 'app-123', appSecret: 'secret' },
+      'default',
+      { groupSenderAllowFrom: 'ou_user1\nou_user2' },
+    );
+
+    const config = await readOpenClawJson();
+    const feishu = (config.channels as Record<string, unknown>)?.feishu as Record<string, unknown>;
+    expect(Array.isArray(feishu?.groupSenderAllowFrom)).toBe(true);
+    expect(feishu?.groupSenderAllowFrom).toEqual(['ou_user1', 'ou_user2']);
+  });
 });
 
 describe('parseDoctorValidationOutput', () => {
@@ -328,6 +344,76 @@ describe('configured channel account extraction', () => {
     expect(result.feishu).toEqual({
       defaultAccountId: '2',
       accountIds: ['2'],
+    });
+  });
+});
+
+describe('groups object serialization and deserialization', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    vi.resetModules();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('extractFormValues serializes groups object to JSON string', async () => {
+    const { getChannelFormValues, saveChannelConfig } = await import('@electron/utils/channel-config');
+
+    await saveChannelConfig(
+      'feishu',
+      { appId: 'app-123', appSecret: 'secret' },
+      'default',
+      {
+        groups: {
+          'oc_test_group': {
+            enabled: true,
+            requireMention: false,
+            groupPolicy: 'allowlist',
+            allowFrom: ['ou_user1', 'ou_user2'],
+          },
+        },
+      },
+    );
+
+    const formValues = await getChannelFormValues('feishu', 'default');
+    expect(formValues).toBeDefined();
+    expect(typeof formValues!.groups).toBe('string');
+    const parsed = JSON.parse(formValues!.groups);
+    expect(parsed).toEqual({
+      'oc_test_group': {
+        enabled: true,
+        requireMention: false,
+        groupPolicy: 'allowlist',
+        allowFrom: ['ou_user1', 'ou_user2'],
+      },
+    });
+  });
+
+  it('coerceConfigTypes parses groups JSON string to object on save', async () => {
+    const { saveChannelConfig } = await import('@electron/utils/channel-config');
+
+    await saveChannelConfig(
+      'feishu',
+      { appId: 'app-456', appSecret: 'secret' },
+      'default',
+      {
+        groups: JSON.stringify({
+          'oc_group_a': {
+            enabled: true,
+            requireMention: true,
+          },
+        }),
+      },
+    );
+
+    const config = await readOpenClawJson();
+    const feishu = (config.channels as Record<string, unknown>)?.feishu as Record<string, unknown>;
+    expect(typeof feishu?.groups).toBe('object');
+    expect(Array.isArray(feishu?.groups)).toBe(false);
+    const groups = feishu?.groups as Record<string, { enabled?: boolean; requireMention?: boolean }>;
+    expect(groups['oc_group_a']).toEqual({
+      enabled: true,
+      requireMention: true,
     });
   });
 });

@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { extractSessionRecords } from '../../utils/session-util';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { join } from 'node:path';
@@ -67,6 +67,7 @@ import {
   normalizeWhatsAppMessagingTarget,
 } from '../../utils/openclaw-sdk';
 import { logger } from '../../utils/logger';
+import { getCachedFeishuUsers, scanOpenClawSessionsForFeishuUsers, listAgentsWithSessions } from '../../utils/feishu-user-cache';
 import { buildGatewayHealthSummary } from '../../utils/gateway-health';
 import type { GatewayHealthSummary } from '../../gateway/manager';
 
@@ -286,6 +287,15 @@ function toComparableConfig(input: Record<string, unknown>): Record<string, stri
     }
     if (typeof value === 'number' || typeof value === 'boolean') {
       next[key] = String(value);
+      continue;
+    }
+    // Serialize objects/arrays so nested config changes (e.g. groups) are detected
+    if (typeof value === 'object') {
+      try {
+        next[key] = JSON.stringify(value);
+      } catch {
+        // skip unserializable values
+      }
     }
   }
   return next;
@@ -1258,6 +1268,102 @@ async function listChannelTargetOptions(params: {
   return targets;
 }
 
+// Feishu pairing helpers
+const PAIRING_PENDING_TTL_MS = 3600 * 1000;
+
+interface PairingRequest {
+  id: string;
+  code: string;
+  createdAt: string;
+  lastSeenAt?: string;
+  meta?: { accountId?: string; [key: string]: unknown };
+}
+
+function resolvePairingPath(channel: string): string {
+  return join(getOpenClawConfigDir(), 'credentials', `${channel}-pairing.json`);
+}
+
+function resolveAllowFromPath(channel: string, accountId: string): string {
+  return join(getOpenClawConfigDir(), 'credentials', `${channel}-${accountId}-allowFrom.json`);
+}
+
+async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    return JSON.parse(content) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
+  await writeFile(filePath, JSON.stringify(value, null, 2), 'utf-8');
+}
+
+function normalizePairingAccountId(accountId: string | undefined): string {
+  return (accountId || '').trim().toLowerCase();
+}
+
+function requestMatchesAccountId(entry: PairingRequest, normalizedAccountId: string): boolean {
+  if (!normalizedAccountId) return true;
+  const entryAccountId = normalizePairingAccountId(entry.meta?.accountId) || 'default';
+  return entryAccountId === normalizedAccountId;
+}
+
+function parseTimestamp(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function isPairingExpired(entry: PairingRequest, nowMs: number): boolean {
+  const createdAt = parseTimestamp(entry.createdAt);
+  if (!createdAt) return true;
+  return nowMs - createdAt > PAIRING_PENDING_TTL_MS;
+}
+
+async function approveFeishuPairing(accountId: string, code: string): Promise<{ openId: string; accountId: string } | null> {
+  const channel = 'feishu';
+  const filePath = resolvePairingPath(channel);
+  const normalizedCode = code.trim().toUpperCase();
+  if (!normalizedCode) return null;
+
+  const store = await readJsonFile<{ version: number; requests: PairingRequest[] }>(filePath, { version: 1, requests: [] });
+  const nowMs = Date.now();
+
+  const pruned = store.requests.filter((r) => !isPairingExpired(r, nowMs));
+  const normalizedAccountId = normalizePairingAccountId(accountId);
+  const idx = pruned.findIndex((r) => {
+    if ((r.code || '').toUpperCase() !== normalizedCode) return false;
+    return requestMatchesAccountId(r, normalizedAccountId);
+  });
+
+  if (idx < 0) {
+    if (pruned.length !== store.requests.length) {
+      await writeJsonFile(filePath, { version: 1, requests: pruned });
+    }
+    return null;
+  }
+
+  const entry = pruned[idx];
+  pruned.splice(idx, 1);
+  await writeJsonFile(filePath, { version: 1, requests: pruned });
+
+  const entryAccountId = normalizePairingAccountId(entry.meta?.accountId) || 'default';
+  const targetAccountId = normalizedAccountId || entryAccountId;
+
+  const allowFromPath = resolveAllowFromPath(channel, targetAccountId);
+  const allowFromStore = await readJsonFile<{ version: number; allowFrom: string[] }>(allowFromPath, { version: 1, allowFrom: [] });
+  const allowFrom = Array.isArray(allowFromStore.allowFrom) ? allowFromStore.allowFrom : [];
+  if (!allowFrom.includes(entry.id)) {
+    allowFrom.push(entry.id);
+  }
+  await writeJsonFile(allowFromPath, { version: 1, allowFrom });
+
+  return { openId: entry.id, accountId: targetAccountId };
+}
+
 export async function handleChannelRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1559,6 +1665,86 @@ export async function handleChannelRoutes(
         scheduleGatewayChannelRestart(ctx, `channel:deleteConfig:${storedChannelType}`);
       }
       sendJson(res, 200, { success: true });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/channels/feishu/agents' && req.method === 'GET') {
+    try {
+      const agents = await listAgentsWithSessions();
+      sendJson(res, 200, { success: true, agents });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/channels/feishu/users' && req.method === 'GET') {
+    try {
+      // Return users discovered from intercepted OpenClaw events or session logs.
+      // This avoids requiring Feishu contact API permissions.
+      const refresh = url.searchParams.get('refresh') === '1';
+      const agentId = url.searchParams.get('agentId')?.trim() || undefined;
+      let users: Array<{ name: string; openId: string; lastMessagePreview: string; lastSeenAt: number; agentId?: string }>;
+      let debug: Record<string, unknown> | undefined;
+
+      if (refresh) {
+        logger.info(`[FeishuUserCache] API: forced refresh scan${agentId ? ` (agent: ${agentId})` : ''}`);
+        const scanResult = await scanOpenClawSessionsForFeishuUsers(agentId);
+        users = scanResult.users.map((u) => ({
+          name: u.name,
+          openId: u.openId,
+          lastMessagePreview: u.lastMessagePreview,
+          lastSeenAt: u.lastSeenAt,
+          agentId: u.agentId,
+        }));
+        debug = scanResult.debug as Record<string, unknown>;
+      } else {
+        const cached = await getCachedFeishuUsers();
+        users = cached.map((u) => ({
+          name: u.name,
+          openId: u.openId,
+          lastMessagePreview: u.lastMessagePreview,
+          lastSeenAt: u.lastSeenAt,
+          agentId: u.agentId,
+        }));
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        users,
+        ...(debug ? { debug } : {}),
+        hint: users.length === 0
+          ? 'No users discovered yet. Users will appear here after they send a message to the bot.'
+          : undefined,
+      });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/channels/feishu/pairing/approve' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{ accountId: string; pairingCode: string }>(req);
+      const accountId = body.accountId?.trim();
+      const pairingCode = body.pairingCode?.trim();
+      if (!accountId) {
+        sendJson(res, 400, { success: false, error: 'accountId is required' });
+        return true;
+      }
+      if (!pairingCode) {
+        sendJson(res, 400, { success: false, error: 'pairingCode is required' });
+        return true;
+      }
+      const result = await approveFeishuPairing(accountId, pairingCode);
+      if (!result) {
+        sendJson(res, 400, { success: false, error: '配对码无效或已过期' });
+        return true;
+      }
+      sendJson(res, 200, { success: true, openId: result.openId, accountId: result.accountId });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
     }

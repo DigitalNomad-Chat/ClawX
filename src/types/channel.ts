@@ -69,7 +69,7 @@ export interface ChannelConfigField {
 export interface ChannelSettingsField {
   key: string;
   label: string;
-  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number';
+  type: 'text' | 'password' | 'select' | 'textarea' | 'checkbox' | 'number' | 'custom';
   placeholder?: string;
   description?: string;
   options?: { value: string; label: string }[];
@@ -960,6 +960,19 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
             placeholder: 'channels:fields.groupAllowFrom.placeholder',
           },
           {
+            key: 'groupSenderAllowFrom',
+            label: 'channels:fields.groupSenderAllowFrom.label',
+            type: 'textarea',
+            placeholder: 'channels:fields.groupSenderAllowFrom.placeholder',
+            description: 'channels:fields.groupSenderAllowFrom.description',
+          },
+          {
+            key: 'resolveSenderNames',
+            label: 'channels:fields.resolveSenderNames.label',
+            type: 'checkbox',
+            defaultValue: true,
+          },
+          {
             key: 'requireMention',
             label: 'channels:fields.requireMention.label',
             type: 'checkbox',
@@ -968,8 +981,8 @@ export const CHANNEL_META: Record<ChannelType, ChannelMeta> = {
           {
             key: 'groups',
             label: 'channels:fields.groups.label',
-            type: 'textarea',
-            placeholder: 'channels:fields.groups.placeholder',
+            type: 'custom',
+            description: 'channels:fields.groups.description',
           },
           {
             key: 'groupCommandMentionBypass',
