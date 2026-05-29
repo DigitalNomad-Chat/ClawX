@@ -55,6 +55,29 @@
         "title": "Удалить канал",
         "message": "Удалить {{name}} из ClawDock? Это удалит текущую конфигурацию канала."
     },
+    "globalDefaultModel": {
+        "title": "Глобальная модель по умолчанию",
+        "currentLabel": "Текущая модель по умолчанию",
+        "notSet": "Не задана",
+        "configure": "Настроить",
+        "configureTitle": "Настроить глобальную модель по умолчанию",
+        "configureDescription": "Задайте модель по умолчанию для всех агентов. Агенты без отдельной настройки будут использовать эту модель."
+    },
+    "agentModelAssignments": {
+        "sectionTitle": "Назначения моделей агентов",
+        "title": "Назначения моделей агентов",
+        "subtitle": "Управляйте конфигурацией моделей всех агентов в одном месте",
+        "manageAssignments": "Управлять назначениями",
+        "batchSet": "Массовая настройка",
+        "inheritedCount": "{{count}} агентов используют глобальную модель",
+        "overriddenCount": "{{count}} агентов имеют отдельную настройку",
+        "inherited": "Унаследовано",
+        "overridden": "Переопределено",
+        "editTitle": "Редактировать модель для {{name}}",
+        "editDescription": "Текущая глобальная модель: {{defaultModel}}",
+        "batchTitle": "Массовая настройка моделей агентов",
+        "batchDescription": "Задать единую модель для всех агентов"
+    },
     "toast": {
         "agentCreated": "Агент создан",
         "agentCreateFailed": "Не удалось создать агента: {{error}}",
@@ -69,6 +92,10 @@
         "agentModelUpdateFailed": "Не удалось обновить модель агента: {{error}}",
         "agentModelReset": "Модель агента сброшена до значения по умолчанию",
         "agentModelResetFailed": "Не удалось сбросить модель агента: {{error}}",
+        "defaultModelUpdated": "Глобальная модель по умолчанию обновлена",
+        "defaultModelCleared": "Глобальная модель по умолчанию очищена",
+        "batchModelUpdated": "Массовое обновление выполнено",
+        "batchModelUpdateFailed": "Массовое обновление не удалось: {{error}}",
         "channelAssigned": "{{channel}} назначен агенту",
         "channelAssignFailed": "Не удалось назначить канал: {{error}}",
         "channelRemoved": "{{channel}} удалён",

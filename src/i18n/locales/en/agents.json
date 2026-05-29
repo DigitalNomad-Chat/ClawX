@@ -55,6 +55,29 @@
         "title": "Remove Channel",
         "message": "Remove {{name}} from ClawDock? This deletes the current channel configuration."
     },
+    "globalDefaultModel": {
+        "title": "Global Default Model",
+        "currentLabel": "Current Default Model",
+        "notSet": "Not set",
+        "configure": "Configure",
+        "configureTitle": "Configure Global Default Model",
+        "configureDescription": "Set the default model for all agents. Agents without an independent model will use this one."
+    },
+    "agentModelAssignments": {
+        "sectionTitle": "Agent Model Assignments",
+        "title": "Agent Model Assignments",
+        "subtitle": "Manage model configuration for all agents in one place",
+        "manageAssignments": "Manage Assignments",
+        "batchSet": "Batch Set",
+        "inheritedCount": "{{count}} agents using global default",
+        "overriddenCount": "{{count}} agents with independent model",
+        "inherited": "Inherited",
+        "overridden": "Overridden",
+        "editTitle": "Edit Model for {{name}}",
+        "editDescription": "Current global default: {{defaultModel}}",
+        "batchTitle": "Batch Set Agent Models",
+        "batchDescription": "Set a uniform model for all agents"
+    },
     "toast": {
         "agentCreated": "Agent created",
         "agentCreateFailed": "Failed to create agent: {{error}}",
@@ -69,6 +92,10 @@
         "agentModelUpdateFailed": "Failed to update agent model: {{error}}",
         "agentModelReset": "Agent model reset to default",
         "agentModelResetFailed": "Failed to reset agent model: {{error}}",
+        "defaultModelUpdated": "Global default model updated",
+        "defaultModelCleared": "Global default model cleared",
+        "batchModelUpdated": "Batch update completed",
+        "batchModelUpdateFailed": "Batch update failed: {{error}}",
         "channelAssigned": "{{channel}} assigned to agent",
         "channelAssignFailed": "Failed to assign channel: {{error}}",
         "channelRemoved": "{{channel}} removed",

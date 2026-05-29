@@ -55,6 +55,29 @@
         "title": "移除频道",
         "message": "确认移除 {{name}}？这会删除当前的频道配置。"
     },
+    "globalDefaultModel": {
+        "title": "全局默认模型",
+        "currentLabel": "当前默认模型",
+        "notSet": "尚未设置",
+        "configure": "配置",
+        "configureTitle": "配置全局默认模型",
+        "configureDescription": "设置所有 Agent 的默认模型。未独立设置的 Agent 将使用此模型。"
+    },
+    "agentModelAssignments": {
+        "sectionTitle": "Agent 模型分配",
+        "title": "Agent 模型分配",
+        "subtitle": "集中管理所有 Agent 的模型配置",
+        "manageAssignments": "管理分配",
+        "batchSet": "批量设置",
+        "inheritedCount": "{{count}} 个 Agent 使用全局默认",
+        "overriddenCount": "{{count}} 个 Agent 已独立设置",
+        "inherited": "继承",
+        "overridden": "已覆盖",
+        "editTitle": "编辑 {{name}} 的模型",
+        "editDescription": "当前全局默认: {{defaultModel}}",
+        "batchTitle": "批量设置 Agent 模型",
+        "batchDescription": "为所有 Agent 统一设置模型"
+    },
     "toast": {
         "agentCreated": "Agent 已创建",
         "agentCreateFailed": "创建 Agent 失败：{{error}}",
@@ -69,6 +92,10 @@
         "agentModelUpdateFailed": "更新 Agent 模型失败：{{error}}",
         "agentModelReset": "Agent 模型已恢复为默认",
         "agentModelResetFailed": "恢复 Agent 默认模型失败：{{error}}",
+        "defaultModelUpdated": "全局默认模型已更新",
+        "defaultModelCleared": "全局默认模型已清除",
+        "batchModelUpdated": "批量设置完成",
+        "batchModelUpdateFailed": "批量设置失败：{{error}}",
         "channelAssigned": "{{channel}} 已分配给 Agent",
         "channelAssignFailed": "分配频道失败：{{error}}",
         "channelRemoved": "{{channel}} 已移除",

@@ -55,6 +55,29 @@
         "title": "Channel を削除",
         "message": "{{name}} を削除しますか？現在の Channel 設定も削除されます。"
     },
+    "globalDefaultModel": {
+        "title": "グローバルデフォルトモデル",
+        "currentLabel": "現在のデフォルトモデル",
+        "notSet": "未設定",
+        "configure": "設定",
+        "configureTitle": "グローバルデフォルトモデルを設定",
+        "configureDescription": "すべての Agent のデフォルトモデルを設定します。個別に設定されていない Agent はこのモデルを使用します。"
+    },
+    "agentModelAssignments": {
+        "sectionTitle": "Agent モデル割り当て",
+        "title": "Agent モデル割り当て",
+        "subtitle": "すべての Agent のモデル設定を一括管理",
+        "manageAssignments": "割り当てを管理",
+        "batchSet": "一括設定",
+        "inheritedCount": "{{count}} 個の Agent がグローバルデフォルトを使用",
+        "overriddenCount": "{{count}} 個の Agent が個別設定",
+        "inherited": "継承",
+        "overridden": "上書き",
+        "editTitle": "{{name}} のモデルを編集",
+        "editDescription": "現在のグローバルデフォルト: {{defaultModel}}",
+        "batchTitle": "Agent モデルを一括設定",
+        "batchDescription": "すべての Agent に統一モデルを設定"
+    },
     "toast": {
         "agentCreated": "Agent を作成しました",
         "agentCreateFailed": "Agent の作成に失敗しました: {{error}}",
@@ -69,6 +92,10 @@
         "agentModelUpdateFailed": "Agent モデルの更新に失敗しました: {{error}}",
         "agentModelReset": "Agent モデルをデフォルトに戻しました",
         "agentModelResetFailed": "Agent モデルのリセットに失敗しました: {{error}}",
+        "defaultModelUpdated": "グローバルデフォルトモデルを更新しました",
+        "defaultModelCleared": "グローバルデフォルトモデルをクリアしました",
+        "batchModelUpdated": "一括設定が完了しました",
+        "batchModelUpdateFailed": "一括設定に失敗しました: {{error}}",
         "channelAssigned": "{{channel}} を Agent に割り当てました",
         "channelAssignFailed": "Channel の割り当てに失敗しました: {{error}}",
         "channelRemoved": "{{channel}} を削除しました",
