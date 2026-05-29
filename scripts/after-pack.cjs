@@ -864,6 +864,47 @@ exports.default = async function afterPack(context) {
     }
   }
 
+  // 2.6 Resolve external symlinks in ocr-env (macOS codesign requires all
+  //     symlinks to point inside the bundle; external symlinks cause
+  //     "invalid destination for symbolic link in bundle" on macOS 15+).
+  if (platform === 'darwin') {
+    const ocrEnvDirs = [
+      join(resourcesDir, 'resources', 'ocr-env'),
+      join(resourcesDir, 'ocr-env'),
+    ];
+    for (const ocrEnvDir of ocrEnvDirs) {
+      if (!existsSync(ocrEnvDir)) continue;
+      function resolveSymlinks(dir) {
+        let entries;
+        try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          if (entry.isSymbolicLink()) {
+            try {
+              const target = realpathSync(fullPath);
+              rmSync(fullPath);
+              const s = statSync(target);
+              if (s.isDirectory()) {
+                cpSync(target, fullPath, { recursive: true, dereference: true });
+              } else {
+                cpSync(target, fullPath);
+              }
+              console.log(`[after-pack] 🩹 Resolved symlink: ${relative(resourcesDir, fullPath)}`);
+              if (s.isDirectory()) {
+                resolveSymlinks(fullPath);
+              }
+            } catch (e) {
+              console.warn(`[after-pack] ⚠️  Failed to resolve symlink ${fullPath}: ${e.message}`);
+            }
+          } else if (entry.isDirectory()) {
+            resolveSymlinks(fullPath);
+          }
+        }
+      }
+      resolveSymlinks(ocrEnvDir);
+    }
+  }
+
   // 3. Platform-specific: strip koffi non-target platform binaries
   const koffiRemoved = cleanupKoffi(dest, platform, arch);
   if (koffiRemoved > 0) {
