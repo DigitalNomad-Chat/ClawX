@@ -89,3 +89,4 @@ scripts/issued-licenses.json
 native/build/
 native/*.node
 .worktrees/
+dist-test/
