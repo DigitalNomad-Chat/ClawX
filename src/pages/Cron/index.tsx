@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ScheduleEditor } from '@/components/cron/ScheduleEditor';
 import { hostApiFetch } from '@/lib/host-api';
 import { useCronStore } from '@/stores/cron';
 import { useGatewayStore } from '@/stores/gateway';
@@ -118,64 +119,6 @@ function parseCronExpr(cron: string, t: TFunction<'cron'>): string {
   return cron;
 }
 
-function estimateNextRun(scheduleExpr: string): string | null {
-  const now = new Date();
-  const next = new Date(now.getTime());
-
-  if (scheduleExpr === '* * * * *') {
-    next.setSeconds(0, 0);
-    next.setMinutes(next.getMinutes() + 1);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '*/5 * * * *') {
-    const delta = 5 - (next.getMinutes() % 5 || 5);
-    next.setSeconds(0, 0);
-    next.setMinutes(next.getMinutes() + delta);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '*/15 * * * *') {
-    const delta = 15 - (next.getMinutes() % 15 || 15);
-    next.setSeconds(0, 0);
-    next.setMinutes(next.getMinutes() + delta);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '0 * * * *') {
-    next.setMinutes(0, 0, 0);
-    next.setHours(next.getHours() + 1);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '0 9 * * *' || scheduleExpr === '0 18 * * *') {
-    const targetHour = scheduleExpr === '0 9 * * *' ? 9 : 18;
-    next.setSeconds(0, 0);
-    next.setHours(targetHour, 0, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '0 9 * * 1') {
-    next.setSeconds(0, 0);
-    next.setHours(9, 0, 0, 0);
-    const day = next.getDay();
-    const daysUntilMonday = day === 1 ? 7 : (8 - day) % 7;
-    next.setDate(next.getDate() + daysUntilMonday);
-    return next.toLocaleString();
-  }
-
-  if (scheduleExpr === '0 9 1 * *') {
-    next.setSeconds(0, 0);
-    next.setDate(1);
-    next.setHours(9, 0, 0, 0);
-    if (next <= now) next.setMonth(next.getMonth() + 1);
-    return next.toLocaleString();
-  }
-
-  return null;
-}
-
 interface DeliveryChannelAccount {
   accountId: string;
   name: string;
@@ -262,8 +205,6 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
     return '0 9 * * *';
   })();
   const [schedule, setSchedule] = useState(initialSchedule);
-  const [customSchedule, setCustomSchedule] = useState('');
-  const [useCustom, setUseCustom] = useState(false);
   const [enabled, setEnabled] = useState(job?.enabled ?? true);
   const [deliveryMode, setDeliveryMode] = useState<'none' | 'announce'>(job?.delivery?.mode === 'announce' ? 'announce' : 'none');
   const [deliveryChannel, setDeliveryChannel] = useState(job?.delivery?.channel || '');
@@ -271,7 +212,6 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
   const [selectedDeliveryAccountId, setSelectedDeliveryAccountId] = useState(job?.delivery?.accountId || '');
   const [channelTargetOptions, setChannelTargetOptions] = useState<ChannelTargetOption[]>([]);
   const [loadingChannelTargets, setLoadingChannelTargets] = useState(false);
-  const schedulePreview = estimateNextRun(useCustom ? customSchedule : schedule);
   const selectableChannels = configuredChannels.filter((group) => isSupportedCronDeliveryChannel(group.channelType));
   const availableChannels = selectableChannels.some((group) => group.channelType === deliveryChannel)
     ? selectableChannels
@@ -370,7 +310,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
       return;
     }
 
-    const finalSchedule = useCustom ? customSchedule : schedule;
+    const finalSchedule = schedule;
     if (!finalSchedule.trim()) {
       toast.error(t('toast.scheduleRequired'));
       return;
@@ -481,49 +421,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
           {/* Schedule */}
           <div className="space-y-2.5">
             <Label className="text-sm text-foreground/80 font-bold">{t('dialog.schedule')}</Label>
-            {!useCustom ? (
-              <div className="grid grid-cols-2 gap-2">
-                {schedulePresets.map((preset) => (
-                  <Button
-                    key={preset.value}
-                    type="button"
-                    variant={schedule === preset.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSchedule(preset.value)}
-                    className={cn(
-                      "justify-start h-10 rounded-xl font-medium text-sm transition-all",
-                      schedule === preset.value
-                        ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm border-transparent"
-                        : "bg-surface-input border hover:bg-muted text-foreground/80 hover:text-foreground"
-                    )}
-                  >
-                    <Timer className="h-4 w-4 mr-2 opacity-70" />
-                    {t(`presets.${preset.key}` as const)}
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <Input
-                placeholder={t('dialog.cronPlaceholder')}
-                value={customSchedule}
-                onChange={(e) => setCustomSchedule(e.target.value)}
-                className="h-[44px] rounded-xl font-mono text-sm bg-surface-input border focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40"
-              />
-            )}
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground/80 font-medium">
-                {schedulePreview ? `${t('card.next')}: ${schedulePreview}` : t('dialog.cronPlaceholder')}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setUseCustom(!useCustom)}
-                className="text-xs h-7 px-2 text-foreground/60 hover:text-foreground hover:bg-muted rounded-lg"
-              >
-                {useCustom ? t('dialog.usePresets') : t('dialog.useCustomCron')}
-              </Button>
-            </div>
+            <ScheduleEditor value={schedule} onChange={setSchedule} />
           </div>
 
           {/* Delivery */}
