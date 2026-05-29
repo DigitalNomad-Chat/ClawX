@@ -16,6 +16,8 @@ interface AgentsState {
   createAgent: (name: string, options?: { inheritWorkspace?: boolean }) => Promise<void>;
   updateAgent: (agentId: string, name: string) => Promise<void>;
   updateAgentModel: (agentId: string, modelRef: string | null) => Promise<void>;
+  updateDefaultModel: (modelRef: string | null) => Promise<void>;
+  batchUpdateAgentModels: (modelRef: string | null) => Promise<void>;
   deleteAgent: (agentId: string) => Promise<void>;
   assignChannel: (agentId: string, channelType: ChannelType) => Promise<void>;
   removeChannel: (agentId: string, channelType: ChannelType) => Promise<void>;
@@ -92,6 +94,40 @@ export const useAgentsStore = create<AgentsState>((set) => ({
     try {
       const snapshot = await hostApiFetch<AgentsSnapshot & { success?: boolean }>(
         `/api/agents/${encodeURIComponent(agentId)}/model`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ modelRef }),
+        }
+      );
+      set(applySnapshot(snapshot));
+    } catch (error) {
+      set({ error: String(error) });
+      throw error;
+    }
+  },
+
+  updateDefaultModel: async (modelRef: string | null) => {
+    set({ error: null });
+    try {
+      const snapshot = await hostApiFetch<AgentsSnapshot & { success?: boolean }>(
+        '/api/agents/default-model',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ modelRef }),
+        }
+      );
+      set(applySnapshot(snapshot));
+    } catch (error) {
+      set({ error: String(error) });
+      throw error;
+    }
+  },
+
+  batchUpdateAgentModels: async (modelRef: string | null) => {
+    set({ error: null });
+    try {
+      const snapshot = await hostApiFetch<AgentsSnapshot & { success?: boolean }>(
+        '/api/agents/batch-model',
         {
           method: 'PUT',
           body: JSON.stringify({ modelRef }),
