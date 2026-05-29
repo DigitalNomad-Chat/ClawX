@@ -197,6 +197,90 @@ describe('agent config lifecycle', () => {
     );
   });
 
+  it('updates and clears the global default model', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [{ id: 'main', name: 'Main', default: true }],
+      },
+    });
+
+    const { listAgentsSnapshot, updateDefaultModel } = await import('@electron/utils/agent-config');
+
+    await updateDefaultModel('anthropic/claude-sonnet-4-6');
+    let config = await readOpenClawJson();
+    expect((config.agents as { defaults?: { model?: { primary?: string } } }).defaults?.model?.primary).toBe(
+      'anthropic/claude-sonnet-4-6',
+    );
+
+    let snapshot = await listAgentsSnapshot();
+    expect(snapshot.defaultModelRef).toBe('anthropic/claude-sonnet-4-6');
+
+    await updateDefaultModel(null);
+    config = await readOpenClawJson();
+    expect((config.agents as { defaults?: { model?: unknown } }).defaults?.model).toBeUndefined();
+
+    snapshot = await listAgentsSnapshot();
+    expect(snapshot.defaultModelRef).toBeNull();
+  });
+
+  it('rejects invalid model ref format for global default model', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [{ id: 'main', name: 'Main', default: true }],
+      },
+    });
+
+    const { updateDefaultModel } = await import('@electron/utils/agent-config');
+
+    await expect(updateDefaultModel('invalid-no-slash')).rejects.toThrow(
+      'modelRef must be in "provider/model" format',
+    );
+  });
+
+  it('batch updates agent models', async () => {
+    await writeOpenClawJson({
+      agents: {
+        defaults: {
+          model: { primary: 'moonshot/kimi-k2.6' },
+        },
+        list: [
+          { id: 'main', name: 'Main', default: true },
+          { id: 'coder', name: 'Coder' },
+          { id: 'writer', name: 'Writer', model: { primary: 'ark/ark-code-latest' } },
+        ],
+      },
+    });
+
+    const { listAgentsSnapshot, batchUpdateAgentModels } = await import('@electron/utils/agent-config');
+
+    await batchUpdateAgentModels('openai/gpt-4o');
+    let config = await readOpenClawJson();
+    const list = (config.agents as { list: Array<{ id: string; model?: { primary?: string } }> }).list;
+    expect(list.every((agent) => agent.model?.primary === 'openai/gpt-4o')).toBe(true);
+
+    let snapshot = await listAgentsSnapshot();
+    expect(snapshot.agents.every((agent) => agent.overrideModelRef === 'openai/gpt-4o')).toBe(true);
+
+    await batchUpdateAgentModels(null);
+    config = await readOpenClawJson();
+    const listAfterClear = (config.agents as { list: Array<{ id: string; model?: unknown }> }).list;
+    expect(listAfterClear.every((agent) => agent.model === undefined)).toBe(true);
+  });
+
+  it('rejects invalid model ref format for batch update', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [{ id: 'main', name: 'Main', default: true }],
+      },
+    });
+
+    const { batchUpdateAgentModels } = await import('@electron/utils/agent-config');
+
+    await expect(batchUpdateAgentModels('bad-format')).rejects.toThrow(
+      'modelRef must be in "provider/model" format',
+    );
+  });
+
   it('deletes the config entry, bindings, runtime directory, and managed workspace for a removed agent', async () => {
     await writeOpenClawJson({
       agents: {

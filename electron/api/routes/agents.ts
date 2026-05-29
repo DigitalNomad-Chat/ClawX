@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import {
   assignChannelToAgent,
+  batchUpdateAgentModels,
   clearChannelBinding,
   createAgent,
   deleteAgentConfig,
@@ -9,6 +10,7 @@ import {
   resolveAccountIdForAgent,
   updateAgentModel,
   updateAgentName,
+  updateDefaultModel,
 } from '../../utils/agent-config';
 import { deleteChannelAccountConfig } from '../../utils/channel-config';
 import { syncAgentModelOverrideToRuntime, syncAllProviderAuthToRuntime } from '../../services/providers/provider-runtime-sync';
@@ -144,6 +146,41 @@ export async function handleAgentRoutes(
   if (url.pathname.startsWith('/api/agents/') && req.method === 'PUT') {
     const suffix = url.pathname.slice('/api/agents/'.length);
     const parts = suffix.split('/').filter(Boolean);
+
+    if (parts.length === 1 && parts[0] === 'default-model') {
+      try {
+        const body = await parseJsonBody<{ modelRef?: string | null }>(req);
+        const snapshot = await updateDefaultModel(body.modelRef ?? null);
+        try {
+          await syncAllProviderAuthToRuntime();
+        } catch (syncError) {
+          console.warn('[agents] Failed to sync runtime after updating default model:', syncError);
+        }
+        sendJson(res, 200, { success: true, ...snapshot });
+      } catch (error) {
+        sendJson(res, 500, { success: false, error: String(error) });
+      }
+      return true;
+    }
+
+    if (parts.length === 1 && parts[0] === 'batch-model') {
+      try {
+        const body = await parseJsonBody<{ modelRef?: string | null }>(req);
+        const snapshot = await batchUpdateAgentModels(body.modelRef ?? null);
+        try {
+          await syncAllProviderAuthToRuntime();
+          for (const agent of snapshot.agents) {
+            await syncAgentModelOverrideToRuntime(agent.id).catch(() => {});
+          }
+        } catch (syncError) {
+          console.warn('[agents] Failed to sync runtime after batch update:', syncError);
+        }
+        sendJson(res, 200, { success: true, ...snapshot });
+      } catch (error) {
+        sendJson(res, 500, { success: false, error: String(error) });
+      }
+      return true;
+    }
 
     if (parts.length === 1) {
       try {

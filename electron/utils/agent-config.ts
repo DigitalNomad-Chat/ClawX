@@ -706,6 +706,69 @@ export async function updateAgentModel(agentId: string, modelRef: string | null)
   });
 }
 
+export async function updateDefaultModel(modelRef: string | null): Promise<AgentsSnapshot> {
+  return withConfigLock(async () => {
+    const config = await readOpenClawConfig() as AgentConfigDocument;
+    const { agentsConfig, entries } = normalizeAgentsConfig(config);
+
+    const normalizedModelRef = typeof modelRef === 'string' ? modelRef.trim() : '';
+
+    const nextDefaults: AgentDefaultsConfig = { ...agentsConfig.defaults };
+
+    if (!normalizedModelRef) {
+      delete nextDefaults.model;
+    } else {
+      if (!isValidModelRef(normalizedModelRef)) {
+        throw new Error('modelRef must be in "provider/model" format');
+      }
+      nextDefaults.model = { primary: normalizedModelRef };
+    }
+
+    config.agents = {
+      ...agentsConfig,
+      defaults: nextDefaults,
+      list: entries,
+    };
+
+    await writeOpenClawConfig(config);
+    logger.info('Updated default model', { modelRef: normalizedModelRef || null });
+    return buildSnapshotFromConfig(config);
+  });
+}
+
+export async function batchUpdateAgentModels(modelRef: string | null): Promise<AgentsSnapshot> {
+  return withConfigLock(async () => {
+    const config = await readOpenClawConfig() as AgentConfigDocument;
+    const { agentsConfig, entries } = normalizeAgentsConfig(config);
+
+    const normalizedModelRef = typeof modelRef === 'string' ? modelRef.trim() : '';
+
+    if (normalizedModelRef && !isValidModelRef(normalizedModelRef)) {
+      throw new Error('modelRef must be in "provider/model" format');
+    }
+
+    const nextEntries = entries.map((entry) => {
+      if (!normalizedModelRef) {
+        const { model: _omit, ...rest } = entry;
+        return rest as AgentListEntry;
+      }
+      return {
+        ...entry,
+        model: { primary: normalizedModelRef },
+      };
+    });
+
+    config.agents = {
+      ...agentsConfig,
+      list: nextEntries,
+    };
+
+    await writeOpenClawConfig(config);
+    logger.info('Batch updated agent models', { modelRef: normalizedModelRef || null, count: nextEntries.length });
+    return buildSnapshotFromConfig(config);
+  });
+}
+
 export async function deleteAgentConfig(agentId: string): Promise<{ snapshot: AgentsSnapshot; removedEntry: AgentListEntry }> {
   return withConfigLock(async () => {
     if (agentId === MAIN_AGENT_ID) {

@@ -23,6 +23,8 @@ vi.mock('@electron/utils/agent-config', () => ({
   resolveAccountIdForAgent: vi.fn(),
   updateAgentModel: vi.fn(),
   updateAgentName: vi.fn(),
+  updateDefaultModel: vi.fn(),
+  batchUpdateAgentModels: vi.fn(),
 }));
 
 vi.mock('@electron/utils/channel-config', () => ({
@@ -138,4 +140,115 @@ describe('handleAgentRoutes model updates', () => {
       );
     },
   );
+});
+
+describe('PUT /api/agents/default-model', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+  });
+
+  it('updates default model and returns snapshot', async () => {
+    setPlatform('darwin');
+    const routeUtils = await import('@electron/api/route-utils');
+    const agentConfig = await import('@electron/utils/agent-config');
+    const runtimeSync = await import('@electron/services/providers/provider-runtime-sync');
+    const { handleAgentRoutes } = await import('@electron/api/routes/agents');
+
+    vi.mocked(routeUtils.parseJsonBody).mockResolvedValue({ modelRef: 'anthropic/claude-sonnet-4-6' });
+    vi.mocked(agentConfig.updateDefaultModel).mockResolvedValue({
+      agents: [],
+      defaultAgentId: 'main',
+      defaultModelRef: 'anthropic/claude-sonnet-4-6',
+      configuredChannelTypes: [],
+      channelOwners: {},
+      channelAccountOwners: {},
+    });
+    vi.mocked(runtimeSync.syncAllProviderAuthToRuntime).mockResolvedValue(undefined);
+
+    const gatewayManager = {
+      getStatus: vi.fn(() => ({ state: 'running', pid: 1234, port: 18789 })),
+      debouncedReload: vi.fn(),
+      debouncedRestart: vi.fn(),
+      restart: vi.fn(),
+    };
+
+    const handled = await handleAgentRoutes(
+      { method: 'PUT' } as never,
+      {} as never,
+      new URL('http://127.0.0.1/api/agents/default-model'),
+      { gatewayManager } as never,
+    );
+
+    expect(handled).toBe(true);
+    expect(agentConfig.updateDefaultModel).toHaveBeenCalledWith('anthropic/claude-sonnet-4-6');
+    expect(runtimeSync.syncAllProviderAuthToRuntime).toHaveBeenCalledTimes(1);
+    expect(gatewayManager.debouncedReload).not.toHaveBeenCalled();
+    expect(routeUtils.sendJson).toHaveBeenCalledWith(
+      {},
+      200,
+      expect.objectContaining({ success: true }),
+    );
+  });
+});
+
+describe('PUT /api/agents/batch-model', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+  });
+
+  it('batch updates agent models and returns snapshot', async () => {
+    setPlatform('darwin');
+    const routeUtils = await import('@electron/api/route-utils');
+    const agentConfig = await import('@electron/utils/agent-config');
+    const runtimeSync = await import('@electron/services/providers/provider-runtime-sync');
+    const { handleAgentRoutes } = await import('@electron/api/routes/agents');
+
+    vi.mocked(routeUtils.parseJsonBody).mockResolvedValue({ modelRef: 'openai/gpt-4o' });
+    vi.mocked(agentConfig.batchUpdateAgentModels).mockResolvedValue({
+      agents: [
+        { id: 'main', name: 'Main', isDefault: true, modelDisplay: 'gpt-4o', modelRef: 'openai/gpt-4o', overrideModelRef: 'openai/gpt-4o', inheritedModel: false, workspace: '~/.openclaw/workspace', agentDir: '~/.openclaw/agents/main/agent', mainSessionKey: 'agent:main:main', channelTypes: [] },
+      ],
+      defaultAgentId: 'main',
+      defaultModelRef: 'moonshot/kimi-k2.6',
+      configuredChannelTypes: [],
+      channelOwners: {},
+      channelAccountOwners: {},
+    });
+    vi.mocked(runtimeSync.syncAllProviderAuthToRuntime).mockResolvedValue(undefined);
+    vi.mocked(runtimeSync.syncAgentModelOverrideToRuntime).mockResolvedValue(undefined);
+
+    const gatewayManager = {
+      getStatus: vi.fn(() => ({ state: 'running', pid: 1234, port: 18789 })),
+      debouncedReload: vi.fn(),
+      debouncedRestart: vi.fn(),
+      restart: vi.fn(),
+    };
+
+    const handled = await handleAgentRoutes(
+      { method: 'PUT' } as never,
+      {} as never,
+      new URL('http://127.0.0.1/api/agents/batch-model'),
+      { gatewayManager } as never,
+    );
+
+    expect(handled).toBe(true);
+    expect(agentConfig.batchUpdateAgentModels).toHaveBeenCalledWith('openai/gpt-4o');
+    expect(runtimeSync.syncAllProviderAuthToRuntime).toHaveBeenCalledTimes(1);
+    expect(gatewayManager.debouncedReload).not.toHaveBeenCalled();
+    expect(routeUtils.sendJson).toHaveBeenCalledWith(
+      {},
+      200,
+      expect.objectContaining({ success: true }),
+    );
+  });
 });
