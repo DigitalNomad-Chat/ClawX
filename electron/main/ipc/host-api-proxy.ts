@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { proxyAwareFetch } from '../../utils/proxy-fetch';
 import { getPort } from '../../utils/config';
 import { getHostApiToken } from '../../api/server';
+import { logger } from '../../utils/logger';
 
 type HostApiFetchRequest = {
   path: string;
@@ -18,6 +19,7 @@ export function registerHostApiProxyHandlers(): void {
   ipcMain.handle('hostapi:token', () => getHostApiToken());
 
   ipcMain.handle('hostapi:fetch', async (_, request: HostApiFetchRequest) => {
+    const startedAt = Date.now();
     try {
       const path = typeof request?.path === 'string' ? request.path : '';
       if (!path || !path.startsWith('/')) {
@@ -63,8 +65,10 @@ export function registerHostApiProxyHandlers(): void {
         }
       }
 
+      logger.info(`[hostapi:fetch] ${method} ${path} -> ${response.status} in ${Date.now() - startedAt}ms`);
       return { ok: true, data };
     } catch (error) {
+      logger.warn(`[hostapi:fetch] ${request?.method || 'GET'} ${request?.path} -> ERROR in ${Date.now() - startedAt}ms:`, error);
       return {
         ok: false,
         error: {

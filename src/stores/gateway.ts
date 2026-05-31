@@ -322,14 +322,18 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
           ));
           gatewayEventUnsubscribers = unsubscribers;
 
-          // Periodic reconciliation safety net: every 30 seconds, check if the
-          // renderer's view of gateway state has drifted from main process truth.
+          // Periodic reconciliation safety net: every 3 seconds during startup
+          // then every 30 seconds once stable, check if the renderer's view of
+          // gateway state has drifted from main process truth.
           // This catches any future one-off IPC delivery failures without adding
           // a constant polling load (single lightweight IPC invoke per interval).
           // Clear any previous timer first to avoid leaks during HMR reloads.
           if (gatewayReconcileTimer !== null) {
             clearInterval(gatewayReconcileTimer);
           }
+          const RECONCILE_STARTUP_MS = 3_000;
+          const RECONCILE_STABLE_MS = 30_000;
+          let reconcileInterval = RECONCILE_STARTUP_MS;
           gatewayReconcileTimer = setInterval(() => {
             const ipc = window.electron?.ipcRenderer;
             if (!ipc) return;
@@ -343,9 +347,32 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
                   );
                   set({ status: latest });
                 }
+                // Once we reach a stable running state, back off to 30s
+                if (latest.state === 'running' && reconcileInterval !== RECONCILE_STABLE_MS) {
+                  reconcileInterval = RECONCILE_STABLE_MS;
+                  if (gatewayReconcileTimer !== null) {
+                    clearInterval(gatewayReconcileTimer);
+                  }
+                  gatewayReconcileTimer = setInterval(() => {
+                    const ipc2 = window.electron?.ipcRenderer;
+                    if (!ipc2) return;
+                    ipc2.invoke('gateway:status')
+                      .then((result2: unknown) => {
+                        const latest2 = result2 as GatewayStatus;
+                        const current2 = get().status;
+                        if (latest2.state !== current2.state) {
+                          console.info(
+                            `[gateway-store] reconciled stale state: ${current2.state} → ${latest2.state}`,
+                          );
+                          set({ status: latest2 });
+                        }
+                      })
+                      .catch(() => { /* ignore */ });
+                  }, RECONCILE_STABLE_MS);
+                }
               })
               .catch(() => { /* ignore */ });
-          }, 30_000);
+          }, reconcileInterval);
         }
 
         // Re-fetch status after IPC listeners are registered to close the race

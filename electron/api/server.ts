@@ -17,6 +17,7 @@ import { handleSkillRoutes } from './routes/skills';
 import { handleFileRoutes } from './routes/files';
 import { handleDesensitizeRoutes } from './routes/desensitize';
 import { handleSessionRoutes } from './routes/sessions';
+import { handleHistoryRoutes } from './routes/history';
 import { handleCronRoutes } from './routes/cron';
 import { handleDiagnosticsRoutes } from './routes/diagnostics';
 import { handleConfigRoutes } from './routes/config';
@@ -41,6 +42,7 @@ const coreRouteHandlers: RouteHandler[] = [
   handleSkillRoutes,
   handleFileRoutes,
   handleDesensitizeRoutes,
+  handleHistoryRoutes,
   handleSessionRoutes,
   handleCronRoutes,
   handleDiagnosticsRoutes,

@@ -120,6 +120,12 @@ export interface ChatState {
   /** Last message timestamp (ms) per session key, used for sorting */
   sessionLastActivity: Record<string, number>;
 
+  // History pagination
+  /** Whether there are more historical messages available to load */
+  hasMoreHistory: boolean;
+  /** Number of historical messages already loaded (for offset calculation) */
+  historyOffset: number;
+
   // Thinking
   thinkingLevel: string | null;
 
@@ -135,6 +141,8 @@ export interface ChatState {
   deleteSession: (key: string) => Promise<void>;
   cleanupEmptySession: () => void;
   loadHistory: (quiet?: boolean) => Promise<void>;
+  /** Load earlier messages; prepend them to the existing message list */
+  loadMoreHistory: () => Promise<void>;
   sendMessage: (
     text: string,
     attachments?: Array<{

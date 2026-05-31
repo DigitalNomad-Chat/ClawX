@@ -67,6 +67,11 @@ const _foregroundHistoryLoadSeen = new Set<string>();
 const SESSION_LOAD_MIN_INTERVAL_MS = 1_200;
 const HISTORY_LOAD_MIN_INTERVAL_MS = 800;
 const HISTORY_POLL_SILENCE_WINDOW_MS = 2_500;
+
+/** Number of messages to fetch on initial history load (fast startup) */
+const INITIAL_HISTORY_LIMIT = 30;
+/** Number of messages to fetch when loading more history */
+const MORE_HISTORY_LIMIT = 30;
 const CHAT_EVENT_DEDUPE_TTL_MS = 30_000;
 const _chatEventDedupe = new Map<string, number>();
 
@@ -215,6 +220,40 @@ function compactProgressiveTextParts(parts: string[]): string[] {
   }
 
   return compacted;
+}
+
+/**
+ * Fetch chat history directly from the Host API, bypassing the OpenClaw Gateway
+ * RPC which reads the entire JSONL file into memory regardless of limit.
+ * This uses a streaming ring-buffer reader with O(limit) memory usage.
+ */
+async function fetchHistoryViaHostApi(sessionKey: string, limit: number): Promise<RawMessage[]> {
+  const result = await hostApiFetch<{
+    success: boolean;
+    messages?: RawMessage[];
+    error?: string;
+  }>(`/api/sessions/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=${limit}`);
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to load history via host API');
+  }
+  return result.messages || [];
+}
+
+/**
+ * Fetch sessions list directly from the Host API, bypassing the OpenClaw Gateway
+ * RPC which reads every agent's sessions.json into memory.
+ * This scans disk files in parallel with streaming reads.
+ */
+async function fetchSessionsViaHostApi(): Promise<ChatSession[]> {
+  const result = await hostApiFetch<{
+    success: boolean;
+    sessions?: ChatSession[];
+    error?: string;
+  }>('/api/sessions/list');
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to load sessions via host API');
+  }
+  return result.sessions || [];
 }
 
 function normalizeLiveContentBlocks(content: ContentBlock[]): ContentBlock[] {
@@ -1015,7 +1054,7 @@ function clearSessionEntryFromMap<T extends Record<string, unknown>>(entries: T,
 function buildSessionSwitchPatch(
   state: Pick<
     ChatState,
-    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity' | 'agentRwWorkDirs'
+    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity' | 'agentRwWorkDirs' | 'hasMoreHistory' | 'historyOffset'
   >,
   nextSessionKey: string,
 ): Partial<ChatState> {
@@ -1053,6 +1092,8 @@ function buildSessionSwitchPatch(
     pendingFinal: false,
     lastUserMessageAt: null,
     pendingToolImages: [],
+    hasMoreHistory: true,
+    historyOffset: 0,
     rwWorkDir: state.agentRwWorkDirs[nextAgentId] ?? null,
   };
 }
@@ -1474,6 +1515,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessionLabels: {},
   sessionLastActivity: {},
 
+  hasMoreHistory: true,
+  historyOffset: 0,
+
   thinkingLevel: null,
 
   rwWorkDir: null,
@@ -1492,11 +1536,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     _loadSessionsInFlight = (async () => {
+      const loadStartedAt = Date.now();
       try {
-        const data = await useGatewayStore.getState().rpc<Record<string, unknown>>('sessions.list', {});
-        if (data) {
-          const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
-          const sessions: ChatSession[] = rawSessions.map((s: Record<string, unknown>) => ({
+        let sessions: ChatSession[] = [];
+        let usedHostApi = false;
+
+        // Try fast host API first (parallel disk scan, no gateway RPC)
+        try {
+          const hostApiStartedAt = Date.now();
+          sessions = await fetchSessionsViaHostApi();
+          usedHostApi = true;
+          console.log(`[loadSessions] Host API success: ${sessions.length} sessions in ${Date.now() - hostApiStartedAt}ms`);
+        } catch (hostErr) {
+          console.warn('[loadSessions] host API failed, falling back to RPC:', hostErr);
+        }
+
+        // Fallback to gateway RPC if host API failed or returned empty
+        if (!usedHostApi || sessions.length === 0) {
+          const rpcStartedAt = Date.now();
+          const data = await useGatewayStore.getState().rpc<Record<string, unknown>>('sessions.list', {});
+          const rawSessions = data && Array.isArray(data.sessions) ? data.sessions : [];
+          sessions = rawSessions.map((s: Record<string, unknown>) => ({
             key: String(s.key || ''),
             label: s.label ? String(s.label) : undefined,
             displayName: s.displayName ? String(s.displayName) : undefined,
@@ -1504,86 +1564,88 @@ export const useChatStore = create<ChatState>((set, get) => ({
             model: s.model ? String(s.model) : undefined,
             updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
           })).filter((s: ChatSession) => s.key);
+          console.log(`[loadSessions] RPC fallback: ${sessions.length} sessions in ${Date.now() - rpcStartedAt}ms`);
+        }
 
-          const canonicalBySuffix = new Map<string, string>();
-          for (const session of sessions) {
-            if (!session.key.startsWith('agent:')) continue;
-            const parts = session.key.split(':');
-            if (parts.length < 3) continue;
-            const suffix = parts.slice(2).join(':');
-            if (suffix && !canonicalBySuffix.has(suffix)) {
-              canonicalBySuffix.set(suffix, session.key);
+        console.log(`[loadSessions] total=${Date.now() - loadStartedAt}ms usedHostApi=${usedHostApi} sessions=${sessions.length}`);
+
+        const canonicalBySuffix = new Map<string, string>();
+        for (const session of sessions) {
+          if (!session.key.startsWith('agent:')) continue;
+          const parts = session.key.split(':');
+          if (parts.length < 3) continue;
+          const suffix = parts.slice(2).join(':');
+          if (suffix && !canonicalBySuffix.has(suffix)) {
+            canonicalBySuffix.set(suffix, session.key);
+          }
+        }
+
+        // Deduplicate: if both short and canonical existed, keep canonical only
+        const seen = new Set<string>();
+        const dedupedSessions = sessions.filter((s) => {
+          if (!s.key.startsWith('agent:') && canonicalBySuffix.has(s.key)) return false;
+          if (seen.has(s.key)) return false;
+          seen.add(s.key);
+          return true;
+        });
+
+        const { currentSessionKey, sessions: localSessions } = get();
+        let nextSessionKey = currentSessionKey || DEFAULT_SESSION_KEY;
+        if (!nextSessionKey.startsWith('agent:')) {
+          const canonicalMatch = canonicalBySuffix.get(nextSessionKey);
+          if (canonicalMatch) {
+            nextSessionKey = canonicalMatch;
+          }
+        }
+        if (!dedupedSessions.find((s) => s.key === nextSessionKey) && dedupedSessions.length > 0) {
+          // Preserve only locally-created pending sessions. On initial boot the
+          // default ghost key (`agent:main:main`) should yield to real history.
+          const hasLocalPendingSession = localSessions.some((session) => session.key === nextSessionKey);
+          if (!hasLocalPendingSession) {
+            nextSessionKey = dedupedSessions[0].key;
+          }
+        }
+
+        const sessionsWithCurrent = !dedupedSessions.find((s) => s.key === nextSessionKey) && nextSessionKey
+          ? [
+            ...dedupedSessions,
+            { key: nextSessionKey, displayName: nextSessionKey },
+          ]
+          : dedupedSessions;
+
+        const discoveredActivity = Object.fromEntries(
+          sessionsWithCurrent
+            .filter((session) => typeof session.updatedAt === 'number' && Number.isFinite(session.updatedAt))
+            .map((session) => [session.key, session.updatedAt!]),
+        );
+
+        set((state) => ({
+          sessions: sessionsWithCurrent,
+          currentSessionKey: nextSessionKey,
+          currentAgentId: getAgentIdFromSessionKey(nextSessionKey),
+          sessionLastActivity: {
+            ...state.sessionLastActivity,
+            ...discoveredActivity,
+          },
+        }));
+
+        // Restore rwWorkDir from AGENTS.md marker for current agent
+        const agentId = getAgentIdFromSessionKey(nextSessionKey);
+        const workspace = useAgentsStore.getState().agents.find((a) => a.id === agentId)?.workspace;
+        if (workspace) {
+          invokeIpc('rw-workspace:read', workspace).then((dir) => {
+            const dirStr = dir as string | null;
+            if (dirStr) {
+              set((s) => ({
+                rwWorkDir: dirStr,
+                agentRwWorkDirs: { ...s.agentRwWorkDirs, [agentId]: dirStr },
+              }));
             }
-          }
+          }).catch(() => { /* ignore */ });
+        }
 
-          // Deduplicate: if both short and canonical existed, keep canonical only
-          const seen = new Set<string>();
-          const dedupedSessions = sessions.filter((s) => {
-            if (!s.key.startsWith('agent:') && canonicalBySuffix.has(s.key)) return false;
-            if (seen.has(s.key)) return false;
-            seen.add(s.key);
-            return true;
-          });
-
-          const { currentSessionKey, sessions: localSessions } = get();
-          let nextSessionKey = currentSessionKey || DEFAULT_SESSION_KEY;
-          if (!nextSessionKey.startsWith('agent:')) {
-            const canonicalMatch = canonicalBySuffix.get(nextSessionKey);
-            if (canonicalMatch) {
-              nextSessionKey = canonicalMatch;
-            }
-          }
-          if (!dedupedSessions.find((s) => s.key === nextSessionKey) && dedupedSessions.length > 0) {
-            // Preserve only locally-created pending sessions. On initial boot the
-            // default ghost key (`agent:main:main`) should yield to real history.
-            const hasLocalPendingSession = localSessions.some((session) => session.key === nextSessionKey);
-            if (!hasLocalPendingSession) {
-              nextSessionKey = dedupedSessions[0].key;
-            }
-          }
-
-          const sessionsWithCurrent = !dedupedSessions.find((s) => s.key === nextSessionKey) && nextSessionKey
-            ? [
-              ...dedupedSessions,
-              { key: nextSessionKey, displayName: nextSessionKey },
-            ]
-            : dedupedSessions;
-
-          const discoveredActivity = Object.fromEntries(
-            sessionsWithCurrent
-              .filter((session) => typeof session.updatedAt === 'number' && Number.isFinite(session.updatedAt))
-              .map((session) => [session.key, session.updatedAt!]),
-          );
-
-          set((state) => ({
-            sessions: sessionsWithCurrent,
-            currentSessionKey: nextSessionKey,
-            currentAgentId: getAgentIdFromSessionKey(nextSessionKey),
-            sessionLastActivity: {
-              ...state.sessionLastActivity,
-              ...discoveredActivity,
-            },
-          }));
-
-          // Restore rwWorkDir from AGENTS.md marker for current agent
-          const agentId = getAgentIdFromSessionKey(nextSessionKey);
-          const workspace = useAgentsStore.getState().agents.find((a) => a.id === agentId)?.workspace;
-          if (workspace) {
-            invokeIpc('rw-workspace:read', workspace).then((dir) => {
-              const dirStr = dir as string | null;
-              if (dirStr) {
-                set((s) => ({
-                  rwWorkDir: dirStr,
-                  agentRwWorkDirs: { ...s.agentRwWorkDirs, [agentId]: dirStr },
-                }));
-              }
-            }).catch(() => { /* ignore */ });
-          }
-
-          if (currentSessionKey !== nextSessionKey) {
-            void get().loadHistory();
-          }
-
+        if (currentSessionKey !== nextSessionKey) {
+          void get().loadHistory();
         }
       } catch (err) {
         console.warn('Failed to load sessions:', err);
@@ -1900,6 +1962,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         thinkingLevel,
         loading: false,
         runError: latestTerminalAssistantErrorMessage,
+        hasMoreHistory: rawMessages.length >= INITIAL_HISTORY_LIMIT,
+        historyOffset: rawMessages.length,
       });
 
       // Extract first user message text as a session label for display in the toolbar.
@@ -1974,86 +2038,107 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return true;
       };
 
+      const historyLoadStartedAt = Date.now();
       try {
-        let data: Record<string, unknown> | null = null;
-        let lastError: unknown = null;
+        let rawMessages: RawMessage[] = [];
+        let thinkingLevel: string | null = null;
+        let usedHostApi = false;
 
-        for (let attempt = 0; attempt <= CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS.length; attempt += 1) {
-          if (!isCurrentSession()) {
-            break;
-          }
-
-          try {
-            data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
-              'chat.history',
-              { sessionKey: currentSessionKey, limit: 200 },
-              historyTimeoutOverride,
-            );
-            lastError = null;
-            break;
-          } catch (error) {
-            lastError = error;
-          }
-
-          if (!isCurrentSession()) {
-            break;
-          }
-
-          const errorKind = classifyHistoryStartupRetryError(lastError);
-          const shouldRetry = isInitialForegroundLoad
-            && attempt < CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS.length
-            && shouldRetryStartupHistoryLoad(useGatewayStore.getState().status, errorKind);
-
-          if (!shouldRetry) {
-            break;
-          }
-
-          console.warn('[chat.history] startup retry scheduled', {
-            sessionKey: currentSessionKey,
-            attempt: attempt + 1,
-            gatewayState: useGatewayStore.getState().status.state,
-            errorKind,
-            error: String(lastError),
-          });
-          await sleep(CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS[attempt]!);
+        // Try fast host API first (O(limit) memory, streams file)
+        try {
+          const hostApiStartedAt = Date.now();
+          rawMessages = await fetchHistoryViaHostApi(currentSessionKey, INITIAL_HISTORY_LIMIT);
+          usedHostApi = true;
+          console.log(`[loadHistory] Host API success: ${rawMessages.length} msgs in ${Date.now() - hostApiStartedAt}ms`);
+        } catch (hostErr) {
+          console.warn('[loadHistory] host API failed, falling back to RPC:', hostErr);
         }
 
-        if (data) {
-          let rawMessages = Array.isArray(data.messages) ? data.messages as RawMessage[] : [];
-          const thinkingLevel = data.thinkingLevel ? String(data.thinkingLevel) : null;
-          if (rawMessages.length === 0 && isCronSessionKey(currentSessionKey)) {
-            rawMessages = await loadCronFallbackMessages(currentSessionKey, 200);
+        // Fallback to gateway RPC if host API failed or returned empty
+        if (!usedHostApi || rawMessages.length === 0) {
+          let data: Record<string, unknown> | null = null;
+          let lastError: unknown = null;
+
+          for (let attempt = 0; attempt <= CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS.length; attempt += 1) {
+            if (!isCurrentSession()) {
+              break;
+            }
+
+            try {
+              const rpcStartedAt = Date.now();
+              data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
+                'chat.history',
+                { sessionKey: currentSessionKey, limit: INITIAL_HISTORY_LIMIT },
+                historyTimeoutOverride,
+              );
+              console.log(`[loadHistory] RPC success: attempt=${attempt} in ${Date.now() - rpcStartedAt}ms`);
+              lastError = null;
+              break;
+            } catch (error) {
+              lastError = error;
+            }
+
+            if (!isCurrentSession()) {
+              break;
+            }
+
+            const errorKind = classifyHistoryStartupRetryError(lastError);
+            const shouldRetry = isInitialForegroundLoad
+              && attempt < CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS.length
+              && shouldRetryStartupHistoryLoad(useGatewayStore.getState().status, errorKind);
+
+            if (!shouldRetry) {
+              break;
+            }
+
+            console.warn('[chat.history] startup retry scheduled', {
+              sessionKey: currentSessionKey,
+              attempt: attempt + 1,
+              gatewayState: useGatewayStore.getState().status.state,
+              errorKind,
+              error: String(lastError),
+            });
+            await sleep(CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS[attempt]!);
           }
 
+          if (data) {
+            rawMessages = Array.isArray(data.messages) ? data.messages as RawMessage[] : [];
+            thinkingLevel = data.thinkingLevel ? String(data.thinkingLevel) : null;
+          } else {
+            if (isCurrentSession() && isInitialForegroundLoad && classifyHistoryStartupRetryError(lastError)) {
+              console.warn('[chat.history] startup retry exhausted', {
+                sessionKey: currentSessionKey,
+                gatewayState: useGatewayStore.getState().status.state,
+                error: String(lastError),
+              });
+            }
+            const fallbackMessages = await loadCronFallbackMessages(currentSessionKey, INITIAL_HISTORY_LIMIT);
+            if (fallbackMessages.length > 0) {
+              rawMessages = fallbackMessages;
+            } else {
+              applyLoadFailure(
+                (lastError instanceof Error ? lastError.message : String(lastError))
+                || 'Failed to load chat history',
+              );
+            }
+          }
+        }
+
+        if (rawMessages.length === 0 && isCronSessionKey(currentSessionKey)) {
+          rawMessages = await loadCronFallbackMessages(currentSessionKey, INITIAL_HISTORY_LIMIT);
+        }
+
+        console.log(`[loadHistory] total=${Date.now() - historyLoadStartedAt}ms usedHostApi=${usedHostApi} msgs=${rawMessages.length}`);
+
+        if (rawMessages.length > 0 || !get().error) {
           const applied = applyLoadedMessages(rawMessages, thinkingLevel);
           if (applied && isInitialForegroundLoad) {
             _foregroundHistoryLoadSeen.add(currentSessionKey);
           }
-        } else {
-          if (isCurrentSession() && isInitialForegroundLoad && classifyHistoryStartupRetryError(lastError)) {
-            console.warn('[chat.history] startup retry exhausted', {
-              sessionKey: currentSessionKey,
-              gatewayState: useGatewayStore.getState().status.state,
-              error: String(lastError),
-            });
-          }
-
-          const fallbackMessages = await loadCronFallbackMessages(currentSessionKey, 200);
-          if (fallbackMessages.length > 0) {
-            const applied = applyLoadedMessages(fallbackMessages, null);
-            if (applied && isInitialForegroundLoad) {
-              _foregroundHistoryLoadSeen.add(currentSessionKey);
-            }
-          } else {
-            applyLoadFailure(
-              (lastError instanceof Error ? lastError.message : String(lastError))
-              || 'Failed to load chat history',
-            );
-          }
         }
       } catch (err) {
         console.warn('Failed to load chat history:', err);
-        const fallbackMessages = await loadCronFallbackMessages(currentSessionKey, 200);
+        const fallbackMessages = await loadCronFallbackMessages(currentSessionKey, INITIAL_HISTORY_LIMIT);
         if (fallbackMessages.length > 0) {
           const applied = applyLoadedMessages(fallbackMessages, null);
           if (applied && isInitialForegroundLoad) {
@@ -2076,6 +2161,79 @@ export const useChatStore = create<ChatState>((set, get) => ({
         _lastHistoryLoadAtBySession.set(currentSessionKey, Date.now());
       }
       
+      const active = _historyLoadInFlight.get(currentSessionKey);
+      if (active === loadPromise) {
+        _historyLoadInFlight.delete(currentSessionKey);
+      }
+    }
+  },
+
+  // ── Load more (earlier) history ──
+
+  loadMoreHistory: async () => {
+    const { currentSessionKey, hasMoreHistory, messages } = get();
+    if (!hasMoreHistory || !currentSessionKey) return;
+    if (_historyLoadInFlight.has(currentSessionKey)) {
+      await _historyLoadInFlight.get(currentSessionKey);
+      return;
+    }
+
+    const currentCount = messages.length;
+    const nextLimit = currentCount + MORE_HISTORY_LIMIT;
+
+    const loadPromise = (async () => {
+      try {
+        let newRawMessages: RawMessage[] = [];
+        let usedHostApi = false;
+
+        // Try fast host API first with a larger limit
+        try {
+          newRawMessages = await fetchHistoryViaHostApi(currentSessionKey, nextLimit);
+          usedHostApi = true;
+        } catch (hostErr) {
+          console.warn('[loadMoreHistory] host API failed, falling back to RPC:', hostErr);
+        }
+
+        // Fallback to gateway RPC (offset may not be supported by backend)
+        if (!usedHostApi || newRawMessages.length === 0) {
+          const data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
+            'chat.history',
+            { sessionKey: currentSessionKey, limit: nextLimit },
+            30_000,
+          );
+          newRawMessages = Array.isArray(data.messages) ? (data.messages as RawMessage[]) : [];
+        }
+
+        if (newRawMessages.length <= currentCount) {
+          set({ hasMoreHistory: false });
+          return;
+        }
+
+        // The API returns the LAST `nextLimit` messages.  New earlier messages
+        // are the ones before the already-loaded tail.
+        const earlierRaw = newRawMessages.slice(0, newRawMessages.length - currentCount);
+
+        const messagesWithToolImages = enrichWithToolResultFiles(earlierRaw);
+        const filteredMessages = messagesWithToolImages.filter(
+          (msg) => !isToolResultRole(msg.role) && !isInternalMessage(msg),
+        );
+        const enrichedMessages = enrichWithCachedImages(filteredMessages);
+
+        set((state) => ({
+          messages: [...enrichedMessages, ...state.messages],
+          hasMoreHistory: newRawMessages.length >= nextLimit,
+          historyOffset: 0,
+        }));
+      } catch (err) {
+        console.warn('Failed to load more history:', err);
+      }
+    })();
+
+    _historyLoadInFlight.set(currentSessionKey, loadPromise);
+    try {
+      await loadPromise;
+    } finally {
+      _lastHistoryLoadAtBySession.set(currentSessionKey, Date.now());
       const active = _historyLoadInFlight.get(currentSessionKey);
       if (active === loadPromise) {
         _historyLoadInFlight.delete(currentSessionKey);

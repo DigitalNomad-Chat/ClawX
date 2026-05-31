@@ -6,6 +6,7 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
 import { useGatewayStore } from '@/stores/gateway';
@@ -22,7 +23,6 @@ import { extractImages, extractText, extractThinking, extractToolUse, stripProce
 import { deriveTaskSteps, findReplyMessageIndex, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { useStickToBottomInstant } from '@/hooks/use-stick-to-bottom-instant';
 import { useMinLoading } from '@/hooks/use-min-loading';
 import { useArtifactParser } from './useArtifactParser';
 import { extractGeneratedFiles, generatedFileHasDiffPayload, type GeneratedFile } from '@/lib/generated-files';
@@ -124,6 +124,8 @@ export function Chat() {
 
   const cleanupEmptySession = useChatStore((s) => s.cleanupEmptySession);
   const lastUserMessageAt = useChatStore((s) => s.lastUserMessageAt);
+  const hasMoreHistory = useChatStore((s) => s.hasMoreHistory);
+  const loadMoreHistory = useChatStore((s) => s.loadMoreHistory);
   const agentsList = useAgentsStore((s) => s.agents);
   const currentAgent = useMemo(
     () => (agentsList ?? []).find((a) => a.id === currentAgentId) ?? null,
@@ -171,14 +173,51 @@ export function Chat() {
   const [graphExpandedOverrides, setGraphExpandedOverrides] = useState<Record<string, boolean>>({});
   const graphStepCache: Record<string, GraphStepCacheEntry> = graphStepCacheStore.get(currentSessionKey) ?? {};
   const minLoading = useMinLoading(loading && messages.length > 0);
-  const { contentRef, scrollRef, scrollToBottom } = useStickToBottomInstant(currentSessionKey);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // Wrap sendMessage so that every user send forces a scroll-to-bottom,
   // even when the user had previously scrolled up to read older messages.
   const handleSend = useCallback((...args: Parameters<typeof sendMessage>) => {
-    scrollToBottom("instant");
+    virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'auto' });
     return sendMessage(...args);
-  }, [scrollToBottom, sendMessage]);
+  }, [sendMessage]);
+
+  // Force scroll to bottom after initial history load completes so the user
+  // lands at the latest message instead of somewhere in the middle.
+  const prevLoadingRef = useRef(loading);
+  useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+    if (wasLoading && !loading && messages.length > 0) {
+      // Small delay to let Virtuoso finish its initial layout
+      const timer = setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'auto' });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, messages.length]);
+
+  // When a new message arrives during an active send, force scroll to bottom
+  // so the user sees the latest reply even if followOutput missed it.
+  const prevMessageCountRef = useRef(messages.length);
+  useEffect(() => {
+    const prevCount = prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+    if (sending && messages.length > prevCount) {
+      virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'auto' });
+    }
+  }, [messages.length, sending]);
+
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const handleAtTop = useCallback(async (atTop: boolean) => {
+    if (!atTop || !hasMoreHistory || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      await loadMoreHistory();
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreHistory, isLoadingMore, loadMoreHistory]);
 
   // Load data when gateway is running.
   // When the store already holds messages for this session (i.e. the user
@@ -580,6 +619,17 @@ export function Chat() {
   }, [userRunCards, messages]);
   const streamingReplyText = userRunCards.find((card) => card.streamingReplyText != null)?.streamingReplyText ?? null;
 
+  // Rows visible to the virtual scroller (folded narration messages are excluded
+  // so Virtuoso never has to render a zero-height item).
+  const visibleRows = useMemo(() => {
+    const rows: Array<{ msg: RawMessage; originalIdx: number }> = [];
+    for (let idx = 0; idx < messages.length; idx += 1) {
+      if (foldedNarrationIndices.has(idx)) continue;
+      rows.push({ msg: messages[idx], originalIdx: idx });
+    }
+    return rows;
+  }, [messages, foldedNarrationIndices]);
+
   // Derive the set of run keys that should be auto-collapsed (run finished
   // streaming or has a reply override) during render instead of in an effect,
   // so we don't violate react-hooks/set-state-in-effect. Explicit user toggles
@@ -699,51 +749,50 @@ export function Chat() {
       {/* Messages Area */}
       <div className="min-h-0 flex-1 overflow-hidden px-4 py-4">
         <div className="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-4 lg:flex-row lg:items-stretch">
-          <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-            <div
-              ref={contentRef}
-              className={cn(
-                "mx-auto space-y-4 transition-all duration-300",
-                isEmpty ? "w-full max-w-3xl" : "max-w-4xl",
-              )}
-            >
-              {isEmpty ? (
+          {isEmpty ? (
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl space-y-4 transition-all duration-300">
                 <WelcomeScreen />
-              ) : (
-                <>
-                  {messages.map((msg, idx) => {
-                    if (foldedNarrationIndices.has(idx)) return null;
-                    const suppressToolCards = userRunCards.some((card) =>
-                      idx > card.triggerIndex && idx <= card.segmentEnd,
-                    );
-                    return (
+              </div>
+            </div>
+          ) : (
+            <Virtuoso
+              key={currentSessionKey}
+              ref={virtuosoRef}
+              className="min-h-0 min-w-0 flex-1"
+              style={{ overflowY: 'auto' }}
+              data={visibleRows}
+              initialTopMostItemIndex={visibleRows.length - 1}
+              followOutput={(isAtBottom) => (sending || isAtBottom ? 'auto' : false)}
+              increaseViewportBy={{ top: 400, bottom: 400 }}
+              atTopStateChange={handleAtTop}
+              itemContent={(_index, row) => {
+                const { msg, originalIdx } = row;
+                const suppressToolCards = userRunCards.some((card) =>
+                  originalIdx > card.triggerIndex && originalIdx <= card.segmentEnd,
+                );
+                return (
+                  <div className="mx-auto max-w-4xl">
                     <div
-                      key={msg.id || `msg-${idx}`}
                       className="space-y-3 animate-message-in"
-                      id={`chat-message-${idx}`}
-                      data-testid={`chat-message-${idx}`}
+                      id={`chat-message-${originalIdx}`}
+                      data-testid={`chat-message-${originalIdx}`}
                     >
                       <ChatMessage
                         message={msg}
-                        textOverride={replyTextOverrides.get(idx)}
+                        textOverride={replyTextOverrides.get(originalIdx)}
                         suppressToolCards={suppressToolCards}
                         suppressProcessAttachments={suppressToolCards}
                         onOpenFile={handleOpenAttachedFile}
                       />
                       {userRunCards
-                        .filter((card) => card.triggerIndex === idx)
+                        .filter((card) => card.triggerIndex === originalIdx)
                         .map((card) => {
                           const triggerMsg = messages[card.triggerIndex];
                           const runKey = triggerMsg?.id
                             ? `msg-${triggerMsg.id}`
                             : `${currentSessionKey}:trigger-${card.triggerIndex}`;
                           const userOverride = graphExpandedOverrides[runKey];
-                          // Always use the controlled expanded prop instead of
-                          // relying on ExecutionGraphCard's uncontrolled state.
-                          // Uncontrolled state is lost on remount (key changes
-                          // when loadHistory replaces message ids), causing
-                          // spurious collapse.  The controlled prop survives
-                          // remounts because it's computed fresh each render.
                           const expanded = userOverride != null
                             ? userOverride
                             : !autoCollapsedRunKeys.has(runKey);
@@ -771,60 +820,66 @@ export function Chat() {
                           );
                         })}
                     </div>
-                    );
-                  })}
+                  </div>
+                );
+              }}
+              components={{
+                Header: () =>
+                  isLoadingMore ? (
+                    <div className="mx-auto max-w-4xl py-3 text-center">
+                      <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : null,
+                Footer: () => (
+                  <div className="mx-auto max-w-4xl">
+                    {/* Streaming message — render when reply text is separated from graph,
+                        OR when there's streaming content without an active graph */}
+                    {shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph) && (
+                      <ChatMessage
+                        message={(() => {
+                          const base = streamMsg
+                            ? {
+                                ...(streamMsg as Record<string, unknown>),
+                                role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
+                                content: streamMsg.content ?? streamText,
+                                timestamp: streamMsg.timestamp ?? streamingTimestamp,
+                              }
+                            : {
+                                role: 'assistant' as const,
+                                content: streamText,
+                                timestamp: streamingTimestamp,
+                              };
+                          if (streamingReplyText != null && Array.isArray(base.content)) {
+                            return {
+                              ...base,
+                              content: (base.content as Array<{ type?: string }>).filter(
+                                (block) => block.type !== 'thinking',
+                              ),
+                            } as RawMessage;
+                          }
+                          return base as RawMessage;
+                        })()}
+                        textOverride={streamingReplyText ?? undefined}
+                        isStreaming
+                        streamingTools={streamingReplyText != null ? [] : streamingTools}
+                        onOpenFile={handleOpenAttachedFile}
+                      />
+                    )}
 
-                  {/* Streaming message — render when reply text is separated from graph,
-                      OR when there's streaming content without an active graph */}
-                  {shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph) && (
-                    <ChatMessage
-                      message={(() => {
-                        const base = streamMsg
-                          ? {
-                              ...(streamMsg as Record<string, unknown>),
-                              role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
-                              content: streamMsg.content ?? streamText,
-                              timestamp: streamMsg.timestamp ?? streamingTimestamp,
-                            }
-                          : {
-                              role: 'assistant' as const,
-                              content: streamText,
-                              timestamp: streamingTimestamp,
-                            };
-                        // When the reply renders as a separate bubble, strip
-                        // thinking blocks from the message — they belong to
-                        // the execution phase and are already omitted from
-                        // the graph via omitLastStreamingMessageSegment.
-                        if (streamingReplyText != null && Array.isArray(base.content)) {
-                          return {
-                            ...base,
-                            content: (base.content as Array<{ type?: string }>).filter(
-                              (block) => block.type !== 'thinking',
-                            ),
-                          } as RawMessage;
-                        }
-                        return base as RawMessage;
-                      })()}
-                      textOverride={streamingReplyText ?? undefined}
-                      isStreaming
-                      streamingTools={streamingReplyText != null ? [] : streamingTools}
-                      onOpenFile={handleOpenAttachedFile}
-                    />
-                  )}
+                    {/* Activity indicator: waiting for next AI turn after tool execution */}
+                    {sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph && (
+                      <ActivityIndicator phase="tool_processing" />
+                    )}
 
-                  {/* Activity indicator: waiting for next AI turn after tool execution */}
-                  {sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph && (
-                    <ActivityIndicator phase="tool_processing" />
-                  )}
-
-                  {/* Typing indicator when sending but no stream content yet */}
-                  {sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph && (
-                    <TypingIndicator />
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+                    {/* Typing indicator when sending but no stream content yet */}
+                    {sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph && (
+                      <TypingIndicator />
+                    )}
+                  </div>
+                ),
+              }}
+            />
+          )}
 
         </div>
       </div>

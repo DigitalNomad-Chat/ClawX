@@ -107,23 +107,21 @@ export function Sidebar() {
 
   const gatewayStatus = useGatewayStore((s) => s.status);
   const isGatewayRunning = gatewayStatus.state === 'running';
-  const isGatewayReady = isGatewayRunning && gatewayStatus.gatewayReady !== false;
 
   useEffect(() => {
-    if (!isGatewayReady) return;
+    if (!isGatewayRunning) return;
     let cancelled = false;
     const hasExistingMessages = useChatStore.getState().messages.length > 0;
     (async () => {
-      await Promise.allSettled([
-        loadSessions(),
-        loadHistory(hasExistingMessages),
-      ]);
+      await loadSessions();
+      if (cancelled) return;
+      await loadHistory(hasExistingMessages);
       if (cancelled) return;
     })();
     return () => {
       cancelled = true;
     };
-  }, [isGatewayReady, loadHistory, loadSessions]);
+  }, [isGatewayRunning, loadHistory, loadSessions]);
   const agents = useAgentsStore((s) => s.agents);
   const fetchAgents = useAgentsStore((s) => s.fetchAgents);
 
