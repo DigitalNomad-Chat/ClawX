@@ -4,7 +4,7 @@ import { Feature } from '../../services/member/types';
 import { logger } from '../../utils/logger';
 
 /**
- * Register auth/member IPC handlers.
+ * Register auth/member IPC handlers (Cloud-First).
  *
  * Channels:
  *   auth:login        -> { username, password }
@@ -14,15 +14,16 @@ import { logger } from '../../utils/logger';
  *   auth:checkFeature -> { feature: Feature }
  *   auth:recordUsage  -> { feature: Feature }
  *   auth:getUsageStats-> { feature?: Feature }
+ *   auth:activate     -> { licenseKey: string }
  */
 export function registerAuthIpcHandlers(memberModule: MemberModule): void {
   ipcMain.handle('auth:login', async (_, credentials: { username: string; password: string }) => {
     try {
-      const result = await memberModule.manager.login({
-        ...credentials,
-        deviceId: memberModule.deviceId ?? undefined,
-        deviceName: undefined,
-      });
+      const result = await memberModule.client.login(
+        credentials.username,
+        credentials.password,
+        memberModule.deviceId ?? undefined,
+      );
       return result;
     } catch (err: any) {
       logger.error('[IPC auth:login] error:', err);
@@ -32,10 +33,12 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
 
   ipcMain.handle('auth:register', async (_, credentials: { username: string; email: string; password: string }) => {
     try {
-      const result = await memberModule.manager.register({
-        ...credentials,
-        deviceId: memberModule.deviceId ?? undefined,
-      });
+      const result = await memberModule.client.register(
+        credentials.username,
+        credentials.email,
+        credentials.password,
+        memberModule.deviceId ?? undefined,
+      );
       return result;
     } catch (err: any) {
       logger.error('[IPC auth:register] error:', err);
@@ -45,7 +48,7 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
 
   ipcMain.handle('auth:logout', async () => {
     try {
-      await memberModule.manager.logout();
+      await memberModule.client.logout();
       return { success: true };
     } catch (err: any) {
       logger.error('[IPC auth:logout] error:', err);
@@ -53,8 +56,10 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
     }
   });
 
-  ipcMain.handle('auth:getUser', () => {
-    return memberModule.state.userInfo ?? null;
+  ipcMain.handle('auth:getUser', async () => {
+    // Always fetch fresh user data from the cloud
+    const user = await memberModule.client.getMe();
+    return user ?? memberModule.state.userInfo ?? null;
   });
 
   ipcMain.handle('auth:checkFeature', async (_, feature: Feature) => {
@@ -67,9 +72,9 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
     }
   });
 
-  ipcMain.handle('auth:recordUsage', (_, feature: Feature) => {
+  ipcMain.handle('auth:recordUsage', async (_, feature: Feature) => {
     try {
-      memberModule.recordUsage(feature);
+      await memberModule.recordUsage(feature);
       return { success: true };
     } catch (err: any) {
       logger.error('[IPC auth:recordUsage] error:', err);
@@ -77,45 +82,22 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
     }
   });
 
-  ipcMain.handle('auth:getUsageStats', (_, feature?: Feature) => {
+  ipcMain.handle('auth:getUsageStats', async (_, _feature?: Feature) => {
     try {
-      const payload = memberModule.token.getPayload();
-      if (!payload) {
-        return [];
-      }
-
-      const features = feature
-        ? { [feature]: payload.usage[feature] }
-        : payload.usage;
-
-      const result: { feature: Feature; used: number; limit: number; remaining: number; tier: string; allowed?: boolean }[] = [];
-      for (const [feat, data] of Object.entries(features)) {
-        if (data) {
-          const localCount = memberModule.usage.getCount(feat as Feature);
-          result.push({
-            feature: feat as Feature,
-            used: data.used + localCount,
-            limit: data.limit,
-            remaining: Math.max(0, data.limit - data.used - localCount),
-            tier: payload.tier,
-          });
-        }
-      }
-
-      return result;
+      const stats = await memberModule.client.getUsageStats();
+      return stats;
     } catch (err: any) {
       logger.error('[IPC auth:getUsageStats] error:', err);
       return [];
     }
   });
 
-  ipcMain.handle('auth:activate', async (_, { licenseKey, userId }: { licenseKey: string; userId: string }) => {
+  ipcMain.handle('auth:activate', async (_, { licenseKey }: { licenseKey: string }) => {
     try {
-      const { activationService } = await import('../../services/member/activation');
-      const result = await activationService.activate(userId, licenseKey, memberModule.deviceId ?? 'unknown');
-      if (result.success) {
-        await memberModule.manager.refreshUser();
-      }
+      const result = await memberModule.client.activateLicense(
+        licenseKey,
+        memberModule.deviceId ?? 'unknown',
+      );
       return result;
     } catch (err: any) {
       logger.error('[IPC auth:activate] error:', err);
@@ -123,5 +105,5 @@ export function registerAuthIpcHandlers(memberModule: MemberModule): void {
     }
   });
 
-  logger.info('[IPC] Auth handlers registered');
+  logger.info('[IPC] Auth handlers registered (cloud-first)');
 }

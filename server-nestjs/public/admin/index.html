@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawX 管理后台</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [v-cloak] { display: none; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    .slide-enter-active, .slide-leave-active { transition: transform 0.3s; }
+    .slide-enter-from, .slide-leave-to { transform: translateX(-100%); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+  <div id="app" v-cloak>
+    <!-- 登录页 -->
+    <div v-if="!authenticated" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-blue-100">
+      <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md mx-4">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <i class="fas fa-shield-halved text-white text-2xl"></i>
+          </div>
+          <h1 class="text-2xl font-bold text-gray-900">ClawX 管理后台</h1>
+          <p class="text-gray-500 text-sm mt-2">请输入管理员账号密码登录</p>
+        </div>
+        <form @submit.prevent="login">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">账号</label>
+            <div class="relative">
+              <i class="fas fa-user absolute left-3 top-3 text-gray-400"></i>
+              <input
+                v-model="adminUsername"
+                type="text"
+                class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"
+                placeholder="输入管理员账号"
+                required
+              >
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+            <div class="relative">
+              <i class="fas fa-lock absolute left-3 top-3 text-gray-400"></i>
+              <input
+                v-model="adminPassword"
+                type="password"
+                class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"
+                placeholder="输入管理员密码"
+                required
+              >
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">验证码</label>
+            <div class="flex gap-2">
+              <input
+                v-model="captchaCode"
+                type="text"
+                maxlength="4"
+                class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"
+                placeholder="输入验证码"
+                required
+              >
+              <div
+                v-if="captchaSvg"
+                v-html="captchaSvg"
+                @click="refreshCaptcha"
+                class="cursor-pointer rounded-lg border border-gray-300 overflow-hidden hover:opacity-80 transition select-none"
+                title="点击刷新验证码"
+              ></div>
+              <div v-else class="w-[120px] h-[40px] bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-400">
+                加载中...
+              </div>
+            </div>
+          </div>
+          <button
+            type="submit"
+            :disabled="loading"
+            class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <i v-if="loading" class="fas fa-circle-notch fa-spin"></i>
+            <span>{{ loading ? '验证中...' : '登录' }}</span>
+          </button>
+        </form>
+        <div v-if="loginError" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+          <i class="fas fa-circle-exclamation"></i>
+          <span>{{ loginError }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div v-else class="min-h-screen flex">
+      <!-- 侧边栏 -->
+      <aside class="w-60 bg-white shadow-lg flex flex-col z-10">
+        <div class="h-16 flex items-center px-6 border-b border-gray-100">
+          <div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-brand-700 rounded-lg flex items-center justify-center mr-3">
+            <i class="fas fa-shield-halved text-white text-sm"></i>
+          </div>
+          <span class="font-bold text-lg text-gray-900">ClawX</span>
+        </div>
+        <nav class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+          <a
+            v-for="item in navItems"
+            :key="item.id"
+            @click="currentPage = item.id"
+            :class="[
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition text-sm font-medium',
+              currentPage === item.id
+                ? 'bg-brand-50 text-brand-700'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            ]"
+          >
+            <i :class="item.icon" class="w-5 text-center"></i>
+            <span>{{ item.label }}</span>
+          </a>
+        </nav>
+        <div class="p-4 border-t border-gray-100">
+          <button @click="logout" class="flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 transition w-full px-3 py-2 rounded-lg hover:bg-red-50">
+            <i class="fas fa-right-from-bracket"></i>
+            <span>退出登录</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- 内容区 -->
+      <main class="flex-1 flex flex-col min-w-0">
+        <!-- 顶部栏 -->
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
+          <h2 class="text-lg font-semibold text-gray-800">{{ pageTitle }}</h2>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{{ apiKey.substring(0,8) }}...</span>
+            <div class="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">
+              <i class="fas fa-user text-brand-600 text-xs"></i>
+            </div>
+          </div>
+        </header>
+
+        <!-- 页面内容 -->
+        <div class="flex-1 overflow-auto p-6">
+          <!-- Dashboard -->
+          <div v-if="currentPage === 'dashboard'">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+              <div v-for="card in statCards" :key="card.label" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-gray-500 text-sm mb-1">{{ card.label }}</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ card.value }}</p>
+                  </div>
+                  <div :class="['w-12 h-12 rounded-lg flex items-center justify-center text-white text-lg', card.bg]">
+                    <i :class="card.icon"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-800">用户分布</h3>
+              </div>
+              <div class="p-5">
+                <div class="space-y-3">
+                  <div v-for="item in tierDistribution" :key="item.tier" class="flex items-center gap-4">
+                    <span class="w-16 text-sm text-gray-600 capitalize">{{ item.tier }}</span>
+                    <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all duration-500"
+                        :class="tierBarColor(item.tier)"
+                        :style="{ width: tierPercent(item.count) + '%' }"
+                      ></div>
+                    </div>
+                    <span class="text-sm font-medium text-gray-800 w-8 text-right">{{ item.count }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户管理 -->
+          <div v-if="currentPage === 'users'">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+                <h3 class="font-semibold text-gray-800">用户列表</h3>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="userSearch"
+                    @input="fetchUsers(1)"
+                    placeholder="搜索用户名/邮箱"
+                    class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 w-48"
+                  >
+                  <select v-model="userTierFilter" @change="fetchUsers(1)" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="">全部 Tier</option>
+                    <option value="free">Free</option>
+                    <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                  <select v-model="userStatusFilter" @change="fetchUsers(1)" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="">全部状态</option>
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th class="px-5 py-3 text-left font-medium">用户名</th>
+                      <th class="px-5 py-3 text-left font-medium">邮箱</th>
+                      <th class="px-5 py-3 text-left font-medium">Tier</th>
+                      <th class="px-5 py-3 text-left font-medium">状态</th>
+                      <th class="px-5 py-3 text-left font-medium">余额</th>
+                      <th class="px-5 py-3 text-left font-medium">注册时间</th>
+                      <th class="px-5 py-3 text-left font-medium">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr v-for="user in users" :key="user.id" class="hover:bg-gray-50 transition">
+                      <td class="px-5 py-3 font-medium text-gray-900">{{ user.username }}</td>
+                      <td class="px-5 py-3 text-gray-600">{{ user.email }}</td>
+                      <td class="px-5 py-3">
+                        <span :class="tierBadge(user.tier)">{{ user.tier }}</span>
+                      </td>
+                      <td class="px-5 py-3">
+                        <span :class="statusBadge(user.status)">{{ user.status }}</span>
+                      </td>
+                      <td class="px-5 py-3 text-gray-600">{{ user.balance }}</td>
+                      <td class="px-5 py-3 text-gray-500">{{ formatDate(user.createdAt) }}</td>
+                      <td class="px-5 py-3">
+                        <button @click="editUser(user)" class="text-brand-600 hover:text-brand-700 text-sm mr-3">
+                          <i class="fas fa-pen-to-square"></i> 编辑
+                        </button>
+                      </td>
+                    </tr>
+                    <tr v-if="users.length === 0">
+                      <td colspan="7" class="px-5 py-8 text-center text-gray-400">暂无数据</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                <span class="text-sm text-gray-500">共 {{ userTotal }} 条</span>
+                <div class="flex items-center gap-1">
+                  <button @click="fetchUsers(userPage - 1)" :disabled="userPage <= 1" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40">上一页</button>
+                  <span class="px-3 py-1 text-sm text-gray-600">第 {{ userPage }} 页</span>
+                  <button @click="fetchUsers(userPage + 1)" :disabled="users.length < userLimit" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40">下一页</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- License 管理 -->
+          <div v-if="currentPage === 'licenses'">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5">
+              <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-800">创建 License</h3>
+              </div>
+              <div class="p-5 flex items-end gap-3 flex-wrap">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Tier</label>
+                  <select v-model="newLicense.tier" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">有效期 (天)</label>
+                  <input v-model.number="newLicense.durationDays" type="number" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500 w-28">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">最大设备数</label>
+                  <input v-model.number="newLicense.maxDevices" type="number" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500 w-28">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">备注</label>
+                  <input v-model="newLicense.notes" placeholder="可选" class="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500 w-48">
+                </div>
+                <button @click="createLicense" :disabled="licenseLoading" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50">
+                  <i v-if="licenseLoading" class="fas fa-circle-notch fa-spin mr-1"></i>
+                  创建
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-800">License 列表</h3>
+                <select v-model="licenseStatusFilter" @change="fetchLicenses(1)" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                  <option value="">全部状态</option>
+                  <option value="active">Active</option>
+                  <option value="revoked">Revoked</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th class="px-5 py-3 text-left font-medium">License Key</th>
+                      <th class="px-5 py-3 text-left font-medium">Tier</th>
+                      <th class="px-5 py-3 text-left font-medium">状态</th>
+                      <th class="px-5 py-3 text-left font-medium">设备限制</th>
+                      <th class="px-5 py-3 text-left font-medium">有效期</th>
+                      <th class="px-5 py-3 text-left font-medium">创建时间</th>
+                      <th class="px-5 py-3 text-left font-medium">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr v-for="lic in licenses" :key="lic.id" class="hover:bg-gray-50 transition">
+                      <td class="px-5 py-3 font-mono text-gray-900">{{ lic.licenseKey }}</td>
+                      <td class="px-5 py-3">
+                        <span :class="tierBadge(lic.tier)">{{ lic.tier }}</span>
+                      </td>
+                      <td class="px-5 py-3">
+                        <span :class="statusBadge(lic.status)">{{ lic.status }}</span>
+                      </td>
+                      <td class="px-5 py-3 text-gray-600">{{ lic.maxDevices }}</td>
+                      <td class="px-5 py-3 text-gray-600">{{ lic.durationDays }} 天</td>
+                      <td class="px-5 py-3 text-gray-500">{{ formatDate(lic.createdAt) }}</td>
+                      <td class="px-5 py-3">
+                        <button
+                          v-if="lic.status === 'active'"
+                          @click="revokeLicense(lic.licenseKey)"
+                          class="text-red-600 hover:text-red-700 text-sm"
+                        >
+                          <i class="fas fa-ban"></i> 吊销
+                        </button>
+                        <span v-else class="text-gray-400 text-sm">已处理</span>
+                      </td>
+                    </tr>
+                    <tr v-if="licenses.length === 0">
+                      <td colspan="7" class="px-5 py-8 text-center text-gray-400">暂无数据</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+                <span class="text-sm text-gray-500">共 {{ licenseTotal }} 条</span>
+                <div class="flex items-center gap-1">
+                  <button @click="fetchLicenses(licensePage - 1)" :disabled="licensePage <= 1" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40">上一页</button>
+                  <span class="px-3 py-1 text-sm text-gray-600">第 {{ licensePage }} 页</span>
+                  <button @click="fetchLicenses(licensePage + 1)" :disabled="licenses.length < licenseLimit" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-40">下一页</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tier 配置 -->
+          <div v-if="currentPage === 'tiers'">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div v-for="tier in tiers" :key="tier.tier" class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="font-semibold text-gray-800 capitalize">{{ tier.tier }}</h3>
+                  <span :class="tierBadge(tier.tier)">{{ tier.tier }}</span>
+                </div>
+                <div class="space-y-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">显示名称</label>
+                    <input v-model="tier.displayName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">月配额 (0=无限)</label>
+                    <input v-model.number="tier.monthlyQuota" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">最大设备数</label>
+                    <input v-model.number="tier.maxDevices" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">功能列表 (JSON)</label>
+                    <textarea v-model="tier.featuresJson" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500 font-mono"></textarea>
+                  </div>
+                  <button @click="updateTier(tier)" :disabled="tier._loading" class="w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50">
+                    <i v-if="tier._loading" class="fas fa-circle-notch fa-spin mr-1"></i>
+                    保存修改
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 编辑用户弹窗 -->
+    <div v-if="editingUser" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="editingUser = null">
+      <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">编辑用户</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">用户名</label>
+            <input v-model="editingUser.username" disabled class="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Tier</label>
+            <select v-model="editingUser.tier" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">状态</label>
+            <select v-model="editingUser.status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">余额</label>
+            <input v-model.number="editingUser.balance" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="editingUser = null" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">取消</button>
+          <button @click="saveUser" :disabled="userSaveLoading" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50">
+            <i v-if="userSaveLoading" class="fas fa-circle-notch fa-spin mr-1"></i>
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div class="fixed top-4 right-4 z-50 space-y-2">
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        :class="[
+          'px-4 py-3 rounded-lg shadow-lg text-sm flex items-center gap-2 transition-all duration-300',
+          toast.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' :
+          toast.type === 'error' ? 'bg-red-50 border border-red-200 text-red-700' :
+          'bg-blue-50 border border-blue-200 text-blue-700'
+        ]"
+      >
+        <i :class="toast.type === 'success' ? 'fas fa-check-circle' : toast.type === 'error' ? 'fas fa-circle-exclamation' : 'fas fa-info-circle'"></i>
+        <span>{{ toast.message }}</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        // 状态
+        const apiKey = ref(localStorage.getItem('clawx_admin_token') || '');
+        const adminUsername = ref('');
+        const adminPassword = ref('');
+        const captchaId = ref('');
+        const captchaCode = ref('');
+        const captchaSvg = ref('');
+        const authenticated = ref(false);
+        const loading = ref(false);
+        const loginError = ref('');
+        const currentPage = ref('dashboard');
+
+        // Toast
+        const toasts = ref([]);
+        let toastId = 0;
+        function showToast(message, type = 'success') {
+          const id = ++toastId;
+          toasts.value.push({ id, message, type });
+          setTimeout(() => {
+            toasts.value = toasts.value.filter(t => t.id !== id);
+          }, 3000);
+        }
+
+        // 导航
+        const navItems = [
+          { id: 'dashboard', label: '数据概览', icon: 'fas fa-chart-pie' },
+          { id: 'users', label: '用户管理', icon: 'fas fa-users' },
+          { id: 'licenses', label: 'License 管理', icon: 'fas fa-key' },
+          { id: 'tiers', label: 'Tier 配置', icon: 'fas fa-layer-group' },
+        ];
+        const pageTitle = computed(() => navItems.find(i => i.id === currentPage.value)?.label || '');
+
+        // API 请求
+        async function api(path, options = {}) {
+          const res = await fetch(`/v1/admin${path}`, {
+            ...options,
+            headers: {
+              'Authorization': `Bearer ${apiKey.value}`,
+              'Content-Type': 'application/json',
+              ...options.headers,
+            },
+          });
+          if (res.status === 401) {
+            logout();
+            throw new Error('认证失败，请重新登录');
+          }
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || `请求失败 (${res.status})`);
+          }
+          return res.json();
+        }
+
+        // 验证码
+        async function refreshCaptcha() {
+          try {
+            const res = await fetch('/v1/admin/captcha');
+            const data = await res.json();
+            captchaId.value = data.captchaId;
+            captchaSvg.value = data.svg;
+            captchaCode.value = '';
+          } catch (err) {
+            console.error('获取验证码失败:', err);
+          }
+        }
+
+        // 登录
+        async function login() {
+          loading.value = true;
+          loginError.value = '';
+          try {
+            const res = await fetch('/v1/admin/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: adminUsername.value,
+                password: adminPassword.value,
+                captchaId: captchaId.value,
+                captchaCode: captchaCode.value,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              refreshCaptcha();
+              throw new Error(data.message || '登录失败');
+            }
+            apiKey.value = data.token;
+            localStorage.setItem('clawx_admin_token', data.token);
+            authenticated.value = true;
+            loadPageData();
+          } catch (err) {
+            loginError.value = err.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        function logout() {
+          localStorage.removeItem('clawx_admin_token');
+          apiKey.value = '';
+          adminUsername.value = '';
+          adminPassword.value = '';
+          captchaCode.value = '';
+          authenticated.value = false;
+          currentPage.value = 'dashboard';
+        }
+
+        // Dashboard 数据
+        const stats = ref({});
+        const statCards = computed(() => [
+          { label: '总用户数', value: stats.value.totalUsers || 0, icon: 'fas fa-users', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+          { label: '活跃用户', value: stats.value.activeUsers || 0, icon: 'fas fa-user-check', bg: 'bg-gradient-to-br from-green-400 to-teal-500' },
+          { label: 'License 总数', value: stats.value.totalLicenses || 0, icon: 'fas fa-key', bg: 'bg-gradient-to-br from-blue-400 to-cyan-500' },
+          { label: '近30天注册', value: stats.value.recentRegistrations || 0, icon: 'fas fa-user-plus', bg: 'bg-gradient-to-br from-pink-400 to-red-500' },
+        ]);
+        const tierDistribution = computed(() => stats.value.tierDistribution || []);
+
+        function tierBarColor(tier) {
+          return {
+            free: 'bg-gray-400',
+            pro: 'bg-brand-500',
+            enterprise: 'bg-purple-500',
+          }[tier] || 'bg-gray-400';
+        }
+
+        function tierPercent(count) {
+          const total = stats.value.totalUsers || 1;
+          return Math.max(5, Math.round((count / total) * 100));
+        }
+
+        // 用户管理
+        const users = ref([]);
+        const userTotal = ref(0);
+        const userPage = ref(1);
+        const userLimit = 20;
+        const userSearch = ref('');
+        const userTierFilter = ref('');
+        const userStatusFilter = ref('');
+        const editingUser = ref(null);
+        const userSaveLoading = ref(false);
+
+        async function fetchUsers(page = 1) {
+          userPage.value = Math.max(1, page);
+          const params = new URLSearchParams({ limit: String(userLimit), offset: String((userPage.value - 1) * userLimit) });
+          if (userTierFilter.value) params.set('tier', userTierFilter.value);
+          if (userStatusFilter.value) params.set('status', userStatusFilter.value);
+          try {
+            const data = await api(`/users?${params}`);
+            users.value = data.users || [];
+            userTotal.value = data.total || 0;
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        function editUser(user) {
+          editingUser.value = { ...user };
+        }
+
+        async function saveUser() {
+          userSaveLoading.value = true;
+          try {
+            await api(`/users/${editingUser.value.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                tier: editingUser.value.tier,
+                status: editingUser.value.status,
+                balance: editingUser.value.balance,
+              }),
+            });
+            showToast('用户更新成功');
+            editingUser.value = null;
+            fetchUsers(userPage.value);
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            userSaveLoading.value = false;
+          }
+        }
+
+        // License 管理
+        const licenses = ref([]);
+        const licenseTotal = ref(0);
+        const licensePage = ref(1);
+        const licenseLimit = 20;
+        const licenseStatusFilter = ref('');
+        const licenseLoading = ref(false);
+        const newLicense = ref({ tier: 'pro', durationDays: 365, maxDevices: 2, notes: '' });
+
+        async function fetchLicenses(page = 1) {
+          licensePage.value = Math.max(1, page);
+          const params = new URLSearchParams({ limit: String(licenseLimit), offset: String((licensePage.value - 1) * licenseLimit) });
+          if (licenseStatusFilter.value) params.set('status', licenseStatusFilter.value);
+          try {
+            const data = await api(`/licenses?${params}`);
+            licenses.value = data.licenses || [];
+            licenseTotal.value = data.total || 0;
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        async function createLicense() {
+          licenseLoading.value = true;
+          try {
+            const data = await api('/licenses', {
+              method: 'POST',
+              body: JSON.stringify(newLicense.value),
+            });
+            showToast(`License 创建成功: ${data.licenseKey}`);
+            newLicense.value = { tier: 'pro', durationDays: 365, maxDevices: 2, notes: '' };
+            fetchLicenses(1);
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            licenseLoading.value = false;
+          }
+        }
+
+        async function revokeLicense(key) {
+          if (!confirm('确定要吊销此 License 吗？')) return;
+          try {
+            await api(`/licenses/${encodeURIComponent(key)}`, { method: 'DELETE' });
+            showToast('License 已吊销');
+            fetchLicenses(licensePage.value);
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        // Tier 配置
+        const tiers = ref([]);
+
+        async function fetchTiers() {
+          try {
+            const data = await api('/tiers');
+            tiers.value = (data || []).map(t => ({
+              ...t,
+              featuresJson: JSON.stringify(t.features || [], null, 2),
+              _loading: false,
+            }));
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        async function updateTier(tier) {
+          tier._loading = true;
+          try {
+            const features = JSON.parse(tier.featuresJson);
+            await api(`/tiers/${tier.tier}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                displayName: tier.displayName,
+                monthlyQuota: tier.monthlyQuota,
+                maxDevices: tier.maxDevices,
+                features,
+              }),
+            });
+            showToast('Tier 配置已更新');
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            tier._loading = false;
+          }
+        }
+
+        // 工具
+        function tierBadge(tier) {
+          const map = {
+            free: 'bg-gray-100 text-gray-700',
+            pro: 'bg-brand-100 text-brand-700',
+            enterprise: 'bg-purple-100 text-purple-700',
+          };
+          return `px-2 py-0.5 rounded text-xs font-medium capitalize ${map[tier] || map.free}`;
+        }
+
+        function statusBadge(status) {
+          const map = {
+            active: 'bg-green-100 text-green-700',
+            suspended: 'bg-yellow-100 text-yellow-700',
+            revoked: 'bg-red-100 text-red-700',
+            expired: 'bg-gray-100 text-gray-700',
+          };
+          return `px-2 py-0.5 rounded text-xs font-medium capitalize ${map[status] || map.active}`;
+        }
+
+        function formatDate(dateStr) {
+          if (!dateStr) return '-';
+          const d = new Date(dateStr);
+          return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // 页面数据加载
+        async function loadPageData() {
+          if (currentPage.value === 'dashboard') {
+            try {
+              stats.value = await api('/stats');
+            } catch (err) {
+              showToast(err.message, 'error');
+            }
+          } else if (currentPage.value === 'users') {
+            fetchUsers(1);
+          } else if (currentPage.value === 'licenses') {
+            fetchLicenses(1);
+          } else if (currentPage.value === 'tiers') {
+            fetchTiers();
+          }
+        }
+
+        // 自动加载
+        onMounted(() => {
+          refreshCaptcha();
+        });
+
+        // 监听页面切换
+        Vue.watch(currentPage, loadPageData);
+
+        return {
+          apiKey, adminUsername, adminPassword, captchaId, captchaCode, captchaSvg, authenticated, loading, loginError, currentPage, navItems, pageTitle,
+          login, logout, refreshCaptcha,
+          statCards, tierDistribution, tierBarColor, tierPercent,
+          users, userTotal, userPage, userLimit, userSearch, userTierFilter, userStatusFilter,
+          editingUser, userSaveLoading, fetchUsers, editUser, saveUser,
+          licenses, licenseTotal, licensePage, licenseLimit, licenseStatusFilter,
+          licenseLoading, newLicense, fetchLicenses, createLicense, revokeLicense,
+          tiers, fetchTiers, updateTier,
+          tierBadge, statusBadge, formatDate,
+          toasts, showToast,
+        };
+      },
+    }).mount('#app');
+  </script>
+</body>
+</html>

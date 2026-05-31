@@ -3,7 +3,7 @@ import { memberEventBus } from './event-bus';
 import { resolveApiBaseUrl } from '../../config/server';
 
 /** Health endpoint to probe */
-const HEALTH_ENDPOINT = '/api/v1/health';
+const HEALTH_ENDPOINT = '/health';
 
 /** Probe timeout in milliseconds */
 const PROBE_TIMEOUT_MS = 5_000;

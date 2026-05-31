@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Tier {
+  free
+  pro
+  enterprise
+}
+
+enum LicenseStatus {
+  active
+  revoked
+  expired
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+model License {
+  id              String        @id @default(cuid())
+  licenseKey      String        @unique @map("license_key")
+  tier            Tier          @default(pro)
+  status          LicenseStatus @default(active)
+  maxDevices      Int           @default(2) @map("max_devices")
+  durationDays    Int           @default(365) @map("duration_days")
+  activatedCount  Int           @default(0) @map("activated_count")
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  activations     Activation[]
+
+  @@map("licenses")
+}
+
+model Activation {
+  id                  String    @id @default(cuid())
+  licenseKey          String    @map("license_key")
+  deviceFingerprint   String    @map("device_fingerprint")
+  user                User?     @relation(fields: [userId], references: [id])
+  userId              String?   @map("user_id")
+  tier                Tier
+  activatedAt         DateTime  @default(now()) @map("activated_at") @db.Timestamp(0)
+  expiresAt           DateTime? @map("expires_at") @db.Timestamp(0)
+  lastVerifiedAt      DateTime? @map("last_verified_at") @db.Timestamp(0)
+  revoked             Boolean   @default(false)
+  license             License   @relation(fields: [licenseKey], references: [licenseKey])
+
+  @@unique([licenseKey, deviceFingerprint])
+  @@map("activations")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  username      String       @unique
+  email         String       @unique
+  passwordHash  String       @map("password_hash")
+  passwordSalt  String       @map("password_salt")
+  avatarUrl     String?      @map("avatar_url")
+  tier          Tier         @default(free)
+  balance       Float        @default(0)
+  status        UserStatus   @default(active)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  sessions      Session[]
+  usageRecords  Usage[]
+  activations   Activation[]
+
+  @@map("users")
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  deviceId    String?   @map("device_id")
+  tokenHash   String    @map("token_hash")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamp(0)
+
+  @@map("sessions")
+}
+
+model Usage {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id")
+  feature     String
+  yearMonth   String   @map("year_month")
+  usedCount   Int      @default(0) @map("used_count")
+
+  @@unique([userId, feature, yearMonth])
+  @@map("usage")
+}
+
+model TierConfig {
+  tier          String   @id
+  displayName   String   @map("display_name")
+  monthlyQuota  Int      @default(3) @map("monthly_quota")
+  features      String   @default("[]")
+  maxDevices    Int      @default(1) @map("max_devices")
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("tier_config")
+}

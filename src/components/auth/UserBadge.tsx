@@ -68,12 +68,31 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
   const [showLogin, setShowLogin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ left: 0, bottom: 0 });
   const navigate = useNavigate();
+
+  // Calculate fixed position when menu opens
+  useEffect(() => {
+    if (menuOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos({
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 4,
+      });
+    }
+  }, [menuOpen]);
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
+      ) {
         setMenuOpen(false);
       }
     }
@@ -140,6 +159,7 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
     <>
       <div className="relative" ref={menuRef}>
         <button
+          ref={buttonRef}
           onClick={() => setMenuOpen((v) => !v)}
           className={cn(
             'flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
@@ -165,7 +185,13 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border bg-popover p-3 shadow-lg">
+          <div
+            className="fixed z-[100] w-64 rounded-lg border bg-popover p-3 shadow-lg"
+            style={{
+              left: menuPos.left,
+              bottom: menuPos.bottom,
+            }}
+          >
             {/* 用户信息 */}
             <div className="flex items-center gap-3 pb-3 border-b">
               <Avatar name={userInfo.username} url={userInfo.avatarUrl} />

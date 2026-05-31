@@ -40,6 +40,11 @@ export function useFeatureGuard(feature: 'collaboration' | 'marketplace'): Featu
 
       setAllowed(true);
       return true;
+    } catch {
+      // Network or other errors: treat as not allowed
+      setAllowed(false);
+      setShowLimitModal(true);
+      return false;
     } finally {
       setLoading(false);
     }

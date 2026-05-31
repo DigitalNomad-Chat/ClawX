@@ -63,7 +63,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       return { success: false, reason: result?.reason || 'Login failed' };
     } catch (err: any) {
-      return { success: false, reason: err?.message || 'Network error' };
+      const isNetwork = err?.message?.includes('network') || err?.message?.includes('fetch') || err?.message?.includes('ECONNREFUSED') || err?.message?.includes('timeout');
+      return { success: false, reason: isNetwork ? '服务器不可用，请检查网络连接' : (err?.message || 'Network error') };
     } finally {
       set({ isLoading: false });
     }
@@ -84,7 +85,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       return { success: false, reason: result?.reason || 'Registration failed' };
     } catch (err: any) {
-      return { success: false, reason: err?.message || 'Network error' };
+      const isNetwork = err?.message?.includes('network') || err?.message?.includes('fetch') || err?.message?.includes('ECONNREFUSED') || err?.message?.includes('timeout');
+      return { success: false, reason: isNetwork ? '服务器不可用，请检查网络连接' : (err?.message || 'Network error') };
     } finally {
       set({ isLoading: false });
     }
@@ -118,17 +120,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoggedIn: !!user,
         isGuest: !user,
       });
+    } catch {
+      // Silently fail on network errors
+      set({ isGuest: true, isLoggedIn: false });
     } finally {
       set({ isLoading: false });
     }
   },
 
   checkFeature: async (feature) => {
-    return invokeIpc<UsageInfo>('auth:checkFeature', { feature });
+    try {
+      return await invokeIpc<UsageInfo>('auth:checkFeature', { feature });
+    } catch {
+      // Return a default denied response on network failure
+      return { feature, used: 0, limit: 0, remaining: 0, tier: 'free', allowed: false } as UsageInfo;
+    }
   },
 
   recordUsage: async (feature, triggerAction) => {
-    await invokeIpc('auth:recordUsage', { feature, triggerAction });
+    try {
+      await invokeIpc('auth:recordUsage', { feature, triggerAction });
+    } catch {
+      // Silently fail on network errors
+    }
   },
 
   activateLicense: async (licenseKey) => {

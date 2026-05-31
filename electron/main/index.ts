@@ -376,14 +376,7 @@ async function startMainApp(): Promise<void> {
     },
   );
 
-  // Initialize member database first, then member module
-  try {
-    const { initMemberDatabase } = await import('../services/member/database');
-    initMemberDatabase();
-  } catch (err) {
-    logger.error('Failed to initialize member database:', err);
-  }
-
+  // Initialize member module (cloud-first)
   await memberModule.init().catch((err) => {
     logger.warn('Member module init failed:', err);
   });
@@ -597,12 +590,6 @@ if (gotTheLock) {
 
   app.on('will-quit', () => {
     releaseProcessInstanceFileLock();
-    try {
-      const { closeMemberDatabase } = require('../services/member/database');
-      closeMemberDatabase();
-    } catch {
-      // ignore
-    }
   });
 
   if (process.platform === 'win32') {

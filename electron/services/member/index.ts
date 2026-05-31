@@ -1,19 +1,16 @@
 /**
- * MemberModule Facade (Local-First)
- * Wires together local authentication, subscription, and usage tracking.
+ * MemberModule Facade (Cloud-First)
+ * Lightweight proxy that delegates all membership operations to the cloud API.
  */
 import { machineId } from 'node-machine-id';
 import { createHash } from 'node:crypto';
 import { platform } from 'node:os';
-import { MemberManager } from './member-manager';
-import { TokenManager, tokenManager } from './token-manager';
-import { UsageCounter, usageCounter } from './usage-counter';
+import { cloudApiClient, CloudApiClient } from './cloud-api-client';
 import { NetworkDetector, networkDetector } from './network-detector';
 import { memberEventBus } from './event-bus';
 import { MemberEvent, type MemberState, type Feature, type UsageInfo } from './types';
 import { logger } from '../../utils/logger';
-import { initMemberDatabase } from './database';
-import { getTierConfig } from './subscription';
+import { cleanupLegacyLocalData } from './local-cleanup';
 
 async function generateDeviceId(): Promise<string> {
   const raw = await machineId();
@@ -22,58 +19,41 @@ async function generateDeviceId(): Promise<string> {
 }
 
 export class MemberModule {
-  readonly manager: MemberManager;
-  readonly token: TokenManager;
-  readonly usage: UsageCounter;
+  readonly client: CloudApiClient;
   readonly network: NetworkDetector;
 
   private _deviceId: string | null = null;
   private _initialized = false;
 
   constructor() {
-    this.manager = new MemberManager();
-    this.token = tokenManager;
-    this.usage = usageCounter;
+    this.client = cloudApiClient;
     this.network = networkDetector;
   }
 
   async init(): Promise<void> {
     if (this._initialized) return;
 
-    initMemberDatabase();
-
-    // Migrate legacy data (one-time)
-    try {
-      const { migrateLegacyMemberData } = await import('./migrate');
-      await migrateLegacyMemberData();
-    } catch {
-      // Ignore migration errors
-    }
+    // Clean up legacy local SQLite data (one-time)
+    await cleanupLegacyLocalData();
 
     this._deviceId = await generateDeviceId();
 
-    await this.manager.init();
-    await this.token.init();
-    await this.usage.init();
-
-    memberEventBus.on(MemberEvent.LOGIN_SUCCESS, () => {
-      this._onLoginSuccess();
-    });
-    memberEventBus.on(MemberEvent.LOGOUT, () => {
-      this.token.stopAutoRenewal();
-    });
+    // Initialize cloud API client (restores token, validates session)
+    await this.client.init();
 
     this.network.start();
 
     this._initialized = true;
-    logger.info('[MemberModule] Initialized (local-first mode)');
+    logger.info('[MemberModule] Initialized (cloud-first mode)');
   }
 
   get state(): MemberState {
     return {
-      ...this.manager.state,
+      isLoggedIn: this.client.isLoggedIn,
+      isGuest: !this.client.isLoggedIn,
+      userInfo: this.client.userInfo,
+      tier: this.client.userInfo?.subscriptionTier ?? null,
       isOnline: this.network.isOnline,
-      featureToken: this.token.getPayload(),
     };
   }
 
@@ -82,67 +62,19 @@ export class MemberModule {
   }
 
   async checkFeature(feature: Feature): Promise<UsageInfo | null> {
-    const userId = this.manager.getUserId();
-    if (!userId) {
-      return null;
-    }
-
-    const userInfo = this.manager.state.userInfo;
-    if (!userInfo) {
-      return null;
-    }
-
-    const tier = userInfo.subscriptionTier ?? 'free';
-    const config = getTierConfig(tier);
-    const used = this.usage.getCount(userId, feature);
-    const limit = config.monthlyQuota;
-    const allowed = limit === 0 || used < limit;
-
-    return {
-      feature,
-      used,
-      limit,
-      remaining: limit === 0 ? 999999 : Math.max(0, limit - used),
-      tier,
-      allowed,
-    };
+    if (!this.client.isLoggedIn) return null;
+    return this.client.checkFeature(feature);
   }
 
-  recordUsage(feature: Feature): void {
-    const userId = this.manager.getUserId();
-    if (!userId) return;
-    this.usage.increment(userId, feature);
+  async recordUsage(feature: Feature): Promise<void> {
+    if (!this.client.isLoggedIn) return;
+    await this.client.recordUsage(feature);
   }
 
   async shutdown(): Promise<void> {
     this.network.stop();
-    this.token.stopAutoRenewal();
     this._initialized = false;
     logger.info('[MemberModule] Shutdown complete');
-  }
-
-  private _onLoginSuccess(): void {
-    const userInfo = this.manager.state.userInfo;
-    const jwt = this.manager.getJwtToken();
-    if (!userInfo || !jwt || !this._deviceId) return;
-
-    try {
-      this.token.issueToken(
-        userInfo.id,
-        userInfo.username,
-        userInfo.email,
-        userInfo.subscriptionTier,
-        this._deviceId,
-        (feature) => this.usage.getCount(userInfo.id, feature),
-      );
-      this.token.startAutoRenewal(
-        () => this.manager.state.userInfo,
-        () => this._deviceId,
-        (feature) => this.usage.getCount(userInfo.id, feature),
-      );
-    } catch (err) {
-      logger.warn('[MemberModule] Failed to issue token after login:', err);
-    }
   }
 }
 
