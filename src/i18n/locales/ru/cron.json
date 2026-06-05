@@ -72,6 +72,9 @@
         "discordChannelId": "ID канала Discord",
         "discordChannelIdPlaceholder": "напр., 1438452657525100686",
         "discordChannelIdDesc": "Правый клик по каналу Discord → Копировать ID канала",
+        "timeout": "Таймаут (секунды)",
+        "timeoutPlaceholder": "Оставьте пустым для значения по умолчанию",
+        "timeoutDesc": "Максимальное время ожидания одного выполнения. Для сложных задач (чтение нескольких файлов + глубокий анализ) рекомендуется 300–600 секунд.",
         "enableImmediately": "Включить немедленно",
         "enableImmediatelyDesc": "Начать выполнение этой задачи после создания",
         "saveChanges": "Сохранить изменения"

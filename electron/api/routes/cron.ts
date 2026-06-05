@@ -20,7 +20,7 @@ interface GatewayCronJob {
   createdAtMs: number;
   updatedAtMs: number;
   schedule: { kind: string; expr?: string; everyMs?: number; at?: string; tz?: string };
-  payload: { kind: string; message?: string; text?: string };
+  payload: { kind: string; message?: string; text?: string; timeoutSeconds?: number };
   delivery?: { mode: string; channel?: string; to?: string; accountId?: string };
   sessionTarget?: string;
   state: {
@@ -361,6 +361,19 @@ function buildCronUpdatePatch(input: Record<string, unknown>): Record<string, un
     // Keep sessionTarget as isolated when agentId changes
   }
 
+  if ('timeoutSeconds' in patch) {
+    const ts = typeof patch.timeoutSeconds === 'string'
+      ? Number(patch.timeoutSeconds)
+      : patch.timeoutSeconds;
+    if (typeof ts === 'number' && Number.isFinite(ts) && ts > 0) {
+      patch.payload = {
+        ...(typeof patch.payload === 'object' && patch.payload !== null ? patch.payload : {}),
+        timeoutSeconds: Math.round(ts),
+      };
+    }
+    delete patch.timeoutSeconds;
+  }
+
   return patch;
 }
 
@@ -407,6 +420,7 @@ function transformCronJob(job: GatewayCronJob) {
     lastRun,
     nextRun,
     agentId,
+    timeoutSeconds: job.payload?.timeoutSeconds,
   };
 }
 
@@ -605,6 +619,7 @@ export async function handleCronRoutes(
         delivery?: GatewayCronDelivery;
         enabled?: boolean;
         agentId?: string;
+        timeoutSeconds?: number;
       }>(req);
       const agentId = typeof input.agentId === 'string' && input.agentId.trim()
         ? input.agentId.trim()
@@ -617,16 +632,21 @@ export async function handleCronRoutes(
         sendJson(res, 400, { success: false, error: unsupportedDeliveryError });
         return true;
       }
-      const result = await ctx.gatewayManager.rpc('cron.add', {
+      const payload: Record<string, unknown> = { kind: 'agentTurn', message: input.message };
+      if (typeof input.timeoutSeconds === 'number' && Number.isFinite(input.timeoutSeconds) && input.timeoutSeconds > 0) {
+        payload.timeoutSeconds = Math.round(input.timeoutSeconds);
+      }
+      const rpcPayload: Record<string, unknown> = {
         name: input.name,
         schedule: { kind: 'cron', expr: input.schedule },
-        payload: { kind: 'agentTurn', message: input.message },
+        payload,
         enabled: input.enabled ?? true,
         wakeMode: 'next-heartbeat',
         sessionTarget: 'isolated',
         agentId,
         delivery,
-      });
+      };
+      const result = await ctx.gatewayManager.rpc('cron.add', rpcPayload);
       sendJson(res, 200, result && typeof result === 'object' ? transformCronJob(result as GatewayCronJob) : result);
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });

@@ -59,6 +59,7 @@ export interface CronJob {
   lastRun?: CronJobLastRun;
   nextRun?: string;
   agentId: string;
+  timeoutSeconds?: number;
 }
 
 /**
@@ -71,6 +72,7 @@ export interface CronJobCreateInput {
   delivery?: CronJobDelivery;
   enabled?: boolean;
   agentId?: string;
+  timeoutSeconds?: number;
 }
 
 /**
@@ -83,6 +85,7 @@ export interface CronJobUpdateInput {
   delivery?: CronJobDelivery;
   enabled?: boolean;
   agentId?: string;
+  timeoutSeconds?: number;
 }
 
 /**

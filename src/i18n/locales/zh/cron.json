@@ -72,6 +72,9 @@
         "discordChannelId": "Discord 频道 ID",
         "discordChannelIdPlaceholder": "例如：1438452657525100686",
         "discordChannelIdDesc": "右键点击 Discord 频道 → 复制频道 ID",
+        "timeout": "超时时间（秒）",
+        "timeoutPlaceholder": "留空则使用默认",
+        "timeoutDesc": "单次执行的最大等待时间。复杂任务（如读取多文件+深度分析）建议设为 300~600 秒。",
         "enableImmediately": "立即启用",
         "enableImmediatelyDesc": "创建后立即开始运行此任务",
         "saveChanges": "保存更改"

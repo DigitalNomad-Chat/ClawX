@@ -205,6 +205,9 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
     return '0 9 * * *';
   })();
   const [schedule, setSchedule] = useState(initialSchedule);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(
+    typeof job?.timeoutSeconds === 'number' ? String(job.timeoutSeconds) : '',
+  );
   const [enabled, setEnabled] = useState(job?.enabled ?? true);
   const [deliveryMode, setDeliveryMode] = useState<'none' | 'announce'>(job?.delivery?.mode === 'announce' ? 'announce' : 'none');
   const [deliveryChannel, setDeliveryChannel] = useState(job?.delivery?.channel || '');
@@ -344,14 +347,20 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
         }
       }
 
-      await onSave({
+      const payload: CronJobCreateInput = {
         name: name.trim(),
         message: message.trim(),
         schedule: finalSchedule,
         delivery: finalDelivery,
         enabled,
         agentId: selectedAgentId,
-      });
+      };
+      const ts = timeoutSeconds.trim() ? Number(timeoutSeconds.trim()) : NaN;
+      if (!Number.isNaN(ts) && Number.isFinite(ts) && ts > 0) {
+        payload.timeoutSeconds = Math.round(ts);
+      }
+
+      await onSave(payload);
       onClose();
       toast.success(job ? t('toast.updated') : t('toast.created'));
     } catch (err) {
@@ -422,6 +431,22 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
           <div className="space-y-2.5">
             <Label className="text-sm text-foreground/80 font-bold">{t('dialog.schedule')}</Label>
             <ScheduleEditor value={schedule} onChange={setSchedule} />
+          </div>
+
+          {/* Timeout */}
+          <div className="space-y-2.5">
+            <Label htmlFor="timeout" className="text-sm text-foreground/80 font-bold">{t('dialog.timeout')}</Label>
+            <Input
+              id="timeout"
+              type="number"
+              min={60}
+              max={3600}
+              placeholder={t('dialog.timeoutPlaceholder')}
+              value={timeoutSeconds}
+              onChange={(e) => setTimeoutSeconds(e.target.value)}
+              className="h-[44px] rounded-xl font-mono text-sm bg-surface-input border focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40"
+            />
+            <p className="text-xs text-muted-foreground">{t('dialog.timeoutDesc')}</p>
           </div>
 
           {/* Delivery */}

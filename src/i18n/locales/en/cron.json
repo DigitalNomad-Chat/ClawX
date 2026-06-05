@@ -72,6 +72,9 @@
         "discordChannelId": "Discord Channel ID",
         "discordChannelIdPlaceholder": "e.g., 1438452657525100686",
         "discordChannelIdDesc": "Right-click the Discord channel → Copy Channel ID",
+        "timeout": "Timeout (seconds)",
+        "timeoutPlaceholder": "Leave empty for default",
+        "timeoutDesc": "Maximum wait time for a single execution. Complex tasks (e.g., reading multiple files + deep analysis) should use 300-600 seconds.",
         "enableImmediately": "Enable immediately",
         "enableImmediatelyDesc": "Start running this task after creation",
         "saveChanges": "Save Changes"
