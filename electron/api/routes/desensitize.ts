@@ -17,7 +17,7 @@ export async function handleDesensitizeRoutes(
         return true;
       }
       const result = desensitize(body.text);
-      sendJson(res, 200, { success: true, ...result });
+      sendJson(res, 200, { success: true, text: result.text, map: result.map, stats: result.stats });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
     }

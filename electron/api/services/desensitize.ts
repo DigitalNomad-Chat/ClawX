@@ -5,6 +5,7 @@ export interface SensitiveMap {
 interface DesensitizeResult {
   text: string;
   map: SensitiveMap;
+  stats?: Record<string, number>;
 }
 
 // 保险文档常见术语（不应被当作姓名匹配）
@@ -405,7 +406,16 @@ export function desensitize(text: string): DesensitizeResult {
     result,
   );
 
-  return { text: result, map };
+  const stats: Record<string, number> = {};
+  for (const placeholder of Object.keys(map)) {
+    const typeMatch = placeholder.match(/__PII_(\w+)_\d+__/);
+    if (typeMatch) {
+      const type = typeMatch[1];
+      stats[type] = (stats[type] || 0) + 1;
+    }
+  }
+
+  return { text: result, map, stats };
 }
 
 export function markSensitive(
