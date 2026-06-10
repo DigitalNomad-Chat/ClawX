@@ -102,7 +102,7 @@ function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 const documentsModule: BackendModule = {
   id: "documents",
-  name: "文档中心",
+  name: "人设管理",
   routeHandlers: [handleDocumentRoutes],
   enabledByDefault: true,
 };

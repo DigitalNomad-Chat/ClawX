@@ -125,10 +125,11 @@ export function resolveEditableAgentScopes(
           : (resolveConfiguredAgentWorkspace(asString(row.workspace)?.trim(), rawId, dirname(configPath)) ??
              join(root, "agents", rawId));
 
+      const displayName = asString(row.name)?.trim();
       output.push({
         agentId: rawId,
         facetKey: key,
-        facetLabel: key === "main" ? "Main" : humanizeOperatorLabel(rawId),
+        facetLabel: key === "main" ? "Main" : (displayName || humanizeOperatorLabel(rawId)),
         workspaceRoot: ws,
       });
     }

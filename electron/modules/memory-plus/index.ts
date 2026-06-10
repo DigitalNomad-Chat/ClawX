@@ -4,7 +4,6 @@ import { sendJson } from "../../api/route-utils";
 import { createModuleLogger } from "../_shared/module-logger";
 import { listEditableMemoryFiles, readEditableFile, writeEditableFileContent } from "../_shared/editable-file-service";
 import { resolveEditableAgentScopes } from "../_shared/workspace-resolver";
-import { loadCachedOpenClawMemorySummary } from "./memory-status";
 
 const logger = createModuleLogger("memory-plus");
 
@@ -83,18 +82,6 @@ async function handleMemoryRoutes(
     return true;
   }
 
-  // GET /api/memory/status
-  if (pathname === "/api/memory/status" && req.method === "GET") {
-    try {
-      const summary = await loadCachedOpenClawMemorySummary();
-      sendJson(res, 200, { ok: true, summary });
-    } catch (err) {
-      logger.error("Failed to load memory status:", err);
-      sendJson(res, 500, { ok: false, error: "Failed to load memory status" });
-    }
-    return true;
-  }
-
   return false;
 }
 
@@ -115,7 +102,7 @@ function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 const memoryPlusModule: BackendModule = {
   id: "memory-plus",
-  name: "记忆增强",
+  name: "记忆管理",
   routeHandlers: [handleMemoryRoutes],
   enabledByDefault: true,
 };

@@ -5,14 +5,14 @@ import { MemoryPage } from "./MemoryPage";
 
 const memoryPlusModule: FrontendModule = {
   id: "memory-plus",
-  name: "记忆增强",
+  name: "记忆管理",
   routes: [
     <Route key="memory-plus" path="/memory-plus" element={<MemoryPage />} />,
   ],
   navItems: [
     {
       to: "/memory-plus",
-      label: "记忆增强",
+      label: "记忆管理",
       icon: <Brain className="w-4 h-4" />,
       order: 26,
     },

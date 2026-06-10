@@ -4,13 +4,11 @@ import type {
   MemoryState,
   MemoryFile,
   MemoryAgent,
-  MemoryStatusSummary,
 } from "./types";
 
 interface MemoryStore extends MemoryState {
   loadFiles: () => Promise<void>;
   loadAgents: () => Promise<void>;
-  loadStatus: () => Promise<void>;
   selectFile: (file: MemoryFile) => Promise<void>;
   saveFile: (path: string, content: string) => Promise<void>;
   setActiveFacet: (facet: string) => void;
@@ -19,7 +17,6 @@ interface MemoryStore extends MemoryState {
 export const useMemoryStore = create<MemoryStore>((set, get) => ({
   files: [],
   agents: [],
-  status: null,
   selectedFile: null,
   selectedContent: "",
   loading: false,
@@ -50,19 +47,6 @@ export const useMemoryStore = create<MemoryStore>((set, get) => ({
       );
       if (!res.ok) throw new Error("Failed to load agents");
       set({ agents: res.agents });
-    } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Unknown error" });
-    }
-  },
-
-  loadStatus: async () => {
-    try {
-      const res = await hostApiFetch<{
-        ok: boolean;
-        summary: MemoryStatusSummary;
-      }>("/api/memory/status");
-      if (!res.ok) throw new Error("Failed to load status");
-      set({ status: res.summary });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Unknown error" });
     }

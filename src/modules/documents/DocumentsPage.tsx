@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ModulePageLayout } from "../_shared/ModulePageLayout";
 import { useDocumentStore } from "./store";
 import { t } from "./i18n";
 import { MarkdownEditor } from "../_shared/components/MarkdownEditor";
 import { EditableFileList } from "../_shared/components/EditableFileList";
-import { AgentFacetTabs } from "../_shared/components/AgentFacetTabs";
-import { FileText } from "lucide-react";
+import { AgentSidebar } from "../_shared/components/AgentSidebar";
+import { FileText, FileEdit } from "lucide-react";
 
 export function DocumentsPage() {
   const lang = "zh" as const;
@@ -16,88 +16,87 @@ export function DocumentsPage() {
   const selectedContent = useDocumentStore((s) => s.selectedContent);
   const loading = useDocumentStore((s) => s.loading);
   const activeFacet = useDocumentStore((s) => s.activeFacet);
-  const mainCount = files.filter((f) => f.facetKey === "main").length;
 
   useEffect(() => {
     store.loadFiles();
     store.loadAgents();
   }, []);
 
+  const filteredFiles = useMemo(() => {
+    return files.filter((f) => f.facetKey === activeFacet);
+  }, [files, activeFacet]);
+
+  const fileCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of files) {
+      counts[f.facetKey ?? "main"] = (counts[f.facetKey ?? "main"] ?? 0) + 1;
+    }
+    return counts;
+  }, [files]);
+
   return (
     <ModulePageLayout>
-      <div className="flex h-full flex-col gap-6">
+      <div className="flex h-full flex-col gap-4">
         {/* Header */}
-        <div className="flex items-center gap-3 shrink-0">
-          <FileText className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">{t("pageTitle", lang)}</h1>
-            <p className="text-sm text-muted-foreground">{t("description", lang)}</p>
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <FileText className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">{t("pageTitle", lang)}</h1>
+              <p className="text-sm text-muted-foreground">{t("description", lang)}</p>
+            </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto space-y-6">
-          {/* Overview Card */}
-          <div className="bg-card border rounded-xl p-4 shadow-sm">
-            <h2 className="text-lg font-semibold">{t("overview", lang)}</h2>
-            <div className="text-sm text-muted-foreground mt-1">
-              {t("mainDocuments", lang)} {mainCount} {t("files", lang)} ·{" "}
-              {t("agentsFound", lang)}{" "}
-              {Math.max(0, agents.filter((a) => a.key !== "main").length)}{" "}
-              {t("items", lang)}
-            </div>
-          </div>
-
-          {/* Agent Tabs */}
-          <AgentFacetTabs
+        {/* Three-column layout */}
+        <div className="flex-1 flex min-h-0 border rounded-xl overflow-hidden shadow-sm">
+          {/* Agent Sidebar */}
+          <AgentSidebar
             agents={agents}
             activeKey={activeFacet}
             onChange={store.setActiveFacet}
+            fileCounts={fileCounts}
           />
 
-          {/* Split Layout */}
-          <div
-            className="grid grid-cols-1 lg:grid-cols-3 gap-4"
-            style={{ minHeight: "500px" }}
-          >
-            <div className="lg:col-span-1 border rounded-xl overflow-hidden bg-card shadow-sm">
-              <div className="p-2 border-b bg-muted/50 text-sm font-medium">
-                {t("documentWorkbench", lang)}
-              </div>
-              <div className="p-2 h-[calc(500px-40px)]">
-                {loading ? (
-                  <div className="p-4 text-sm text-muted-foreground">加载中...</div>
-                ) : (
-                  <EditableFileList
-                    entries={files}
-                    selectedPath={selectedFile?.sourcePath ?? null}
-                    onSelect={store.selectFile}
-                    facetKey={activeFacet}
-                  />
-                )}
-              </div>
+          {/* File List */}
+          <div className="w-[240px] border-r flex flex-col min-h-0 bg-card">
+            <div className="px-3 py-2 border-b bg-muted/50 text-sm font-medium flex items-center justify-between">
+              <span>{t("documentWorkbench", lang)}</span>
+              <span className="text-xs text-muted-foreground">{filteredFiles.length} 份</span>
             </div>
-            <div className="lg:col-span-2 border rounded-xl overflow-hidden bg-card shadow-sm flex flex-col">
-              <div className="p-2 border-b bg-muted/50 text-sm font-medium flex justify-between items-center">
-                <span>{selectedFile ? selectedFile.title : "请选择一个文件"}</span>
-                {selectedFile && (
-                  <span className="text-xs text-muted-foreground">
-                    {t("saveHint", lang)}
-                  </span>
-                )}
-              </div>
-              <div className="flex-1 p-2 overflow-auto">
-                {selectedFile ? (
-                  <MarkdownEditor
-                    initialContent={selectedContent}
-                    onSave={(c) => store.saveFile(selectedFile.relativePath, c)}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    {t("noFiles", lang)}
-                  </div>
-                )}
-              </div>
+            <div className="flex-1 p-2 overflow-y-auto min-h-0">
+              {loading ? (
+                <div className="p-4 text-sm text-muted-foreground">加载中...</div>
+              ) : (
+                <EditableFileList
+                  entries={filteredFiles}
+                  selectedPath={selectedFile?.sourcePath ?? null}
+                  onSelect={store.selectFile}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Editor */}
+          <div className="flex-1 flex flex-col min-h-0 bg-card">
+            <div className="px-3 py-2 border-b bg-muted/50 text-sm font-medium flex justify-between items-center">
+              <span className="truncate">{selectedFile ? selectedFile.title : "请选择一个文件"}</span>
+              {selectedFile && (
+                <span className="text-xs text-muted-foreground shrink-0 ml-2">{t("saveHint", lang)}</span>
+              )}
+            </div>
+            <div className="flex-1 p-3 overflow-y-auto min-h-0">
+              {selectedFile ? (
+                <MarkdownEditor
+                  initialContent={selectedContent}
+                  onSave={(c) => store.saveFile(selectedFile.relativePath, c)}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                  <FileEdit className="w-10 h-10 opacity-20" />
+                  <span className="text-sm">{t("noFiles", lang)}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
