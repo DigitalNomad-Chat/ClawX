@@ -19,6 +19,7 @@ import {
   GitBranch,
   SlidersHorizontal,
   Info,
+  Folder,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,6 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -199,7 +199,7 @@ function ConfigCard({
 }) {
   return (
     <div
-      className={`rounded-lg p-3 bg-muted/30 ${accent ? 'border border-primary/30' : ''} ${className}`}
+      className={`rounded-lg p-3 border transition-colors ${accent ? 'border-primary/30 bg-primary/5' : 'border-border/40 bg-muted/20 hover:bg-muted/30'} ${className}`}
     >
       {children}
     </div>
@@ -218,8 +218,8 @@ function FieldLabel({
   accent?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 mb-2">
-      <span className={`text-xs font-medium ${accent ? 'text-primary' : 'text-muted-foreground'}`}>
+    <div className="flex items-center gap-1.5 mb-2">
+      <span className={`text-xs font-semibold ${accent ? 'text-primary' : 'text-foreground/80'}`}>
         {children}
       </span>
       {helpTitle && helpContent && <HelpTooltip title={helpTitle} content={helpContent} />}
@@ -705,19 +705,24 @@ export function AdvancedConfig() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-4 max-w-4xl">
+      <div className="flex h-full flex-col gap-4">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <SlidersHorizontal className="h-5 w-5" />
-              高级配置
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              管理 Tools、Session 等 Agent 间通信与会话配置
-            </p>
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <SlidersHorizontal className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">高级配置</h1>
+              <p className="text-sm text-muted-foreground">
+                管理 Tools、Session 等 Agent 间通信与会话配置
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            {isDirty && (
+              <span className="text-xs text-amber-500 font-medium px-2 py-1 rounded-full bg-amber-500/10">
+                未保存
+              </span>
+            )}
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               刷新
@@ -736,7 +741,7 @@ export function AdvancedConfig() {
 
         {/* Loading */}
         {loading && !configSource && (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <RefreshCw className="h-8 w-8 animate-spin mx-auto text-primary" />
               <p className="mt-3 text-muted-foreground text-sm">加载配置中...</p>
@@ -746,7 +751,7 @@ export function AdvancedConfig() {
 
         {/* Error */}
         {error && !configSource && (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-destructive/10">
                 <AlertCircle className="h-8 w-8 text-destructive" />
@@ -763,17 +768,17 @@ export function AdvancedConfig() {
 
         {/* Config sections */}
         {configSource && (
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-6 pr-1 pb-6">
             {/* ================================================ */}
             {/* Tools Config */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <Wrench className="h-4 w-4 text-primary" />
                 Tools 配置
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Profile */}
                 <ConfigCard>
                   <FieldLabel helpTitle="工具 Profile" helpContent="控制 Agent 可使用的工具集级别。full = 所有工具可用，minimal = 仅基础安全工具。">
@@ -858,7 +863,7 @@ export function AdvancedConfig() {
                   <FieldLabel helpTitle="工具访问控制" helpContent="全局黑/白名单控制哪些工具可用。支持工具组写法如 group:fs、group:web。">
                     工具访问控制
                   </FieldLabel>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <span className="text-xs text-muted-foreground">Allow</span>
                       <TagInput
@@ -983,7 +988,7 @@ export function AdvancedConfig() {
                     <Shield className="h-3.5 w-3.5 inline-block mr-1 -mt-0.5" />
                     Sandbox 工具控制
                   </FieldLabel>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <span className="text-xs text-muted-foreground">Allow</span>
                       <TagInput
@@ -1019,18 +1024,16 @@ export function AdvancedConfig() {
               </div>
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Session Config */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <MessageSquare className="h-4 w-4 text-primary" />
                 Session 配置
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* DM Scope */}
                 <ConfigCard>
                   <FieldLabel helpTitle="DM 作用域" helpContent="控制私聊会话在不同 Agent 之间的共享方式。">
@@ -1131,13 +1134,11 @@ export function AdvancedConfig() {
               </div>
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Agent List */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <Users className="h-4 w-4 text-primary" />
                 Agent 列表
               </h3>
@@ -1164,18 +1165,16 @@ export function AdvancedConfig() {
               )}
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Agent Defaults */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <Users className="h-4 w-4 text-primary" />
                 Agent 默认配置
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ConfigCard>
                   <FieldLabel helpTitle="Thinking Default" helpContent="控制 Agent 默认的思考强度。">
                     思考模式
@@ -1274,33 +1273,28 @@ export function AdvancedConfig() {
               </div>
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Hooks */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <GitBranch className="h-4 w-4 text-primary" />
                 Hooks 钩子管理
               </h3>
 
               {/* Master toggle */}
-              <ConfigCard accent className="mb-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-primary">内部钩子总开关</span>
-                    <HelpTooltip title="内部钩子" content="全局控制所有内部钩子是否生效。" />
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Switch
-                      checked={hooksEnabled}
-                      onCheckedChange={(v) => { setHooksEnabled(v); markDirty(); }}
-                    />
-                    <span className="text-sm">{hooksEnabled ? '已启用' : '已禁用'}</span>
-                  </label>
-                </div>
-              </ConfigCard>
+              <div className="flex items-center justify-between gap-3 mb-4 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <FieldLabel accent helpTitle="内部钩子" helpContent="全局控制所有内部钩子是否生效。">
+                  内部钩子总开关
+                </FieldLabel>
+                <label className="flex items-center gap-2 cursor-pointer shrink-0">
+                  <Switch
+                    checked={hooksEnabled}
+                    onCheckedChange={(v) => { setHooksEnabled(v); markDirty(); }}
+                  />
+                  <span className="text-sm">{hooksEnabled ? '已启用' : '已禁用'}</span>
+                </label>
+              </div>
 
               {/* Hook entries */}
               <div
@@ -1309,7 +1303,7 @@ export function AdvancedConfig() {
                 {hookEntries.map((hook) => (
                   <ConfigCard key={hook.id}>
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-xs font-medium text-muted-foreground">{hook.label}</span>
+                      <span className="text-xs font-semibold text-foreground/70">{hook.label}</span>
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <Switch
                           checked={hook.enabled}
@@ -1332,13 +1326,11 @@ export function AdvancedConfig() {
               </div>
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Skills Config */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <Wrench className="h-4 w-4 text-primary" />
                 Skills 配置
               </h3>
@@ -1360,18 +1352,16 @@ export function AdvancedConfig() {
               </ConfigCard>
             </section>
 
-            <Separator />
-
             {/* ================================================ */}
             {/* Misc Config */}
             {/* ================================================ */}
-            <section className="rounded-lg border bg-card p-4">
-              <h3 className="flex items-center gap-2 mb-4 text-sm font-semibold">
+            <section className="rounded-lg border shadow-sm bg-card p-4">
+              <h3 className="flex items-center gap-2 pb-3 mb-3 border-b text-sm font-bold text-foreground">
                 <Settings2 className="h-4 w-4 text-primary" />
                 杂项配置
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Ack Reaction Scope */}
                 <ConfigCard>
                   <FieldLabel helpTitle="确认回应范围" helpContent="控制 Agent 处理消息后是否发送确认回应。">
@@ -1516,7 +1506,9 @@ function AgentCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {agent.workspace && (
-            <span className="text-xs text-muted-foreground">📁 {agent.workspace}</span>
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Folder className="w-3 h-3" /> {agent.workspace}
+            </span>
           )}
           {agent.model && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
