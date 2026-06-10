@@ -221,7 +221,7 @@ export function Sidebar() {
     ...moduleNavItems.map((item) => ({
       to: item.to,
       icon: item.icon,
-      label: item.i18nKey ? t(item.i18nKey as never) : item.label,
+      label: item.i18nKey ? t(item.i18nKey as never, { defaultValue: item.label }) : item.label,
       testId: item.testId,
     })),
     { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },

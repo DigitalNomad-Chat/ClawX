@@ -350,9 +350,10 @@ export function Chat() {
   // Indices of intermediate assistant process messages that are represented
   // in the ExecutionGraphCard (narration text and/or thinking). We suppress
   // them from the chat stream so they don't appear duplicated below the graph.
-  const foldedNarrationIndices = new Set<number>();
+  const { userRunCards, foldedNarrationIndices } = useMemo(() => {
+    const foldedNarrationIndices = new Set<number>();
 
-  const userRunCards: UserRunCard[] = messages.flatMap((message, idx) => {
+    const userRunCards: UserRunCard[] = messages.flatMap((message, idx) => {
     if (!isRealUserMessage(message) || subagentCompletionInfos[idx]) return [];
 
     const runKey = message.id
@@ -601,7 +602,9 @@ export function Chat() {
       streamingReplyText,
       suppressThinking,
     }];
-  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools.length, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError]);
+  });
+    return { userRunCards, foldedNarrationIndices };
+  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError]);
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
   const replyTextOverrides = useMemo(() => {
     const map = new Map<number, string>();
@@ -625,7 +628,17 @@ export function Chat() {
     const rows: Array<{ msg: RawMessage; originalIdx: number }> = [];
     for (let idx = 0; idx < messages.length; idx += 1) {
       if (foldedNarrationIndices.has(idx)) continue;
-      rows.push({ msg: messages[idx], originalIdx: idx });
+      const msg = messages[idx];
+      const role = typeof msg.role === 'string' ? msg.role.toLowerCase() : '';
+      // Skip tool_result messages — ChatMessage renders them as null
+      if (role === 'toolresult' || role === 'tool_result') continue;
+      // Skip empty messages that ChatMessage would render as null
+      const hasText = extractText(msg).trim().length > 0;
+      const hasImages = extractImages(msg).length > 0;
+      const hasTools = extractToolUse(msg).length > 0;
+      const hasAttachments = msg._attachedFiles && msg._attachedFiles.length > 0;
+      if (!hasText && !hasImages && !hasTools && !hasAttachments) continue;
+      rows.push({ msg, originalIdx: idx });
     }
     return rows;
   }, [messages, foldedNarrationIndices]);

@@ -28,6 +28,12 @@ import agentBoardModule from './agent-board';
 import documentsModule from './documents';
 import memoryPlusModule from './memory-plus';
 import taskRoomsModule from './task-rooms';
+import officeToolsModule from './office-tools';
+
+// ---------------------------------------------------------------------------
+//  Feature flags
+// ---------------------------------------------------------------------------
+const enableOfficeTools = import.meta.env.VITE_ENABLE_OFFICE_TOOLS === '1';
 
 // ---------------------------------------------------------------------------
 //  Registry assembly
@@ -41,6 +47,7 @@ const allModules: FrontendModule[] = [
   documentsModule,
   memoryPlusModule,
   taskRoomsModule,
+  ...(enableOfficeTools ? [officeToolsModule] : []),
 ];
 
 /** All registered module routes as pre-built JSX elements */
