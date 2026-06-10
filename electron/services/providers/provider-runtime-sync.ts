@@ -14,6 +14,7 @@ import {
   syncProviderConfigToOpenClaw,
   updateAgentModelProvider,
   updateSingleAgentModelProvider,
+  getOpenClawProvidersConfig,
 } from '../../utils/openclaw-auth';
 import {
   piAiModelsJsonModelEntry,
@@ -76,6 +77,10 @@ function shouldUseExplicitDefaultOverride(config: ProviderConfig, runtimeProvide
   return Boolean(config.baseUrl || config.apiProtocol || runtimeProviderKey !== config.type);
 }
 
+function looksLikeUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export function getOpenClawProviderKey(type: string, providerId: string): string {
   if (isUnregisteredProviderType(type)) {
     // If the providerId is already a runtime key (e.g. re-seeded from openclaw.json
@@ -86,6 +91,12 @@ export function getOpenClawProviderKey(type: string, providerId: string): string
       if (tail.length === 8 && !tail.includes('-')) {
         return providerId;
       }
+    }
+    // If providerId is not a UUID, treat it as an explicit OpenClaw provider key.
+    // This handles providers that were manually configured in openclaw.json with
+    // meaningful names (e.g. "agnes-ai") rather than UUID-generated ids.
+    if (!looksLikeUUID(providerId)) {
+      return providerId;
     }
     const suffix = providerId.replace(/-/g, '').slice(0, 8);
     return `${type}-${suffix}`;
@@ -145,9 +156,18 @@ export function getProviderModelRef(config: ProviderConfig): string | undefined 
   const providerKey = getOpenClawProviderKey(config.type, config.id);
 
   if (config.model) {
-    return config.model.startsWith(`${providerKey}/`)
-      ? config.model
-      : `${providerKey}/${config.model}`;
+    // If model already starts with the expected providerKey, use as-is.
+    if (config.model.startsWith(`${providerKey}/`)) {
+      return config.model;
+    }
+    // If model contains a foreign provider prefix (e.g. "agnes-ai/agnes-2.0-flash"
+    // when providerKey is "custom-agnesai"), strip it and rebuild with the
+    // correct providerKey to avoid double prefixes.
+    if (config.model.includes('/')) {
+      const modelId = config.model.split('/').slice(1).join('/');
+      return `${providerKey}/${modelId}`;
+    }
+    return `${providerKey}/${config.model}`;
   }
 
   const defaultModel = getProviderDefaultModel(config.type);
@@ -354,7 +374,14 @@ async function syncCustomProviderAgentModel(
     return;
   }
 
-  const modelId = config.model;
+  // Extract pure model id — config.model may be a full model ref like
+  // "agnes-ai/agnes-2.0-flash" (seeded from openclaw.json). We must strip
+  // any existing provider prefix before passing it to updateAgentModelProvider,
+  // which builds the ref as "runtimeProviderKey/modelId".
+  let modelId = config.model;
+  if (modelId?.includes('/')) {
+    modelId = modelId.split('/').slice(1).join('/');
+  }
   await updateAgentModelProvider(runtimeProviderKey, {
     baseUrl: normalizeProviderBaseUrl(config, config.baseUrl, config.apiProtocol || 'openai-completions'),
     api: config.apiProtocol || 'openai-completions',
@@ -390,6 +417,25 @@ async function removeDeletedProviderFromOpenClaw(
     keys.add(await resolveRuntimeProviderKey({ ...provider, id: providerId }));
   }
   keys.add(providerId);
+
+  // Also try to find and delete by the current openclaw.json key.
+  // This handles cases where the provider key was manually renamed in
+  // openclaw.json (e.g. user edited it directly), causing the stored
+  // providerId to no longer match the actual key in openclaw.json.
+  // For custom/ollama providers we match by baseUrl since the key name
+  // may have changed but the baseUrl uniquely identifies this provider.
+  if (provider.baseUrl) {
+    const { providers: openClawProviders } = await getOpenClawProvidersConfig();
+    for (const [key, entry] of Object.entries(openClawProviders)) {
+      if (key === providerId) continue; // already covered
+      if (key === runtimeProviderKey) continue; // already covered
+      const entryBaseUrl = typeof entry.baseUrl === 'string' ? entry.baseUrl : undefined;
+      if (entryBaseUrl === provider.baseUrl) {
+        keys.add(key);
+        break;
+      }
+    }
+  }
 
   for (const key of keys) {
     await removeProviderFromOpenClaw(key);

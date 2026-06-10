@@ -1,5 +1,9 @@
 const MULTI_INSTANCE_PROVIDER_TYPES = new Set(['custom', 'ollama']);
 
+function looksLikeUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export const OPENCLAW_PROVIDER_KEY_MINIMAX = 'minimax-portal';
 export const OPENCLAW_PROVIDER_KEY_MOONSHOT = 'moonshot';
 export const OPENCLAW_PROVIDER_KEY_MOONSHOT_GLOBAL = 'moonshot-global';
@@ -39,6 +43,12 @@ export function getOpenClawProviderKeyForType(
       if (tail.length === 8 && !tail.includes('-')) {
         return providerId;
       }
+    }
+    // If providerId is not a UUID, treat it as an explicit OpenClaw provider key.
+    // This handles providers that were manually configured in openclaw.json with
+    // meaningful names (e.g. "agnes-ai") rather than UUID-generated ids.
+    if (!looksLikeUUID(providerId)) {
+      return providerId;
     }
     const suffix = providerId.replace(/-/g, '').slice(0, 8);
     return `${type}-${suffix}`;

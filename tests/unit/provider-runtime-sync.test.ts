@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   updateAgentModelProvider: vi.fn(),
   updateSingleAgentModelProvider: vi.fn(),
   listAgentsSnapshot: vi.fn(),
+  getOpenClawProvidersConfig: vi.fn(),
 }));
 
 vi.mock('@electron/services/providers/provider-store', () => ({
@@ -55,6 +56,7 @@ vi.mock('@electron/utils/openclaw-auth', () => ({
   syncProviderConfigToOpenClaw: mocks.syncProviderConfigToOpenClaw,
   updateAgentModelProvider: mocks.updateAgentModelProvider,
   updateSingleAgentModelProvider: mocks.updateSingleAgentModelProvider,
+  getOpenClawProvidersConfig: mocks.getOpenClawProvidersConfig,
 }));
 
 vi.mock('@electron/utils/agent-config', () => ({
@@ -77,6 +79,8 @@ import {
   syncDeletedProviderToRuntime,
   syncSavedProviderToRuntime,
   syncUpdatedProviderToRuntime,
+  getOpenClawProviderKey,
+  getProviderModelRef,
 } from '@electron/services/providers/provider-runtime-sync';
 
 function createProvider(overrides: Partial<ProviderConfig> = {}): ProviderConfig {
@@ -124,6 +128,7 @@ describe('provider-runtime-sync refresh strategy', () => {
     mocks.updateAgentModelProvider.mockResolvedValue(undefined);
     mocks.updateSingleAgentModelProvider.mockResolvedValue(undefined);
     mocks.listAgentsSnapshot.mockResolvedValue({ agents: [] });
+    mocks.getOpenClawProvidersConfig.mockResolvedValue({ providers: {}, defaultModel: undefined, agentsList: [] });
   });
 
   it('uses debouncedReload after saving provider config', async () => {
@@ -152,9 +157,8 @@ describe('provider-runtime-sync refresh strategy', () => {
 
     await syncDeletedProviderToRuntime(customProvider, 'moonshot-cn', gateway as GatewayManager);
 
-    expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledWith('custom-moonshot');
     expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledWith('moonshot-cn');
-    expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledTimes(2);
+    expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledTimes(1);
     expect(gateway.debouncedRestart).toHaveBeenCalledTimes(1);
   });
 
@@ -274,7 +278,7 @@ describe('provider-runtime-sync refresh strategy', () => {
     await syncSavedProviderToRuntime(ollamaProvider, undefined, gateway as GatewayManager);
 
     expect(mocks.syncProviderConfigToOpenClaw).toHaveBeenCalledWith(
-      'ollama-ollamafd',
+      'ollamafd',
       'qwen3:30b',
       expect.objectContaining({
         baseUrl: 'http://localhost:11434/v1',
@@ -302,8 +306,8 @@ describe('provider-runtime-sync refresh strategy', () => {
     await syncDefaultProviderToRuntime('ollamafd', gateway as GatewayManager);
 
     expect(mocks.setOpenClawDefaultModelWithOverride).toHaveBeenCalledWith(
-      'ollama-ollamafd',
-      'ollama-ollamafd/qwen3:30b',
+      'ollamafd',
+      'ollamafd/qwen3:30b',
       expect.objectContaining({
         baseUrl: 'http://localhost:11434/v1',
         api: 'openai-completions',
@@ -329,8 +333,8 @@ describe('provider-runtime-sync refresh strategy', () => {
 
     // Should use the custom/ollama branch with explicit override
     expect(mocks.setOpenClawDefaultModelWithOverride).toHaveBeenCalledWith(
-      'ollama-ollamafd',
-      'ollama-ollamafd/qwen3:30b',
+      'ollamafd',
+      'ollamafd/qwen3:30b',
       expect.objectContaining({
         baseUrl: 'http://localhost:11434/v1',
         api: 'openai-completions',
@@ -354,8 +358,133 @@ describe('provider-runtime-sync refresh strategy', () => {
     const gateway = createGateway('running');
     await syncDeletedProviderToRuntime(ollamaProvider, 'ollamafd', gateway as GatewayManager);
 
-    expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledWith('ollama-ollamafd');
     expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledWith('ollamafd');
+    expect(mocks.removeProviderFromOpenClaw).toHaveBeenCalledTimes(1);
     expect(gateway.debouncedRestart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getOpenClawProviderKey', () => {
+  it('returns providerId directly for non-UUID custom ids', () => {
+    expect(getOpenClawProviderKey('custom', 'agnes-ai')).toBe('agnes-ai');
+    expect(getOpenClawProviderKey('custom', 'my-api')).toBe('my-api');
+    expect(getOpenClawProviderKey('ollama', 'localhost')).toBe('localhost');
+  });
+
+  it('returns hashed key for UUID custom ids', () => {
+    expect(getOpenClawProviderKey('custom', 'abc12345-1234-1234-1234-123456789012')).toBe('custom-abc12345');
+    expect(getOpenClawProviderKey('ollama', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBe('ollama-a1b2c3d4');
+  });
+
+  it('returns already-hashed keys as-is', () => {
+    expect(getOpenClawProviderKey('custom', 'custom-agnesai')).toBe('custom-agnesai');
+    expect(getOpenClawProviderKey('ollama', 'ollama-local01')).toBe('ollama-local01');
+  });
+
+  it('maps built-in types correctly', () => {
+    expect(getOpenClawProviderKey('moonshot', 'any')).toBe('moonshot');
+    expect(getOpenClawProviderKey('kimi-coding', 'any')).toBe('kimi');
+    expect(getOpenClawProviderKey('minimax-portal-cn', 'any')).toBe('minimax-portal');
+  });
+});
+
+describe('getProviderModelRef with semantic custom providers', () => {
+  it('builds correct model ref for semantic custom provider id', () => {
+    const config = createProvider({
+      id: 'agnes-ai',
+      type: 'custom',
+      model: 'agnes-2.0-flash',
+    });
+    expect(getProviderModelRef(config)).toBe('agnes-ai/agnes-2.0-flash');
+  });
+
+  it('handles model that already contains provider prefix', () => {
+    const config = createProvider({
+      id: 'agnes-ai',
+      type: 'custom',
+      model: 'agnes-ai/agnes-2.0-flash',
+    });
+    // Should NOT produce double prefix like agnes-ai/agnes-ai/agnes-2.0-flash
+    expect(getProviderModelRef(config)).toBe('agnes-ai/agnes-2.0-flash');
+  });
+
+  it('handles model seeded from openclaw.json with foreign provider prefix', () => {
+    // Simulates the case where openclaw.json has model "old-vendor/some-model"
+    // but provider id is now "new-vendor"
+    const config = createProvider({
+      id: 'new-vendor',
+      type: 'custom',
+      model: 'old-vendor/some-model',
+    });
+    expect(getProviderModelRef(config)).toBe('new-vendor/some-model');
+  });
+});
+
+describe('syncSavedProviderToRuntime with semantic custom provider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getProviderAccount.mockResolvedValue(null);
+    mocks.getProviderSecret.mockResolvedValue(undefined);
+    mocks.getProviderConfig.mockReturnValue(undefined);
+    mocks.syncProviderConfigToOpenClaw.mockResolvedValue(undefined);
+    mocks.saveProviderKeyToOpenClaw.mockResolvedValue(undefined);
+    mocks.updateAgentModelProvider.mockResolvedValue(undefined);
+  });
+
+  it('syncs semantic custom provider without hashing id', async () => {
+    const semanticProvider = createProvider({
+      id: 'agnes-ai',
+      type: 'custom',
+      name: 'Agnes AI',
+      model: 'agnes-2.0-flash',
+      baseUrl: 'https://apihub.agnes-ai.com/v1',
+    });
+
+    mocks.getProviderSecret.mockResolvedValue({ type: 'api_key', apiKey: 'sk-agnes' });
+
+    const gateway = createGateway('running');
+    await syncSavedProviderToRuntime(semanticProvider, undefined, gateway as GatewayManager);
+
+    // Should use the semantic id directly, NOT custom-agnesai
+    expect(mocks.syncProviderConfigToOpenClaw).toHaveBeenCalledWith(
+      'agnes-ai',
+      'agnes-2.0-flash',
+      expect.objectContaining({
+        baseUrl: 'https://apihub.agnes-ai.com/v1',
+        api: 'openai-completions',
+      }),
+    );
+    expect(mocks.saveProviderKeyToOpenClaw).toHaveBeenCalledWith('agnes-ai', 'sk-agnes');
+    expect(gateway.debouncedReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('extracts pure model id when model has foreign prefix', async () => {
+    const semanticProvider = createProvider({
+      id: 'agnes-ai',
+      type: 'custom',
+      name: 'Agnes AI',
+      model: 'old-prefix/agnes-2.0-flash',
+      baseUrl: 'https://apihub.agnes-ai.com/v1',
+    });
+
+    mocks.getProviderSecret.mockResolvedValue({ type: 'api_key', apiKey: 'sk-agnes' });
+
+    const gateway = createGateway('running');
+    await syncSavedProviderToRuntime(semanticProvider, undefined, gateway as GatewayManager);
+
+    // syncProviderConfigToOpenClaw should receive pure model id
+    expect(mocks.syncProviderConfigToOpenClaw).toHaveBeenCalledWith(
+      'agnes-ai',
+      'old-prefix/agnes-2.0-flash',
+      expect.any(Object),
+    );
+
+    // updateAgentModelProvider should receive stripped model id
+    expect(mocks.updateAgentModelProvider).toHaveBeenCalledWith(
+      'agnes-ai',
+      expect.objectContaining({
+        models: [{ id: 'agnes-2.0-flash', name: 'agnes-2.0-flash', cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
+      }),
+    );
   });
 });

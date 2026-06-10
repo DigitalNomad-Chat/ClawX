@@ -17,6 +17,7 @@ import {
   Copy,
   XCircle,
   ChevronDown,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +55,7 @@ import { invokeIpc } from '@/lib/api-client';
 import { useSettingsStore } from '@/stores/settings';
 import { hostApiFetch } from '@/lib/host-api';
 import { subscribeHostEvent } from '@/lib/host-events';
+import { QuickModelSwitchDialog } from '@/components/models/QuickModelSwitchDialog';
 
 const inputClasses = 'h-[44px] rounded-xl font-mono text-meta bg-surface-input border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:border-blue-500 shadow-sm transition-all text-foreground placeholder:text-foreground/40';
 const labelClasses = 'text-sm text-foreground/80 font-bold';
@@ -195,6 +197,7 @@ export function ProvidersSettings() {
   } = useProviderStore();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showQuickModelDialog, setShowQuickModelDialog] = useState(false);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const vendorMap = new Map(vendors.map((vendor) => [vendor.id, vendor]));
   const existingVendorIds = new Set(accounts.map((account) => account.vendorId));
@@ -275,10 +278,21 @@ export function ProvidersSettings() {
         <h2 data-testid="providers-settings-title" className="text-3xl font-serif text-foreground font-normal tracking-tight">
           {t('aiProviders.title', 'AI Providers')}
         </h2>
-        <Button data-testid="providers-add-button" onClick={() => setShowAddDialog(true)} className="rounded-full px-5 h-9 shadow-none font-medium text-meta">
-          <Plus className="h-4 w-4 mr-2" />
-          {t('aiProviders.add')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            data-testid="providers-quick-model-button"
+            variant="outline"
+            onClick={() => setShowQuickModelDialog(true)}
+            className="rounded-full px-4 h-9 shadow-none font-medium text-meta"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            快捷模型
+          </Button>
+          <Button data-testid="providers-add-button" onClick={() => setShowAddDialog(true)} className="rounded-full px-5 h-9 shadow-none font-medium text-meta">
+            <Plus className="h-4 w-4 mr-2" />
+            {t('aiProviders.add')}
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -347,6 +361,12 @@ export function ProvidersSettings() {
           devModeUnlocked={devModeUnlocked}
         />
       )}
+
+      {/* Quick Model Switch Dialog */}
+      <QuickModelSwitchDialog
+        open={showQuickModelDialog}
+        onOpenChange={setShowQuickModelDialog}
+      />
     </div>
   );
 }

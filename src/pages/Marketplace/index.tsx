@@ -19,6 +19,7 @@ import { MessageSquare, Clock } from 'lucide-react';
 import { useFeatureGuard } from '@/hooks/useFeatureGuard';
 import { UsageLimitModal } from '@/components/auth/UsageLimitModal';
 import { UsageBar } from '@/components/auth/UsageBar';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface AgentCardData {
   id: string;
@@ -64,6 +65,8 @@ export function Marketplace() {
   const [activeCategory, setActiveCategory] = useState('全部');
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<AgentCardData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
   const [recentSessions, setRecentSessions] = useState<Array<{
     sessionId: string;
     agentId: string;
@@ -179,6 +182,12 @@ export function Marketplace() {
     return filteredAgents.filter((agent) => !PINNED_AGENT_IDS.includes(agent.id));
   }, [filteredAgents]);
 
+  const totalPages = Math.ceil(regularAgents.length / PAGE_SIZE);
+  const paginatedAgents = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return regularAgents.slice(start, start + PAGE_SIZE);
+  }, [regularAgents, currentPage]);
+
   return (
     <div className="flex h-full flex-col gap-6">
       {/* Header */}
@@ -205,7 +214,10 @@ export function Marketplace() {
           <Input
             placeholder="搜索 Agent..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-9"
           />
         </div>
@@ -215,7 +227,10 @@ export function Marketplace() {
               key={cat}
               variant={activeCategory === cat ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => {
+                setActiveCategory(cat);
+                setCurrentPage(1);
+              }}
             >
               {cat}
             </Button>
@@ -295,15 +310,53 @@ export function Marketplace() {
 
           {/* Regular Agent Grid */}
           {regularAgents.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {regularAgents.map((agent) => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  onClick={() => setSelectedAgent(agent)}
-                  onHire={() => hireAgent(agent.id)}
-                />
-              ))}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {paginatedAgents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    onClick={() => setSelectedAgent(agent)}
+                    onHire={() => hireAgent(agent.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="min-w-[32px]"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    共 {regularAgents.length} 个
+                  </span>
+                </div>
+              )}
             </div>
           ) : pinnedAgents.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">

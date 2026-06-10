@@ -88,7 +88,7 @@ export class ProviderService {
     // The provider list is derived entirely from openclaw.json.
     // The electron-store is only used as a metadata cache (label, authMode, etc.).
 
-    const { providers: openClawProviders, defaultModel } = await getOpenClawProvidersConfig();
+    const { providers: openClawProviders, defaultModel, agentsList } = await getOpenClawProvidersConfig();
     const activeProviders = await getActiveOpenClawProviders();
 
     if (activeProviders.size === 0) {
@@ -145,6 +145,7 @@ export class ProviderService {
             new Set(),
             new Set(),
             defaultModel,
+            agentsList,
           );
           for (const account of seeded) {
             await saveProviderAccount(account);
@@ -169,6 +170,7 @@ export class ProviderService {
     existingIds: Set<string>,
     existingVendorIds: Set<string>,
     defaultModel: string | undefined,
+    agentsList?: Array<{ model?: { primary?: string }; defaultModelRef?: string }>,
   ): ProviderAccount[] {
     const defaultModelProvider = defaultModel?.includes('/')
       ? defaultModel.split('/')[0]
@@ -199,9 +201,25 @@ export class ProviderService {
       // Infer model from the default model if it belongs to this provider
       let model: string | undefined;
       if (defaultModelProvider === key && defaultModel) {
-        model = defaultModel;
+        // Strip provider prefix if defaultModel is a full model ref.
+        model = defaultModel.startsWith(`${key}/`)
+          ? defaultModel.slice(`${key}/`.length)
+          : defaultModel;
       } else if (definition?.defaultModelId) {
         model = definition.defaultModelId;
+      } else {
+        // Also check per-agent model overrides in agents.list[].model
+        // This covers providers that aren't the default provider but have
+        // explicit model assignments for individual agents.
+        const agentList = agentsList ?? [];
+        for (const agent of agentList) {
+          const agentModel = agent.model?.primary ?? agent.defaultModelRef;
+          if (agentModel?.includes('/') && agentModel.startsWith(`${key}/`)) {
+            // Strip the provider prefix so account.model stores only the model id.
+            model = agentModel.slice(`${key}/`.length);
+            break;
+          }
+        }
       }
 
       const account: ProviderAccount = {
@@ -380,7 +398,9 @@ export class ProviderService {
     const results: Array<{ accountId: string; hasKey: boolean; keyMasked: string | null }> = [];
     for (const account of accounts) {
       const runtimeProviderKey = getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode);
+      // Try multiple key sources: runtime key, account id, secure storage
       const apiKey = (await getProviderApiKeyFromOpenClaw(runtimeProviderKey))
+        ?? (await getProviderApiKeyFromOpenClaw(account.id))
         ?? (await getApiKey(account.id))
         ?? (runtimeProviderKey !== account.id ? await getApiKey(runtimeProviderKey) : null);
       results.push({
@@ -403,10 +423,15 @@ export class ProviderService {
     const runtimeProviderKey = account
       ? getOpenClawProviderKeyForType(account.vendorId, account.id, account.authMode)
       : accountId;
+    // Check auth-profiles by runtime key AND by account id (handles seeded providers)
     if (await getProviderApiKeyFromOpenClaw(runtimeProviderKey)) {
       return true;
     }
     if (runtimeProviderKey !== accountId && (await hasApiKey(runtimeProviderKey))) {
+      return true;
+    }
+    // Also check auth-profiles by account id directly
+    if (await getProviderApiKeyFromOpenClaw(accountId)) {
       return true;
     }
     return this._hasProviderApiKeyInternal(accountId);

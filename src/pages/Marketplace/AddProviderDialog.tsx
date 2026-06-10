@@ -3,7 +3,7 @@
  * Step 1: Select a built-in brand
  * Step 2: Enter API Key, select model, customize
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ChevronRight,
   Eye,
@@ -65,6 +65,29 @@ export function AddProviderDialog({
   const [selectedModel, setSelectedModel] = useState(editProvider?.models[0] || '');
   const [customModel, setCustomModel] = useState('');
 
+  // Sync state when dialog opens in edit mode
+  useEffect(() => {
+    if (open && editProvider) {
+      setStep('config');
+      const brand = BUILT_IN_PROVIDERS.find((b) => b.id === editProvider.id) || null;
+      setSelectedBrand(brand);
+      setCustomName(editProvider.name || '');
+      setBaseUrl(editProvider.baseUrl || '');
+      setApiKey(editProvider.apiKey || '');
+      // 模型回填：预设模型选中按钮，非预设模型填入输入框
+      const model = editProvider.models[0] || '';
+      if (brand && brand.defaultModels.includes(model)) {
+        setSelectedModel(model);
+        setCustomModel('');
+      } else {
+        setSelectedModel('');
+        setCustomModel(model);
+      }
+      setTestResult(null);
+      setError(null);
+    }
+  }, [open, editProvider]);
+
   // States
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; latency?: number; error?: string } | null>(null);
@@ -94,12 +117,13 @@ export function AddProviderDialog({
   }
 
   async function testConnection() {
-    if (!selectedBrand || !apiKey.trim()) return;
+    const apiType = selectedBrand?.api || editProvider?.api;
+    if (!apiType || !apiKey.trim()) return;
     setTesting(true);
     setTestResult(null);
     try {
       const result = await kernelLlmConfig.testConnection(
-        selectedBrand.api,
+        apiType,
         baseUrl,
         apiKey.trim(),
         getEffectiveModel(),
@@ -117,7 +141,8 @@ export function AddProviderDialog({
   }
 
   async function save() {
-    if (!selectedBrand || !apiKey.trim()) return;
+    const brand = selectedBrand;
+    if ((!brand && !editProvider) || !apiKey.trim()) return;
     const model = getEffectiveModel();
     if (!model) {
       setError('请选择或输入模型名称');
@@ -128,12 +153,12 @@ export function AddProviderDialog({
     setError(null);
     try {
       const provider: KernelLLMProvider = {
-        id: selectedBrand.id,
-        name: customName.trim() || selectedBrand.name,
-        api: selectedBrand.api,
-        baseUrl: baseUrl.trim() || selectedBrand.baseUrl,
+        id: brand?.id || editProvider!.id,
+        name: customName.trim() || brand?.name || editProvider!.name,
+        api: brand?.api || editProvider!.api,
+        baseUrl: baseUrl.trim() || brand?.baseUrl || editProvider!.baseUrl,
         apiKey: apiKey.trim(),
-        models: [model, ...selectedBrand.defaultModels.filter((m) => m !== model)],
+        models: [model, ...(brand?.defaultModels || []).filter((m) => m !== model)],
         enabled: true,
       };
 
@@ -255,15 +280,14 @@ export function AddProviderDialog({
             </div>
           ) : (
             /* Step 2: Configuration */
-            selectedBrand && (
-              <div className="space-y-5">
-                {/* Brand badge */}
-                <div className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2">
-                  <span className="text-sm font-medium">{selectedBrand.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({selectedBrand.api === 'anthropic' ? 'Anthropic' : 'OpenAI'} API)
-                  </span>
-                </div>
+            <div className="space-y-5">
+              {/* Brand badge */}
+              <div className="flex items-center gap-2 rounded-lg bg-accent px-3 py-2">
+                <span className="text-sm font-medium">{selectedBrand?.name || editProvider?.name || '自定义服务商'}</span>
+                <span className="text-xs text-muted-foreground">
+                  ({selectedBrand?.api === 'anthropic' ? 'Anthropic' : 'OpenAI'} API)
+                </span>
+              </div>
 
                 {/* Custom Name */}
                 <div className="space-y-2">
@@ -271,7 +295,7 @@ export function AddProviderDialog({
                   <Input
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
-                    placeholder={selectedBrand.name}
+                    placeholder={selectedBrand?.name || editProvider?.name || '自定义服务商'}
                   />
                 </div>
 
@@ -281,7 +305,7 @@ export function AddProviderDialog({
                   <Input
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={selectedBrand.baseUrl}
+                    placeholder={selectedBrand?.baseUrl || editProvider?.baseUrl || 'https://api.example.com/v1'}
                   />
                 </div>
 
@@ -289,7 +313,7 @@ export function AddProviderDialog({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>API Key</Label>
-                    {selectedBrand.keyUrl && (
+                    {selectedBrand?.keyUrl && (
                       <a
                         href="#"
                         onClick={(e) => {
@@ -326,25 +350,27 @@ export function AddProviderDialog({
                 {/* Model Selection */}
                 <div className="space-y-2">
                   <Label>模型</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedBrand.defaultModels.map((model) => (
-                      <button
-                        key={model}
-                        onClick={() => {
-                          setSelectedModel(model);
-                          setCustomModel('');
-                        }}
-                        className={cn(
-                          'rounded-md border px-3 py-1.5 text-xs transition-all',
-                          selectedModel === model && !customModel
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'hover:border-primary/50',
-                        )}
-                      >
-                        {model}
-                      </button>
-                    ))}
-                  </div>
+                  {selectedBrand && selectedBrand.defaultModels.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBrand.defaultModels.map((model) => (
+                        <button
+                          key={model}
+                          onClick={() => {
+                            setSelectedModel(model);
+                            setCustomModel('');
+                          }}
+                          className={cn(
+                            'rounded-md border px-3 py-1.5 text-xs transition-all',
+                            selectedModel === model && !customModel
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'hover:border-primary/50',
+                          )}
+                        >
+                          {model}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-2">
                     <Input
                       value={customModel}
@@ -352,7 +378,7 @@ export function AddProviderDialog({
                         setCustomModel(e.target.value);
                         if (e.target.value) setSelectedModel('');
                       }}
-                      placeholder="或输入自定义模型名..."
+                      placeholder={selectedBrand ? '或输入自定义模型名...' : '输入模型名称...'}
                       className="text-xs"
                     />
                   </div>
@@ -406,7 +432,6 @@ export function AddProviderDialog({
                   </Button>
                 </div>
               </div>
-            )
           )}
         </div>
       </SheetContent>
