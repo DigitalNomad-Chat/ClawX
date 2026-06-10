@@ -21,6 +21,8 @@ export interface TokenUsage {
 export interface TextMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** Tool calls made by the assistant in this message (required for Anthropic/OpenAI tool-use protocol) */
+  toolCalls?: ToolCall[];
 }
 
 export interface ToolCall {
@@ -230,6 +232,8 @@ export interface AIProviderConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  /** API protocol type — 'anthropic' or 'openai'. Used by provider factory to pick the correct adapter. */
+  api?: 'anthropic' | 'openai';
 }
 
 export interface StreamMessageRequest {

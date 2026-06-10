@@ -169,8 +169,8 @@ export async function* runReActLoop(
     }
     console.log(`[DEBUG ReAct] Stream iteration done, events=${streamEventCount}, assistantLen=${assistantContent.length}`);
 
-    // Add assistant message to history
-    messages.push({ role: 'assistant', content: assistantContent });
+    // Add assistant message to history (include tool calls so providers can reconstruct protocol-specific blocks)
+    messages.push({ role: 'assistant', content: assistantContent, toolCalls: toolCalls.length > 0 ? toolCalls : undefined });
 
     // 2. No tool calls -> turn complete
     if (toolCalls.length === 0) {

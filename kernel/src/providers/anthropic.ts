@@ -43,13 +43,27 @@ export class AnthropicProvider implements AIProvider {
           return { role: 'user' as const, content: m.content };
         }
         if (m.role === 'assistant') {
-          // Handle assistant messages with tool calls
-          const msg: Record<string, unknown> = {
-            role: 'assistant',
-            content: m.content,
+          // Build assistant message with optional tool_use blocks
+          const assistantMsg = m as Record<string, unknown>;
+          const contentBlocks: Anthropic.Messages.ContentBlockParam[] = [];
+          if (m.content) {
+            contentBlocks.push({ type: 'text', text: m.content });
+          }
+          const calls = assistantMsg.toolCalls as Array<{ id: string; name: string; input: Record<string, unknown> }> | undefined;
+          if (calls) {
+            for (const call of calls) {
+              contentBlocks.push({
+                type: 'tool_use',
+                id: call.id,
+                name: call.name,
+                input: call.input,
+              } as Anthropic.Messages.ToolUseBlockParam);
+            }
+          }
+          return {
+            role: 'assistant' as const,
+            content: contentBlocks,
           };
-          // Tool calls would be added here if needed
-          return msg;
         }
         if (m.role === 'tool') {
           return {
@@ -77,12 +91,17 @@ export class AnthropicProvider implements AIProvider {
 
     let textContent = '';
     const toolCalls: ToolCall[] = [];
+    // Accumulate partial JSON for the current tool call (Anthropic streams input_json_delta)
+    let currentToolInputJson = '';
 
     for await (const event of stream) {
       if (event.type === 'content_block_delta') {
         if (event.delta.type === 'text_delta') {
           textContent += event.delta.text;
           yield { type: 'text_delta', text: event.delta.text };
+        }
+        if (event.delta.type === 'input_json_delta') {
+          currentToolInputJson += event.delta.partial_json;
         }
       }
 
@@ -91,8 +110,22 @@ export class AnthropicProvider implements AIProvider {
           toolCalls.push({
             id: event.content_block.id,
             name: event.content_block.name,
-            input: event.content_block.input as Record<string, unknown>,
+            input: {}, // placeholder; will be replaced at content_block_stop
           });
+          currentToolInputJson = '';
+        }
+      }
+
+      if (event.type === 'content_block_stop') {
+        // Finalize the last tool call's input by parsing accumulated JSON
+        if (currentToolInputJson && toolCalls.length > 0) {
+          const lastCall = toolCalls[toolCalls.length - 1];
+          try {
+            lastCall.input = JSON.parse(currentToolInputJson);
+          } catch {
+            lastCall.input = {};
+          }
+          currentToolInputJson = '';
         }
       }
     }

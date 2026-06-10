@@ -16,7 +16,7 @@ import type { KernelEvent, KernelRequest, AIProviderConfig } from './types.js';
 // Determine paths
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AGENTS_DIR = process.env.KERNEL_AGENTS_DIR || resolve(__dirname, '../agents');
-const SKILLS_DIR = process.env.KERNEL_SKILLS_DIR || resolve(__dirname, './skills');
+const SKILLS_DIR = process.env.KERNEL_SKILLS_DIR || resolve(__dirname, '../skills');
 
 // Global state
 const sessions = new SessionManager();
@@ -235,7 +235,8 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       }
       if (req.model) process.env.KERNEL_MODEL = req.model as string;
       if (req.baseUrl) process.env.KERNEL_BASE_URL = req.baseUrl as string;
-      console.log(`[Kernel] Config updated: model=${process.env.KERNEL_MODEL || 'unchanged'}`);
+      if (req.api) process.env.KERNEL_API_TYPE = req.api as string;
+      console.log(`[Kernel] Config updated: model=${process.env.KERNEL_MODEL || 'unchanged'}, api=${process.env.KERNEL_API_TYPE || 'unchanged'}`);
       yield { type: 'config.updated' };
       break;
     }
@@ -279,6 +280,7 @@ async function* handleChatSend(
     baseUrl: process.env.KERNEL_BASE_URL || '',
     model: process.env.KERNEL_MODEL || agentConfig.model || 'claude-sonnet-4-6',
     temperature: agentConfig.temperature ?? 0.7,
+    api: (process.env.KERNEL_API_TYPE as 'anthropic' | 'openai' | undefined) || undefined,
   };
   console.log(`[DEBUG handleChatSend] Provider config: model=${providerConfig.model}, baseUrl=${providerConfig.baseUrl}, apiKeyPrefix=${providerConfig.apiKey.slice(0, 8)}...`);
 

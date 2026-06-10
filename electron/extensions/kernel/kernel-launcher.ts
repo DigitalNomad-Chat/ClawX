@@ -94,8 +94,9 @@ export class KernelLauncher {
         const apiKeyEnvVar = active.api === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
         env[apiKeyEnvVar] = active.apiKey;
 
-        // Inject model and base URL
+        // Inject model, base URL and API type
         env['KERNEL_MODEL'] = active.model;
+        env['KERNEL_API_TYPE'] = active.api;
         if (active.baseUrl) {
           env['KERNEL_BASE_URL'] = active.baseUrl;
         }
@@ -119,6 +120,7 @@ export class KernelLauncher {
     // In dev mode, derive project root from __dirname (dist-electron/main/ → project root)
     const projectRoot = resolve(__dirname, '../../');
     const agentsDir = resolve(projectRoot, 'kernel/agents');
+    const skillsDir = resolve(projectRoot, 'kernel/skills');
 
     // Prefer pre-built bundle (fast, ~1s startup) over tsx (slow, ~25s)
     const kernelBundle = resolve(projectRoot, 'build/kernel/kernel.js');
@@ -135,6 +137,7 @@ export class KernelLauncher {
           ...process.env,
           ...providerEnv,
           KERNEL_AGENTS_DIR: agentsDir,
+          KERNEL_SKILLS_DIR: skillsDir,
           NODE_ENV: 'development',
         },
       });
@@ -184,6 +187,7 @@ export class KernelLauncher {
   private startProd(providerEnv: Record<string, string> = {}): Promise<number> {
     const kernelPath = resolve(process.resourcesPath!, 'kernel', 'kernel.js');
     const agentsDir = resolve(process.resourcesPath!, 'kernel', 'agents');
+    const skillsDir = resolve(process.resourcesPath!, 'kernel', 'skills');
 
     console.log('[KernelLauncher] Production mode — forking kernel:', kernelPath);
 
@@ -194,6 +198,7 @@ export class KernelLauncher {
           ...process.env,
           ...providerEnv,
           KERNEL_AGENTS_DIR: agentsDir,
+          KERNEL_SKILLS_DIR: skillsDir,
           NODE_ENV: 'production',
         } as Record<string, string>,
         serviceName: 'ClawDock Kernel',

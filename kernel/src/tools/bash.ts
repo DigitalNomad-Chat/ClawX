@@ -67,6 +67,10 @@ export async function executeBash(input: unknown, context?: ToolExecutionContext
     timeout?: number;
   };
 
+  if (!command || typeof command !== 'string') {
+    return 'Error: No command provided. The "command" parameter is required.';
+  }
+
   if (isCommandDenied(command)) {
     return 'Error: This command is blocked for security reasons.';
   }

@@ -48,7 +48,24 @@ export class OpenAIProvider implements AIProvider {
       if (m.role === 'user') {
         messages.push({ role: 'user', content: m.content });
       } else if (m.role === 'assistant') {
-        messages.push({ role: 'assistant', content: m.content });
+        const assistantMsg = m as Record<string, unknown>;
+        const calls = assistantMsg.toolCalls as Array<{ id: string; name: string; input: Record<string, unknown> }> | undefined;
+        if (calls && calls.length > 0) {
+          messages.push({
+            role: 'assistant',
+            content: m.content,
+            tool_calls: calls.map((call) => ({
+              id: call.id,
+              type: 'function' as const,
+              function: {
+                name: call.name,
+                arguments: JSON.stringify(call.input),
+              },
+            })),
+          });
+        } else {
+          messages.push({ role: 'assistant', content: m.content });
+        }
       } else if (m.role === 'tool') {
         messages.push({
           role: 'tool',

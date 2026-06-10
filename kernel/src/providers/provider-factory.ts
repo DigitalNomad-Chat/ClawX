@@ -7,8 +7,17 @@ import { AnthropicProvider } from './anthropic.js';
 import { OpenAIProvider } from './openai.js';
 
 export function createProvider(config: AIProviderConfig): AIProvider {
-  const model = config.model.toLowerCase();
+  // Prefer explicit api type from config; fallback to model-name heuristics
+  const apiType = config.api?.toLowerCase();
+  if (apiType === 'anthropic') {
+    return new AnthropicProvider(config);
+  }
+  if (apiType === 'openai') {
+    return new OpenAIProvider(config);
+  }
 
+  // Legacy fallback: detect from model name
+  const model = config.model.toLowerCase();
   if (model.includes('claude')) {
     return new AnthropicProvider(config);
   }

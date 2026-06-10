@@ -532,6 +532,7 @@ export function registerKernelLLMRoutes(): void {
       openaiApiKey: active.api === 'openai' ? active.apiKey : undefined,
       model: active.model,
       baseUrl: active.baseUrl,
+      api: active.api,
     } as unknown as Record<string, unknown>);
 
     return { success: true };
@@ -585,6 +586,7 @@ export function registerKernelLLMRoutes(): void {
                 openaiApiKey: active.api === 'openai' ? active.apiKey : undefined,
                 model: active.model,
                 baseUrl: active.baseUrl,
+                api: active.api,
               } as unknown as Record<string, unknown>);
             }
           }
