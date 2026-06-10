@@ -56,6 +56,9 @@ export interface AppSettings {
   selectedBundles: string[];
   enabledSkills: string[];
   disabledSkills: string[];
+
+  // Quick model favorites for /model command
+  quickModelRefs: Array<{ path: string; label: string }>;
 }
 
 /**
@@ -107,6 +110,9 @@ function createDefaultSettings(): AppSettings {
     selectedBundles: ['productivity', 'developer'],
     enabledSkills: [],
     disabledSkills: [],
+
+    // Quick model favorites for /model command
+    quickModelRefs: [],
   };
 }
 

@@ -21,6 +21,7 @@ import { handleHistoryRoutes } from './routes/history';
 import { handleCronRoutes } from './routes/cron';
 import { handleDiagnosticsRoutes } from './routes/diagnostics';
 import { handleConfigRoutes } from './routes/config';
+import { handleOfficeToolsRoutes } from './routes/office-tools';
 import { sendJson, setCorsHeaders, requireJsonContentType } from './route-utils';
 import { moduleRouteHandlers } from '../modules/registry';
 
@@ -30,6 +31,8 @@ type RouteHandler = (
   url: URL,
   ctx: HostApiContext,
 ) => Promise<boolean>;
+
+const enableOfficeTools = import.meta.env.VITE_ENABLE_OFFICE_TOOLS === '1';
 
 const coreRouteHandlers: RouteHandler[] = [
   handleAppRoutes,
@@ -49,6 +52,7 @@ const coreRouteHandlers: RouteHandler[] = [
   handleConfigRoutes,
   handleLogRoutes,
   handleUsageRoutes,
+  ...(enableOfficeTools ? [handleOfficeToolsRoutes] : []),
 ];
 
 function buildRouteHandlers(): RouteHandler[] {

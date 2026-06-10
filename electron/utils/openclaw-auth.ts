@@ -455,6 +455,10 @@ function getApiKeyFromAuthProfilesStore(
  * This intentionally reads auth-profiles.json rather than ClawDock's provider
  * cache, so UI status can reflect providers imported or preserved by the
  * OpenClaw runtime across overwrite installs.
+ *
+ * For providers that store their key directly in openclaw.json's models.providers
+ * (e.g. custom providers like "agnes-ai"), falls back to reading the apiKey field
+ * from the provider config if auth-profiles has no record.
  */
 export async function getProviderApiKeyFromOpenClaw(
   provider: string,
@@ -469,6 +473,30 @@ export async function getProviderApiKeyFromOpenClaw(
     if (apiKey) {
       return apiKey;
     }
+  }
+
+  // Fallback: for providers whose API key is stored directly in openclaw.json
+  // models.providers (common for custom providers), read from there.
+  try {
+    const config = await readOpenClawJson();
+    const providers = (config.models as Record<string, unknown> | undefined)?.providers;
+    if (providers && typeof providers === 'object') {
+      // Direct match by provider name
+      const directEntry = providers[provider] as Record<string, unknown> | undefined;
+      if (directEntry?.apiKey && typeof directEntry.apiKey === 'string') {
+        return directEntry.apiKey;
+      }
+      // Also try the raw provider name stripped of "custom-" prefix for custom providers
+      if (provider.startsWith('custom-')) {
+        const tail = provider.slice('custom-'.length);
+        if (tail.length >= 8 && !tail.includes('-')) {
+          // provider was a hashed key like "custom-a1b2c3d4" — try original names
+          // We can't reconstruct the original name, so skip.
+        }
+      }
+    }
+  } catch {
+    // ignore
   }
 
   return null;
@@ -1489,6 +1517,7 @@ export async function getActiveOpenClawProviders(): Promise<Set<string>> {
 export async function getOpenClawProvidersConfig(): Promise<{
   providers: Record<string, Record<string, unknown>>;
   defaultModel: string | undefined;
+  agentsList: Array<{ model?: { primary?: string }; defaultModelRef?: string }>;
 }> {
   try {
     const config = await readOpenClawJson();
@@ -1526,9 +1555,22 @@ export async function getOpenClawProvidersConfig(): Promise<{
       }
     }
 
-    return { providers, defaultModel };
+    // Extract per-agent model overrides for seeding provider accounts.
+    const agentList = (
+      agents?.list && Array.isArray(agents.list)
+        ? (agents.list as Array<Record<string, unknown>>)
+        : []
+    ).map((agent) => {
+      const model = agent.model as Record<string, unknown> | undefined;
+      return {
+        model: model && typeof model === 'object' ? model : undefined,
+        defaultModelRef: (typeof agent.defaultModelRef === 'string' ? agent.defaultModelRef : undefined) as string | undefined,
+      };
+    });
+
+    return { providers, defaultModel, agentsList: agentList };
   } catch {
-    return { providers: {}, defaultModel: undefined };
+    return { providers: {}, defaultModel: undefined, agentsList: [] };
   }
 }
 

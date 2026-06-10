@@ -530,14 +530,14 @@ function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {
               input = payload as CronCreateInput | undefined;
             }
             if (!input) throw new Error('Invalid cron.create payload');
-            const payload: Record<string, unknown> = { kind: 'agentTurn', message: input.message };
+            const agentPayload: Record<string, unknown> = { kind: 'agentTurn', message: input.message };
             if (typeof input.timeoutSeconds === 'number' && Number.isFinite(input.timeoutSeconds) && input.timeoutSeconds > 0) {
-              payload.timeoutSeconds = Math.round(input.timeoutSeconds);
+              agentPayload.timeoutSeconds = Math.round(input.timeoutSeconds);
             }
             const gatewayInput: Record<string, unknown> = {
               name: input.name,
               schedule: { kind: 'cron', expr: input.schedule },
-              payload,
+              payload: agentPayload,
               enabled: input.enabled ?? true,
               wakeMode: 'next-heartbeat',
               sessionTarget: 'isolated',

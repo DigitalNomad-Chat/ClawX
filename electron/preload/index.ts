@@ -162,6 +162,7 @@ const electronAPI = {
         // Kernel LLM configuration (independent)
         'kernel-llm:readConfig',
         'kernel-llm:addProvider',
+        'kernel-llm:updateProvider',
         'kernel-llm:deleteProvider',
         'kernel-llm:setActive',
         'kernel-llm:checkActive',
