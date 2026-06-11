@@ -47,7 +47,7 @@ export function GoClawMarketplace() {
   async function hireAgent(agentId: string) {
     const allowed = await recordAndCheck();
     if (allowed) {
-      navigate(`/agent-chat/${agentId}`);
+      navigate(`/goclaw/chat/${agentId}`, { state: { from: '/goclaw/marketplace' } });
     }
   }
 

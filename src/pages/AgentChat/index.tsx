@@ -455,6 +455,7 @@ export function AgentChat() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnPath = (location.state as { from?: string } | null)?.from ?? '/goclaw/marketplace';
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -497,6 +498,46 @@ export function AgentChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeToolRef = useRef<string | undefined>(undefined);
   const toolStartTimes = useRef<Map<string, number>>(new Map());
+
+  /**
+   * 从已加载的历史会话恢复对话
+   * 提取到组件级别，供初始化 effect 和侧边栏切换 effect 共用
+   */
+  const restoreFromSession = useCallback(async (session: typeof historySessions[0]) => {
+    setLoading(true);
+    setShowHistoryDialog(false);
+    setPersistenceSessionId(session.sessionId);
+    const restoredMessages: ChatMessage[] = (session.messages || []).map((m) => ({
+      role: m.role,
+      content: m.content,
+      toolCalls: m.toolCalls,
+      timestamp: m.timestamp,
+    }));
+    setMessages(restoredMessages);
+
+    // Prepare messages for kernel restore (strip extra fields)
+    const kernelMessages = restoredMessages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    try {
+      const result = await kernelClient.restoreSession(agentId!, kernelMessages);
+      if (result.success && result.sessionId) {
+        setSessionId(result.sessionId);
+        setSessionReady(true);
+        setInitPhase('ready');
+      } else {
+        setError(result.error || '恢复会话失败');
+        setInitPhase('error');
+      }
+    } catch (err) {
+      setError((err as Error).message || '恢复会话失败');
+      setInitPhase('error');
+    } finally {
+      setLoading(false);
+    }
+  }, [agentId]);
   const isComposingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -832,47 +873,28 @@ export function AgentChat() {
       }
     }
 
-    async function restoreFromSession(session: typeof historySessions[0]) {
-      setLoading(true);
-      setPersistenceSessionId(session.sessionId);
-      const restoredMessages: ChatMessage[] = (session.messages || []).map((m) => ({
-        role: m.role,
-        content: m.content,
-        toolCalls: m.toolCalls,
-        timestamp: m.timestamp,
-      }));
-      setMessages(restoredMessages);
-
-      // Prepare messages for kernel restore (strip extra fields)
-      const kernelMessages = restoredMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      try {
-        const result = await kernelClient.restoreSession(agentId!, kernelMessages);
-        if (cancelled) return;
-        if (result.success && result.sessionId) {
-          setSessionId(result.sessionId);
-          setSessionReady(true);
-          setInitPhase('ready');
-        } else {
-          setError(result.error || '恢复会话失败');
-          setInitPhase('error');
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message || '恢复会话失败');
-          setInitPhase('error');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
     init();
     return () => { cancelled = true; };
   }, [agentId]);
+
+  /**
+   * 监听侧边栏历史会话切换
+   * 同一 Agent 下切换不同历史会话时 URL 不变（/goclaw/chat/:agentId），
+   * 仅 location.state 变化，因此需要单独监听
+   */
+  useEffect(() => {
+    if (!agentId) return;
+    const restoreId = (location.state as { restoreSessionId?: string } | null)?.restoreSessionId;
+    if (!restoreId || historySessions.length === 0) return;
+
+    // 如果当前 persistenceSessionId 已经是目标 session，则无需重复恢复
+    if (persistenceSessionId === restoreId) return;
+
+    const session = historySessions.find((s) => s.sessionId === restoreId);
+    if (session) {
+      restoreFromSession(session);
+    }
+  }, [location.state, historySessions, agentId, persistenceSessionId, restoreFromSession]);
 
   async function respondApproval(approved: boolean, autoApprove = false) {
     if (!approvalRequest) return;
@@ -1052,7 +1074,7 @@ export function AgentChat() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button variant="outline" onClick={() => navigate('/goclaw/marketplace')}>
+        <Button variant="outline" onClick={() => navigate(returnPath)}>
           返回广场
         </Button>
       </div>
@@ -1063,7 +1085,7 @@ export function AgentChat() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Agent 未找到</p>
-        <Button variant="outline" onClick={() => navigate('/goclaw/marketplace')}>
+        <Button variant="outline" onClick={() => navigate(returnPath)}>
           返回广场
         </Button>
       </div>
@@ -1079,7 +1101,7 @@ export function AgentChat() {
     >
       {/* Header */}
       <div className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/goclaw/marketplace')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(returnPath)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl">
@@ -1269,7 +1291,7 @@ export function AgentChat() {
             variant="outline"
             size="sm"
             className="mt-2"
-            onClick={() => navigate('/goclaw/marketplace')}
+            onClick={() => navigate(returnPath)}
           >
             前往配置
           </Button>

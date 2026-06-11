@@ -215,8 +215,8 @@ function App() {
               <Route path="manager" element={<GoClawManager />} />
               <Route path="history" element={<GoClawHistory />} />
               <Route path="models" element={<GoClawModels />} />
+              <Route path="chat/:agentId" element={<AgentChat />} />
             </Route>
-            <Route path="/agent-chat/:agentId" element={<AgentChat />} />
             <Route path="/settings/*" element={<Settings />} />
             <Route path="/advanced-config" element={<AdvancedConfig />} />
             {extraRoutes.map((r) => (

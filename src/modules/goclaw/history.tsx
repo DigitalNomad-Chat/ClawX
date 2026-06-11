@@ -352,7 +352,7 @@ export function GoClawHistory() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => navigate(`/agent-chat/${session.agentId}`, { state: { restoreSessionId: session.sessionId } })}
+                    onClick={() => navigate(`/goclaw/chat/${session.agentId}`, { state: { restoreSessionId: session.sessionId, from: '/goclaw/history' } })}
                   >
                     <ChevronRight className="h-4 w-4 mr-1" />
                     继续

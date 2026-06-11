@@ -81,7 +81,7 @@ function NavItem({ to, icon, label, collapsed }: NavItemProps) {
 export function GoClawSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isOnChat = location.pathname.startsWith('/agent-chat');
+  const isOnChat = location.pathname.startsWith('/goclaw/chat');
 
   const collapsed = useGoClawStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useGoClawStore((s) => s.toggleSidebar);
@@ -220,7 +220,7 @@ export function GoClawSidebar() {
             )}
             {groupedSessions.map((group) => {
               const isExpanded = expandedAgentGroups[group.agentId] !== false;
-              const hasActiveSession = isOnChat && location.pathname.includes(`/agent-chat/${group.agentId}`);
+              const hasActiveSession = isOnChat && location.pathname.includes(`/goclaw/chat/${group.agentId}`);
               return (
                 <div key={group.agentId}>
                   {/* Group Header */}
@@ -264,11 +264,14 @@ export function GoClawSidebar() {
                   {isExpanded && (
                     <div className="pl-5 pr-1 space-y-px">
                       {group.sessions.map((s) => {
-                        const isActive = isOnChat && location.pathname === `/agent-chat/${s.agentId}` && location.search.includes(s.sessionId);
+                        const isActive = isOnChat && location.pathname === `/goclaw/chat/${s.agentId}` && location.search.includes(s.sessionId);
                         return (
                           <div key={s.sessionId} className="group/session relative flex items-center">
                             <button
-                              onClick={() => navigate(`/agent-chat/${s.agentId}`, { state: { restoreSessionId: s.sessionId } })}
+                              onClick={() => {
+                                const fromPath = (location.state as { from?: string } | null)?.from ?? location.pathname;
+                                navigate(`/goclaw/chat/${s.agentId}`, { state: { restoreSessionId: s.sessionId, from: fromPath } });
+                              }}
                               className={cn(
                                 'w-full text-left py-1.5 px-2 text-xs transition-colors relative',
                                 isActive
