@@ -17,7 +17,11 @@ import { Skills } from './pages/Skills';
 import { Cron } from './pages/Cron';
 import { Dreams } from './pages/Dreams';
 import { moduleRoutes } from './modules/registry';
-import { Marketplace } from './pages/Marketplace';
+import { GoClawLayout } from './modules/goclaw/layout';
+import { GoClawMarketplace } from './modules/goclaw/marketplace';
+import { GoClawManager } from './modules/goclaw/manager';
+import { GoClawHistory } from './modules/goclaw/history';
+import { GoClawModels } from './modules/goclaw/models';
 import { AgentChat } from './pages/AgentChat';
 import { Settings } from './pages/Settings';
 import { AdvancedConfig } from './pages/AdvancedConfig';
@@ -205,7 +209,13 @@ function App() {
             <Route path="/skills" element={<Skills />} />
             <Route path="/cron" element={<Cron />} />
             <Route path="/dreams" element={devModeUnlocked ? <Dreams /> : <Navigate to="/" replace />} />
-            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/goclaw" element={<GoClawLayout />}>
+              <Route index element={<Navigate to="/goclaw/marketplace" replace />} />
+              <Route path="marketplace" element={<GoClawMarketplace />} />
+              <Route path="manager" element={<GoClawManager />} />
+              <Route path="history" element={<GoClawHistory />} />
+              <Route path="models" element={<GoClawModels />} />
+            </Route>
             <Route path="/agent-chat/:agentId" element={<AgentChat />} />
             <Route path="/settings/*" element={<Settings />} />
             <Route path="/advanced-config" element={<AdvancedConfig />} />

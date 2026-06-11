@@ -704,12 +704,12 @@ export function AgentChat() {
               return [
                 ...prev.slice(0, -1),
                 { ...last, streaming: false },
-                { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
+                { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「应用广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
               ];
             }
             return [
               ...prev,
-              { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「Agent 广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
+              { role: 'assistant', content: isAuthError ? `[错误] ${errorMsg}\n\n请前往「应用广场」配置您的API密钥。` : `[错误] ${errorMsg}`, timestamp: Date.now() },
             ];
           });
           break;
@@ -1052,7 +1052,7 @@ export function AgentChat() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button variant="outline" onClick={() => navigate('/marketplace')}>
+        <Button variant="outline" onClick={() => navigate('/goclaw/marketplace')}>
           返回广场
         </Button>
       </div>
@@ -1063,7 +1063,7 @@ export function AgentChat() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Agent 未找到</p>
-        <Button variant="outline" onClick={() => navigate('/marketplace')}>
+        <Button variant="outline" onClick={() => navigate('/goclaw/marketplace')}>
           返回广场
         </Button>
       </div>
@@ -1079,7 +1079,7 @@ export function AgentChat() {
     >
       {/* Header */}
       <div className="flex items-center gap-3 border-b px-4 py-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/marketplace')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/goclaw/marketplace')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl">
@@ -1269,7 +1269,7 @@ export function AgentChat() {
             variant="outline"
             size="sm"
             className="mt-2"
-            onClick={() => navigate('/marketplace')}
+            onClick={() => navigate('/goclaw/marketplace')}
           >
             前往配置
           </Button>

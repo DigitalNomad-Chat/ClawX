@@ -30,12 +30,19 @@ import { cn } from '@/lib/utils';
 import { rendererExtensionRegistry } from '@/extensions/registry';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatStore } from '@/stores/chat';
+import { useGoClawStore } from '@/modules/goclaw/store';
 import { useGatewayStore } from '@/stores/gateway';
 import { useAgentsStore } from '@/stores/agents';
 import { groupSessionsByAgent } from './session-buckets';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { hostApiFetch } from '@/lib/host-api';
 import { useTranslation } from 'react-i18next';
 import { moduleNavItems } from '@/modules/registry';
@@ -53,19 +60,22 @@ interface NavItemProps {
 }
 
 function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItemProps) {
-  return (
+  const link = (
     <NavLink
       to={to}
       onClick={onClick}
       data-testid={testId}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
+          'flex items-center gap-2.5 py-2 text-sm font-medium transition-all duration-200',
           'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
           isActive
-            ? 'bg-gradient-to-r from-primary/10 to-transparent !text-foreground/80 border-l-[3px] border-l-primary'
-            : 'border-l-[3px] border-l-transparent',
-          collapsed && 'justify-center px-0 border-l-0'
+            ? collapsed
+              ? 'bg-primary/10 !text-foreground/80 border-l-0 rounded-md justify-center px-0'
+              : 'bg-gradient-to-r from-primary/10 to-transparent !text-foreground/80 border-l-[3px] border-l-primary rounded-lg px-2.5'
+            : collapsed
+              ? 'border-l-0 rounded-md justify-center px-0'
+              : 'border-l-[3px] border-l-transparent rounded-lg px-2.5'
         )
       }
     >
@@ -88,6 +98,16 @@ function NavItem({ to, icon, label, badge, collapsed, onClick, testId }: NavItem
       )}
     </NavLink>
   );
+
+  if (collapsed) {
+    return (
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>{link}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+  return link;
 }
 
 export function Sidebar() {
@@ -126,7 +146,16 @@ export function Sidebar() {
   const fetchAgents = useAgentsStore((s) => s.fetchAgents);
 
   const navigate = useNavigate();
-  const isOnChat = useLocation().pathname === '/';
+  const location = useLocation();
+  const isOnChat = location.pathname === '/';
+
+  /* ── GoClaw 互斥侧边栏行为 ── */
+  const goClawCollapsed = useGoClawStore((s) => s.sidebarCollapsed);
+  const isGoClawRoute = location.pathname.startsWith('/goclaw');
+  // 1) 进入超级助手 → 主侧边栏强制折叠
+  const effectiveCollapsed = isGoClawRoute ? true : sidebarCollapsed;
+  // 2) GoClaw 也折叠时 → 主侧边栏完全消失（由 JSX 条件控制，不能 early return）
+  const shouldHide = isGoClawRoute && goClawCollapsed;
 
   const getSessionLabel = (key: string, displayName?: string, label?: string) =>
     sessionLabels[key] ?? label ?? displayName ?? key;
@@ -205,7 +234,7 @@ export function Sidebar() {
   const extraNavItems = rendererExtensionRegistry.getExtraNavItems();
 
   // Routes shown as top-level persistent nav items
-  const TOP_NAV_PATHS = new Set(['/marketplace', '/dashboard', '/collaboration']);
+  const TOP_NAV_PATHS = new Set(['/goclaw/marketplace', '/dashboard', '/collaboration']);
 
   const allNavItems = [
     { to: '/models', icon: <Cpu className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.models'), testId: 'sidebar-nav-models' },
@@ -224,7 +253,7 @@ export function Sidebar() {
       label: item.i18nKey ? t(item.i18nKey as never, { defaultValue: item.label }) : item.label,
       testId: item.testId,
     })),
-    { to: '/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '应用广场', testId: 'sidebar-nav-marketplace' },
+    { to: '/goclaw/marketplace', icon: <Store className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.marketplace') || '超级助手', testId: 'sidebar-nav-marketplace' },
     ...extraNavItems.map((item) => ({
       to: item.to,
       icon: <item.icon className="h-[18px] w-[18px]" strokeWidth={2} />,
@@ -236,17 +265,20 @@ export function Sidebar() {
   const topNavItems = allNavItems.filter((item) => TOP_NAV_PATHS.has(item.to));
   const managementNavItems = allNavItems.filter((item) => !TOP_NAV_PATHS.has(item.to));
 
+  if (shouldHide) return null;
+
   return (
-    <aside
-      data-testid="sidebar"
-      className={cn(
-        'flex min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar/60 transition-all duration-300',
-        sidebarCollapsed ? 'w-16' : 'w-64'
-      )}
-    >
+    <TooltipProvider delayDuration={200}>
+      <aside
+        data-testid="sidebar"
+        className={cn(
+          'flex min-h-0 shrink-0 flex-col overflow-hidden border-r bg-surface-sidebar/60 transition-all duration-300',
+          effectiveCollapsed ? 'w-16' : 'w-64'
+        )}
+      >
       {/* Top Header Toggle */}
-      <div className={cn("flex items-center p-2 h-12", sidebarCollapsed ? "justify-center" : "justify-between")}>
-        {!sidebarCollapsed && (
+      <div className={cn("flex items-center p-2 h-12", effectiveCollapsed ? "justify-center" : "justify-between")}>
+        {!effectiveCollapsed && (
           <div className="flex items-center gap-2 px-2 overflow-hidden">
             <img src={logoPng} alt="ClawDock" className="h-5 w-auto shrink-0" />
             <span className="text-sm font-semibold truncate whitespace-nowrap text-foreground/90">
@@ -254,50 +286,78 @@ export function Sidebar() {
             </span>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        >
-          {sidebarCollapsed ? (
-            <PanelLeft className="h-[18px] w-[18px]" />
-          ) : (
-            <PanelLeftClose className="h-[18px] w-[18px]" />
-          )}
-        </Button>
+        {!isGoClawRoute && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10"
+            onClick={() => setSidebarCollapsed(!effectiveCollapsed)}
+          >
+            {effectiveCollapsed ? (
+              <PanelLeft className="h-[18px] w-[18px]" />
+            ) : (
+              <PanelLeftClose className="h-[18px] w-[18px]" />
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Layer 1: Top persistent nav — new chat + topNavItems */}
       <nav className="shrink-0 flex flex-col px-2 gap-0.5 pb-1">
-        <button
-          data-testid="sidebar-new-chat"
-          data-nav-item="new-chat"
-          onClick={() => {
-            const { messages } = useChatStore.getState();
-            if (messages.length > 0) newSession();
-            navigate('/');
-          }}
-          className={cn(
-            'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-1',
-            'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
-            'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
-            sidebarCollapsed && 'justify-center px-0',
-          )}
-        >
-          <div className="flex shrink-0 items-center justify-center text-foreground/80">
-            <Plus className="h-[18px] w-[18px]" strokeWidth={2} />
-          </div>
-          {!sidebarCollapsed && <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>}
-        </button>
+        {effectiveCollapsed ? (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button
+                data-testid="sidebar-new-chat"
+                data-nav-item="new-chat"
+                onClick={() => {
+                  const { messages } = useChatStore.getState();
+                  if (messages.length > 0) newSession();
+                  navigate('/');
+                }}
+                className={cn(
+                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-1',
+                  'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
+                  'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
+                  'justify-center px-0',
+                )}
+              >
+                <div className="flex shrink-0 items-center justify-center text-foreground/80">
+                  <Plus className="h-[18px] w-[18px]" strokeWidth={2} />
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>{t('sidebar.newChat')}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            data-testid="sidebar-new-chat"
+            data-nav-item="new-chat"
+            onClick={() => {
+              const { messages } = useChatStore.getState();
+              if (messages.length > 0) newSession();
+              navigate('/');
+            }}
+            className={cn(
+              'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 mb-1',
+              'bg-primary/8 dark:bg-primary/12 text-primary border border-primary/15 shadow-sm',
+              'hover:bg-primary/12 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-px',
+            )}
+          >
+            <div className="flex shrink-0 items-center justify-center text-foreground/80">
+              <Plus className="h-[18px] w-[18px]" strokeWidth={2} />
+            </div>
+            <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('sidebar.newChat')}</span>
+          </button>
+        )}
 
         {!topNavCollapsed && topNavItems.map((item) => (
-          <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
+          <NavItem key={item.to} {...item} collapsed={effectiveCollapsed} />
         ))}
       </nav>
 
       {/* Divider between Layer 1 and Layer 2 with collapse toggle */}
-      {!sidebarCollapsed && (
+      {!effectiveCollapsed && (
         <div className="flex items-center gap-2 px-3 py-1 shrink-0">
           <div className="h-px flex-1 bg-border/60" />
           <button
@@ -316,7 +376,7 @@ export function Sidebar() {
       )}
 
       {/* Layer 2: Session list — grouped by Agent */}
-      {!sidebarCollapsed && (
+      {!effectiveCollapsed && (
         <div className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-2 space-y-2.5">
           {agentGroups.map((group) => {
             const isExpanded = expandedAgentGroups[group.agentId] === true;
@@ -430,7 +490,7 @@ export function Sidebar() {
       )}
 
       {/* Divider between Layer 2 and Layer 3 */}
-      {!sidebarCollapsed && managementNavItems.length > 0 && (
+      {!effectiveCollapsed && managementNavItems.length > 0 && (
         <div className="px-3 shrink-0">
           <div className="h-px bg-border/60" />
         </div>
@@ -438,10 +498,10 @@ export function Sidebar() {
 
       {/* Layer 3: Management tools */}
       {managementNavItems.length > 0 && (
-        sidebarCollapsed ? (
+        effectiveCollapsed ? (
           <nav className="flex flex-col gap-0.5 px-2 mt-2">
             {managementNavItems.map((item) => (
-              <NavItem key={item.to} {...item} collapsed={sidebarCollapsed} />
+              <NavItem key={item.to} {...item} collapsed={effectiveCollapsed} />
             ))}
           </nav>
         ) : (
@@ -472,9 +532,37 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-2 mt-auto shrink-0 space-y-1">
-        <UserBadge collapsed={sidebarCollapsed} />
+        <UserBadge collapsed={effectiveCollapsed} />
 
-        <NavLink
+        {effectiveCollapsed ? (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <NavLink
+                to="/settings"
+                data-testid="sidebar-nav-settings"
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2.5 py-2 text-sm font-medium transition-all duration-200',
+                    'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
+                    isActive
+                      ? 'bg-primary/10 !text-foreground/80 border-l-0 rounded-md justify-center px-0'
+                      : 'border-l-0 rounded-md justify-center px-0'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <div className="flex items-center justify-center w-auto">
+                    <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
+                      <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
+                    </div>
+                  </div>
+                )}
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>{t('sidebar.settings')}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <NavLink
             to="/settings"
             data-testid="sidebar-nav-settings"
             className={({ isActive }) =>
@@ -483,43 +571,61 @@ export function Sidebar() {
                 'hover:bg-primary/5 dark:hover:bg-primary/8 text-foreground/80',
                 isActive
                   ? 'bg-gradient-to-r from-primary/10 to-transparent !text-foreground/80 border-l-[3px] border-l-primary'
-                  : 'border-l-[3px] border-l-transparent',
-                sidebarCollapsed ? 'justify-center px-0 border-l-0' : ''
+                  : 'border-l-[3px] border-l-transparent'
               )
             }
           >
-          {({ isActive }) => (
-            <div className={cn("flex items-center gap-2.5", sidebarCollapsed ? "justify-center w-auto" : "w-full")}>
-              <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
-                <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
+            {({ isActive }) => (
+              <div className="flex items-center gap-2.5 w-full">
+                <div className={cn("flex shrink-0 items-center justify-center", isActive ? "text-foreground/80" : "text-muted-foreground")}>
+                  <SettingsIcon className="h-[18px] w-[18px]" strokeWidth={2} />
+                </div>
+                <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap", isActive && "font-semibold")}>{t('sidebar.settings')}</span>
               </div>
-              {!sidebarCollapsed && <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap", isActive && "font-semibold")}>{t('sidebar.settings')}</span>}
-            </div>
-          )}
-        </NavLink>
+            )}
+          </NavLink>
+        )}
 
-        {devModeUnlocked && (
+        {devModeUnlocked && (effectiveCollapsed ? (
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="sidebar-open-dev-console"
+                variant="ghost"
+                className={cn(
+                  'flex items-center gap-2.5 rounded-md px-2.5 py-2 h-auto text-sm font-medium transition-colors w-full mt-1',
+                  'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
+                  'justify-center px-0'
+                )}
+                onClick={openDevConsole}
+              >
+                <div className="flex shrink-0 items-center justify-center text-muted-foreground">
+                  <Terminal className="h-[18px] w-[18px]" strokeWidth={2} />
+                </div>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>{t('common:sidebar.openClawPage')}</TooltipContent>
+          </Tooltip>
+        ) : (
           <Button
             data-testid="sidebar-open-dev-console"
             variant="ghost"
             className={cn(
               'flex items-center gap-2.5 rounded-lg px-2.5 py-2 h-auto text-sm font-medium transition-colors w-full mt-1',
               'hover:bg-black/5 dark:hover:bg-white/5 text-foreground/80',
-              sidebarCollapsed ? 'justify-center px-0' : 'justify-start'
+              'justify-start'
             )}
             onClick={openDevConsole}
           >
             <div className="flex shrink-0 items-center justify-center text-muted-foreground">
               <Terminal className="h-[18px] w-[18px]" strokeWidth={2} />
             </div>
-            {!sidebarCollapsed && (
-              <>
-                <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('common:sidebar.openClawPage')}</span>
-                <ExternalLink className="h-3 w-3 shrink-0 ml-auto opacity-50 text-muted-foreground" />
-              </>
-            )}
+            <>
+              <span className="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{t('common:sidebar.openClawPage')}</span>
+              <ExternalLink className="h-3 w-3 shrink-0 ml-auto opacity-50 text-muted-foreground" />
+            </>
           </Button>
-        )}
+        ))}
       </div>
 
       <ConfirmDialog
@@ -538,5 +644,6 @@ export function Sidebar() {
         onCancel={() => setSessionToDelete(null)}
       />
     </aside>
+    </TooltipProvider>
   );
 }

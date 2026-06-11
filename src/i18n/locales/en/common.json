@@ -10,7 +10,7 @@
         "settings": "System Settings",
         "devConsole": "Developer Console",
         "models": "Model Mgmt",
-        "marketplace": "Marketplace",
+        "marketplace": "Super Assistant",
         "collaboration": "Collaboration",
         "deleteSessionConfirm": "Are you sure you want to delete session \"{{label}}\"?",
         "openClawPage": "OpenClaw Page",

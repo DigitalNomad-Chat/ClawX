@@ -10,7 +10,7 @@
         "settings": "システム設定",
         "devConsole": "開発者コンソール",
         "models": "モデル管理",
-        "marketplace": "マーケットプレイス",
+        "marketplace": "スーパーアシスタント",
         "collaboration": "コラボレーション",
         "deleteSessionConfirm": "セッション \"{{label}}\" を削除してもよろしいですか？",
         "openClawPage": "OpenClaw ページ",
