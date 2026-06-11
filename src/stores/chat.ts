@@ -227,16 +227,28 @@ function compactProgressiveTextParts(parts: string[]): string[] {
  * RPC which reads the entire JSONL file into memory regardless of limit.
  * This uses a streaming ring-buffer reader with O(limit) memory usage.
  */
-async function fetchHistoryViaHostApi(sessionKey: string, limit: number): Promise<RawMessage[]> {
+interface HostHistoryResult {
+  messages: RawMessage[];
+  totalMessages: number;
+  hasMore: boolean;
+}
+
+async function fetchHistoryViaHostApi(sessionKey: string, limit: number): Promise<HostHistoryResult> {
   const result = await hostApiFetch<{
     success: boolean;
     messages?: RawMessage[];
+    totalMessages?: number;
+    hasMore?: boolean;
     error?: string;
   }>(`/api/sessions/history?sessionKey=${encodeURIComponent(sessionKey)}&limit=${limit}`);
   if (!result.success) {
     throw new Error(result.error || 'Failed to load history via host API');
   }
-  return result.messages || [];
+  return {
+    messages: result.messages || [],
+    totalMessages: result.totalMessages ?? result.messages?.length ?? 0,
+    hasMore: result.hasMore ?? false,
+  };
 }
 
 /**
@@ -1901,7 +1913,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
       };
 
-      const applyLoadedMessages = (rawMessages: RawMessage[], thinkingLevel: string | null) => {
+      const applyLoadedMessages = (rawMessages: RawMessage[], thinkingLevel: string | null, totalMessages?: number) => {
       // Guard: if the user switched sessions while this async load was in
       // flight, discard the result to prevent overwriting the new session's
       // messages with stale data from the old session.
@@ -1962,7 +1974,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         thinkingLevel,
         loading: false,
         runError: latestTerminalAssistantErrorMessage,
-        hasMoreHistory: rawMessages.length >= INITIAL_HISTORY_LIMIT,
+        // totalMessages is returned by the Host API.  When it is available we
+        // can tell exactly whether there are older rows on disk.  When it is
+        // not available (Gateway RPC fallback) we fall back to the heuristic
+        // that a full page implies more pages.
+        hasMoreHistory: totalMessages != null
+          ? totalMessages > rawMessages.length
+          : rawMessages.length >= INITIAL_HISTORY_LIMIT,
         historyOffset: rawMessages.length,
       });
 
@@ -2043,13 +2061,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         let rawMessages: RawMessage[] = [];
         let thinkingLevel: string | null = null;
         let usedHostApi = false;
+        let hostApiTotalMessages: number | undefined;
 
-        // Try fast host API first (O(limit) memory, streams file)
+        // Try fast host API first (reads disk directly, no gateway RPC)
         try {
           const hostApiStartedAt = Date.now();
-          rawMessages = await fetchHistoryViaHostApi(currentSessionKey, INITIAL_HISTORY_LIMIT);
+          const hostResult = await fetchHistoryViaHostApi(currentSessionKey, INITIAL_HISTORY_LIMIT);
+          rawMessages = hostResult.messages;
+          hostApiTotalMessages = hostResult.totalMessages;
           usedHostApi = true;
-          console.log(`[loadHistory] Host API success: ${rawMessages.length} msgs in ${Date.now() - hostApiStartedAt}ms`);
+          console.log(`[loadHistory] Host API success: ${rawMessages.length}/${hostResult.totalMessages} msgs in ${Date.now() - hostApiStartedAt}ms`);
         } catch (hostErr) {
           console.warn('[loadHistory] host API failed, falling back to RPC:', hostErr);
         }
@@ -2131,7 +2152,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         console.log(`[loadHistory] total=${Date.now() - historyLoadStartedAt}ms usedHostApi=${usedHostApi} msgs=${rawMessages.length}`);
 
         if (rawMessages.length > 0 || !get().error) {
-          const applied = applyLoadedMessages(rawMessages, thinkingLevel);
+          const applied = applyLoadedMessages(rawMessages, thinkingLevel, hostApiTotalMessages);
           if (applied && isInitialForegroundLoad) {
             _foregroundHistoryLoadSeen.add(currentSessionKey);
           }
@@ -2171,30 +2192,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // ── Load more (earlier) history ──
 
   loadMoreHistory: async () => {
-    const { currentSessionKey, hasMoreHistory, messages } = get();
+    const { currentSessionKey, hasMoreHistory, messages, historyOffset } = get();
     if (!hasMoreHistory || !currentSessionKey) return;
     if (_historyLoadInFlight.has(currentSessionKey)) {
       await _historyLoadInFlight.get(currentSessionKey);
       return;
     }
 
-    const currentCount = messages.length;
-    const nextLimit = currentCount + MORE_HISTORY_LIMIT;
+    // historyOffset tracks how many *raw* messages were loaded in the last
+    // full load.  We request enough additional rows to bring the raw count up
+    // by MORE_HISTORY_LIMIT.
+    const nextLimit = historyOffset + MORE_HISTORY_LIMIT;
 
     const loadPromise = (async () => {
       try {
         let newRawMessages: RawMessage[] = [];
         let usedHostApi = false;
+        let totalMessages: number | undefined;
 
-        // Try fast host API first with a larger limit
+        // Try fast host API first
         try {
-          newRawMessages = await fetchHistoryViaHostApi(currentSessionKey, nextLimit);
+          const hostResult = await fetchHistoryViaHostApi(currentSessionKey, nextLimit);
+          newRawMessages = hostResult.messages;
+          totalMessages = hostResult.totalMessages;
           usedHostApi = true;
         } catch (hostErr) {
           console.warn('[loadMoreHistory] host API failed, falling back to RPC:', hostErr);
         }
 
-        // Fallback to gateway RPC (offset may not be supported by backend)
+        // Fallback to gateway RPC
         if (!usedHostApi || newRawMessages.length === 0) {
           const data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
             'chat.history',
@@ -2204,14 +2230,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
           newRawMessages = Array.isArray(data.messages) ? (data.messages as RawMessage[]) : [];
         }
 
-        if (newRawMessages.length <= currentCount) {
+        // Deduplicate against messages already in the UI.  We use a stable key
+        // built from id, role, timestamp and content hash so that overlapping
+        // tail rows (including any that were filtered out as tool_result) are
+        // not duplicated.
+        const existingKeys = new Set(
+          messages.map((m) => m.id || `${m.role}:${m.timestamp ?? ''}:${JSON.stringify(m.content).slice(0, 200)}`),
+        );
+        const earlierRaw = newRawMessages.filter((m) => {
+          const key = m.id || `${m.role}:${m.timestamp ?? ''}:${JSON.stringify(m.content).slice(0, 200)}`;
+          return !existingKeys.has(key);
+        });
+
+        if (earlierRaw.length === 0) {
           set({ hasMoreHistory: false });
           return;
         }
-
-        // The API returns the LAST `nextLimit` messages.  New earlier messages
-        // are the ones before the already-loaded tail.
-        const earlierRaw = newRawMessages.slice(0, newRawMessages.length - currentCount);
 
         const messagesWithToolImages = enrichWithToolResultFiles(earlierRaw);
         const filteredMessages = messagesWithToolImages.filter(
@@ -2221,8 +2255,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         set((state) => ({
           messages: [...enrichedMessages, ...state.messages],
-          hasMoreHistory: newRawMessages.length >= nextLimit,
-          historyOffset: 0,
+          // Host API tells us the exact total; otherwise fall back to the
+          // heuristic that a full page means more pages.
+          hasMoreHistory: totalMessages != null
+            ? totalMessages > newRawMessages.length
+            : newRawMessages.length >= nextLimit,
+          historyOffset: newRawMessages.length,
         }));
       } catch (err) {
         console.warn('Failed to load more history:', err);

@@ -209,15 +209,6 @@ export function Chat() {
   }, [messages.length, sending]);
 
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const handleAtTop = useCallback(async (atTop: boolean) => {
-    if (!atTop || !hasMoreHistory || isLoadingMore) return;
-    setIsLoadingMore(true);
-    try {
-      await loadMoreHistory();
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [hasMoreHistory, isLoadingMore, loadMoreHistory]);
 
   // Load data when gateway is running.
   // When the store already holds messages for this session (i.e. the user
@@ -643,6 +634,56 @@ export function Chat() {
     return rows;
   }, [messages, foldedNarrationIndices]);
 
+  // When the user scrolls to the top and triggers loadMoreHistory, we want to
+  // keep the scroll position at the boundary between the newly-loaded older
+  // messages and the previously-visible messages.  This avoids a jarring jump
+  // to the very top of the history.  We record the first visible row before
+  // loading and scroll back to it after the prepend.
+  const scrollAnchorRef = useRef<{ id?: string; originalIdx: number } | null>(null);
+
+  const handleAtTop = useCallback(async (atTop: boolean) => {
+    if (!atTop || !hasMoreHistory || isLoadingMore) return;
+
+    // Remember the first visible message so we can scroll back to it after
+    // the prepend.
+    const firstRow = visibleRows[0];
+    if (firstRow) {
+      scrollAnchorRef.current = { id: firstRow.msg.id, originalIdx: firstRow.originalIdx };
+    }
+
+    setIsLoadingMore(true);
+    try {
+      await loadMoreHistory();
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreHistory, isLoadingMore, loadMoreHistory, visibleRows]);
+
+  // After loadMoreHistory completes, scroll to the old first-visible message
+  // so the user sees the boundary between new and old content.
+  useEffect(() => {
+    if (isLoadingMore || !scrollAnchorRef.current) return;
+
+    const anchor = scrollAnchorRef.current;
+    scrollAnchorRef.current = null;
+
+    const newIndex = visibleRows.findIndex(
+      (r) => r.msg.id === anchor.id && r.originalIdx === anchor.originalIdx,
+    );
+
+    if (newIndex > 0) {
+      // Delay until Virtuoso has laid out the new items
+      const timer = setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: newIndex,
+          behavior: 'auto',
+          align: 'center',
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoadingMore, visibleRows]);
+
   // Derive the set of run keys that should be auto-collapsed (run finished
   // streaming or has a reply override) during render instead of in an effect,
   // so we don't violate react-hooks/set-state-in-effect. Explicit user toggles
@@ -839,8 +880,11 @@ export function Chat() {
               components={{
                 Header: () =>
                   isLoadingMore ? (
-                    <div className="mx-auto max-w-4xl py-3 text-center">
+                    <div className="mx-auto max-w-4xl py-4 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        正在加载历史记录……
+                      </p>
                     </div>
                   ) : null,
                 Footer: () => (

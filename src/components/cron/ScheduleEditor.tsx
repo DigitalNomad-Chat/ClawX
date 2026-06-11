@@ -122,6 +122,8 @@ export function ScheduleEditor({ value, onChange, disabled }: ScheduleEditorProp
 
   // sync lock to prevent emit-while-sync loops
   const syncingRef = useRef(false);
+  // initializedRef: block emit until first syncFromValue has run
+  const initializedRef = useRef(false);
 
   /* ---------- sync external value → internal state ---------- */
   const syncFromValue = useCallback((expr: string) => {
@@ -178,6 +180,8 @@ export function ScheduleEditor({ value, onChange, disabled }: ScheduleEditorProp
 
   useEffect(() => {
     if (syncingRef.current) return;
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     syncFromValue(value);
   }, [value, syncFromValue]);
 
@@ -202,6 +206,7 @@ export function ScheduleEditor({ value, onChange, disabled }: ScheduleEditorProp
 
   /* ---------- emit internal state → external ---------- */
   useEffect(() => {
+    if (!initializedRef.current) return;
     if (syncingRef.current) return;
     if (generatedExpr === value) return;
     syncingRef.current = true;

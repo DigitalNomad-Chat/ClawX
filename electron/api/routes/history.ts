@@ -83,44 +83,52 @@ async function resolveSessionJsonlPath(sessionKey: string): Promise<string | nul
   }
 }
 
-/**
- * Stream-read a JSONL file and keep only the last `limit` messages.
- * Memory usage is O(limit), not O(file size).
- */
-async function readLastMessagesFromJsonl(filePath: string, limit: number): Promise<RawMessage[]> {
-  const startedAt = Date.now();
-  const ring: string[] = new Array(limit);
-  let count = 0;
-  let head = 0;
+interface HistoryReadResult {
+  messages: RawMessage[];
+  totalMessages: number;
+}
 
+/**
+ * Read a JSONL session file and extract the last `limit` messages.
+ *
+ * JSONL files may contain non-message records (run events, heartbeats,
+ * tool calls, etc.) interleaved with message records.  A fixed-size ring
+ * buffer sized exactly to `limit` is insufficient because many of the
+ * buffered lines may be non-message rows, yielding far fewer than `limit`
+ * actual messages to the caller.  This breaks pagination on the frontend
+ * (hasMoreHistory is set to false prematurely).
+ *
+ * We read the whole file into a line array first; typical session files
+ * are small enough (< 10 MB) that this is faster than a complex streaming
+ * approach and guarantees exact counts.
+ */
+async function readLastMessagesFromJsonl(filePath: string, limit: number): Promise<HistoryReadResult> {
+  const startedAt = Date.now();
   const stream = createReadStream(filePath, { encoding: 'utf-8' });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
 
+  const lines: string[] = [];
   for await (const line of rl) {
-    if (!line.trim()) continue;
-    ring[head] = line;
-    head = (head + 1) % limit;
-    count += 1;
+    if (line.trim()) lines.push(line);
   }
 
-  const messages: RawMessage[] = [];
-  const effectiveCount = Math.min(count, limit);
-  for (let i = 0; i < effectiveCount; i += 1) {
-    const idx = (head + limit - effectiveCount + i) % limit;
-    const line = ring[idx];
-    if (!line) continue;
+  const allMessages: RawMessage[] = [];
+  for (const line of lines) {
     try {
       const parsed = JSON.parse(line) as { type?: string; message?: unknown };
       if (parsed.type === 'message' && parsed.message) {
-        messages.push(parsed.message as RawMessage);
+        allMessages.push(parsed.message as RawMessage);
       }
     } catch {
       // Skip malformed lines
     }
   }
 
-  console.log(`[history] readLastMessagesFromJsonl: ${filePath} limit=${limit} lines=${count} msgs=${messages.length} in ${Date.now() - startedAt}ms`);
-  return messages;
+  const totalMessages = allMessages.length;
+  const messages = allMessages.slice(-limit);
+
+  console.log(`[history] readLastMessagesFromJsonl: ${filePath} limit=${limit} lines=${lines.length} totalMsgs=${totalMessages} returned=${messages.length} in ${Date.now() - startedAt}ms`);
+  return { messages, totalMessages };
 }
 
 /**
@@ -252,13 +260,15 @@ export async function handleHistoryRoutes(
         return true;
       }
 
-      const messages = await readLastMessagesFromJsonl(filePath, limit);
+      const { messages, totalMessages } = await readLastMessagesFromJsonl(filePath, limit);
 
       sendJson(res, 200, {
         success: true,
         messages,
         sessionKey,
         count: messages.length,
+        totalMessages,
+        hasMore: totalMessages > messages.length,
       });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
