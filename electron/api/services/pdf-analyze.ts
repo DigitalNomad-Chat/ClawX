@@ -1,4 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as path from 'node:path';
 
 export interface PDFAnalysisResult {
@@ -15,6 +14,9 @@ const SUBSTANTIAL_RATIO_THRESHOLD = 0.3;
 export async function analyzePdf(buffer: Buffer): Promise<PDFAnalysisResult> {
   let doc: any = null;
   try {
+    // Dynamic import to avoid loading pdfjs in Electron main process at startup.
+    // pdfjs references DOMMatrix which is only available in browser/Worker contexts.
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps/') + '/';
     const data = new Uint8Array(buffer);
     doc = await pdfjsLib.getDocument({

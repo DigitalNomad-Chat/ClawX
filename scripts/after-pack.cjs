@@ -902,6 +902,62 @@ exports.default = async function afterPack(context) {
         }
       }
       resolveSymlinks(ocrEnvDir);
+
+      // After resolving symlinks, the Python interpreter may be a real binary
+      // that depends on libpython3.12.dylib via @rpath.  venvs only contain a
+      // symlink to the real interpreter; the real lib/ directory of the managed
+      // Python install also holds libpython3.12.dylib, which is NOT linked into
+      // the venv.  Copy it so the bundled interpreter can launch.
+      function ensureLibpython(libDir) {
+        if (!existsSync(libDir)) return;
+        const libpython = join(libDir, 'libpython3.12.dylib');
+        if (existsSync(libpython)) return;
+        // Derive the platform directory (e.g. darwin-arm64) from libDir
+        // (libDir is typically .../ocr-env/darwin-arm64/lib).
+        const platformDir = dirname(libDir);
+        // Find the managed Python install that this ocr-env was created from.
+        // The ocr-env bin/python was originally a symlink to the managed Python.
+        // We look at the pyvenv.cfg file for the home (bin directory) of the
+        // managed Python install; libpython3.12.dylib lives in ../lib.
+        const pyvenvCfg = join(platformDir, 'pyvenv.cfg');
+        let managedLibDir = null;
+        if (existsSync(pyvenvCfg)) {
+          try {
+            const cfg = readFileSync(pyvenvCfg, 'utf8');
+            const m = cfg.match(/^home\s*=\s*(.+)$/m);
+            if (m) {
+              const homeBin = m[1].trim();
+              // home points to the bin/ dir inside the managed install
+              managedLibDir = join(homeBin, '..', 'lib');
+            }
+          } catch { /* ignore */ }
+        }
+        if (!managedLibDir || !existsSync(managedLibDir)) {
+          // Fallback: derive archDir from the platform directory name
+          const archDir = basename(platformDir);
+          managedLibDir = join(__dirname, '..', 'resources', 'ocr-env', archDir, 'lib');
+        }
+        const managedLibpython = join(managedLibDir, 'libpython3.12.dylib');
+        if (existsSync(managedLibpython)) {
+          try {
+            cpSync(managedLibpython, libpython);
+            console.log(`[after-pack] 🩹 Copied libpython3.12.dylib to ${relative(resourcesDir, libpython)}`);
+          } catch (e) {
+            console.warn(`[after-pack] ⚠️  Failed to copy libpython3.12.dylib: ${e.message}`);
+          }
+        }
+      }
+      const libDir = join(ocrEnvDir, 'lib');
+      ensureLibpython(libDir);
+      // Some ocr-env layouts nest under darwin-arm64/ or darwin-x64/
+      try {
+        const subdirs = readdirSync(ocrEnvDir, { withFileTypes: true })
+          .filter(d => d.isDirectory())
+          .map(d => join(ocrEnvDir, d.name));
+        for (const sub of subdirs) {
+          ensureLibpython(join(sub, 'lib'));
+        }
+      } catch { /* ignore */ }
     }
   }
 

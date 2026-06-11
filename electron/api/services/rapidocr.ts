@@ -49,6 +49,7 @@ function resolvePythonPath(): string {
 }
 
 const WORKER_PATH = resolveWorkerPath();
+console.log('[RapidOCR] Worker path:', WORKER_PATH, 'exists:', existsSync(WORKER_PATH));
 
 interface OcrBlock {
   type: string;
@@ -120,8 +121,13 @@ function runOcrWorker(payload: Record<string, unknown>): Promise<OcrResult> {
       }
     }, WORKER_TIMEOUT_MS);
 
+    console.log('[RapidOCR] Spawning worker:', pythonPath, WORKER_PATH);
     const child = spawn(pythonPath, [WORKER_PATH], {
       stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    child.on('spawn', () => {
+      console.log('[RapidOCR] Worker spawned successfully. PID:', child.pid);
     });
 
     child.on('error', (error) => {
@@ -132,13 +138,11 @@ function runOcrWorker(payload: Record<string, unknown>): Promise<OcrResult> {
       }
     });
 
-    // stdin error (EPIPE, etc.) must be caught or it becomes an unhandled exception
+    // stdin error (EPIPE, etc.) must be caught or it becomes an unhandled exception.
+    // Let handleChild collect diagnostics via child.on('close') before rejecting.
     child.stdin.on('error', (error) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        reject(new Error(`RapidOCR worker stdin error: ${error.message}`));
-      }
+      console.log('[RapidOCR] stdin stream error:', error.message);
+      // Do not immediately reject — handleChild will collect stdout/stderr and report.
     });
 
     handleChild(child, payload, timeout, (result) => {
@@ -164,17 +168,37 @@ function handleChild(
 ) {
   let stderrData = '';
   let stdoutData = '';
+  let writeError: Error | null = null;
+  let closeReceived = false;
+
+  // Helper to finalize with collected diagnostics
+  const finalize = (err: Error) => {
+    clearTimeout(timeout);
+    reject(err);
+  };
 
   child.stderr.on('data', (chunk) => {
-    stderrData += chunk.toString();
+    const text = chunk.toString();
+    stderrData += text;
+    console.log('[RapidOCR] stderr:', text);
   });
 
   child.stdout.on('data', (chunk) => {
     stdoutData += chunk.toString();
   });
 
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
+    if (closeReceived) return;
+    closeReceived = true;
     clearTimeout(timeout);
+    console.log('[RapidOCR] Worker exited. code:', code, 'signal:', signal, 'stderr:', stderrData);
+
+    // If we got a write error (e.g. EPIPE), include diagnostics in the error
+    if (writeError) {
+      const diag = `Exit code: ${code}, signal: ${signal}, stdout: ${stdoutData.slice(0, 500)}, stderr: ${stderrData.slice(0, 500)}`;
+      reject(new Error(`RapidOCR worker failed: ${writeError.message}. ${diag}`));
+      return;
+    }
 
     try {
       const lines = stdoutData.split('\n').filter(Boolean);
@@ -200,18 +224,29 @@ function handleChild(
     }
   });
 
-  // Send input — guard against EPIPE on broken stdin
+  // Send input — guard against EPIPE on broken stdin.
+  // Do NOT immediately reject on EPIPE; let child.on('close') collect stdout/stderr first.
   try {
     child.stdin.write(JSON.stringify(payload), (err) => {
       if (err) {
-        clearTimeout(timeout);
-        reject(new Error(`Failed to write to RapidOCR worker stdin: ${err.message}`));
+        console.log('[RapidOCR] Write error:', err.message);
+        writeError = err;
+        // Give child.on('close') a tick to collect output before rejecting
+        setTimeout(() => {
+          if (!closeReceived) {
+            finalize(new Error(`Failed to write to RapidOCR worker stdin: ${err.message}`));
+          }
+        }, 100);
         return;
       }
       child.stdin.end();
     });
   } catch (error) {
-    clearTimeout(timeout);
-    reject(new Error(`Unexpected error writing to RapidOCR worker: ${String(error)}`));
+    writeError = error instanceof Error ? error : new Error(String(error));
+    setTimeout(() => {
+      if (!closeReceived) {
+        finalize(new Error(`Unexpected error writing to RapidOCR worker: ${String(error)}`));
+      }
+    }, 100);
   }
 }

@@ -7,6 +7,15 @@ import { logger } from './logger';
 import { quoteForCmd, needsWinShell } from './paths';
 
 /**
+ * Known absolute paths for uv on macOS (Homebrew common locations).
+ * Checked after bundled binary and before giving up.
+ */
+const KNOWN_UV_PATHS: string[] =
+  process.platform === 'darwin'
+    ? ['/usr/local/bin/uv', '/opt/homebrew/bin/uv']
+    : [];
+
+/**
  * Get the path to the bundled uv binary
  */
 function getBundledUvPath(): string {
@@ -28,8 +37,10 @@ function getBundledUvPath(): string {
  * In packaged mode we always prefer the bundled binary so we never accidentally
  * pick up a system-wide uv that may be a different (possibly broken) version.
  * In dev we fall through to the system PATH for convenience.
+ * On macOS we also check known Homebrew paths because GUI apps have a
+ * restricted PATH that usually excludes /usr/local/bin and /opt/homebrew/bin.
  */
-function resolveUvBin(): { bin: string; source: 'bundled' | 'path' | 'bundled-fallback' } {
+function resolveUvBin(): { bin: string; source: 'bundled' | 'path' | 'known-path' | 'bundled-fallback' } {
   const bundled = getBundledUvPath();
 
   if (app.isPackaged) {
@@ -42,6 +53,16 @@ function resolveUvBin(): { bin: string; source: 'bundled' | 'path' | 'bundled-fa
   // Dev mode or missing bundled binary — check system PATH
   const found = findUvInPathSync();
   if (found) return { bin: 'uv', source: 'path' };
+
+  // macOS: GUI apps don't inherit shell PATH, check common absolute paths
+  if (process.platform === 'darwin') {
+    for (const knownPath of KNOWN_UV_PATHS) {
+      if (existsSync(knownPath)) {
+        logger.info(`Found uv at known path: ${knownPath}`);
+        return { bin: knownPath, source: 'known-path' };
+      }
+    }
+  }
 
   if (existsSync(bundled)) {
     return { bin: bundled, source: 'bundled-fallback' };
@@ -65,7 +86,7 @@ function findUvInPathSync(): boolean {
  */
 export async function checkUvInstalled(): Promise<boolean> {
   const { bin, source } = resolveUvBin();
-  if (source === 'bundled' || source === 'bundled-fallback') {
+  if (source === 'bundled' || source === 'bundled-fallback' || source === 'known-path') {
     return existsSync(bin);
   }
   return findUvInPathSync();
