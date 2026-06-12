@@ -886,7 +886,7 @@ export class GatewayManager extends EventEmitter {
       }
     }).then((result) => {
       const elapsed = Date.now() - startedAt;
-      logger.info(`[gateway:rpc] ${method} resolved in ${elapsed}ms`);
+      logger.debug(`[gateway:rpc] ${method} resolved in ${elapsed}ms`);
       this.recordRpcSuccess();
       if (isCoreRpcMethod(method)) {
         this.capabilityMonitor.recordCoreProbe({
