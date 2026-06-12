@@ -7,6 +7,7 @@ import { withConfigLock } from './config-mutex';
 import { expandPath, getOpenClawConfigDir } from './paths';
 import * as logger from './logger';
 import { toUiChannelType } from './channel-alias';
+import { getOpenClawProviderKeyForType } from './provider-keys';
 
 const MAIN_AGENT_ID = 'main';
 const MAIN_AGENT_NAME = 'Main Agent';
@@ -140,6 +141,37 @@ function resolveModelRef(model: unknown): string | null {
   }
 
   return null;
+}
+
+/**
+ * Map a modelRef from ClawDock UI provider keys to OpenClaw runtime provider keys.
+ * OpenClaw uses different provider names than the ClawDock UI registry, e.g.
+ *   - "kimi-coding" -> "kimi"
+ *   - "qwen-coding-cn" / "modelstudio" -> "qwen"
+ *   - "minimax-portal-cn" -> "minimax-portal"
+ * Without this mapping, OpenClaw cannot resolve the configured provider and
+ * falls back to the default "openai" provider, producing "No API key" errors.
+ */
+function toOpenClawModelRef(modelRef: string): string {
+  const separatorIndex = modelRef.indexOf('/');
+  if (separatorIndex <= 0 || separatorIndex >= modelRef.length - 1) {
+    return modelRef;
+  }
+
+  const providerKey = modelRef.slice(0, separatorIndex);
+  const modelId = modelRef.slice(separatorIndex + 1);
+
+  // Custom/ollama runtime keys are intentionally opaque; do not remap them.
+  if (providerKey === 'custom' || providerKey === 'ollama') {
+    return modelRef;
+  }
+
+  const openClawProviderKey = getOpenClawProviderKeyForType(providerKey, providerKey);
+  if (openClawProviderKey === providerKey) {
+    return modelRef;
+  }
+
+  return `${openClawProviderKey}/${modelId}`;
 }
 
 function formatModelLabel(model: unknown): string | null {
@@ -682,7 +714,7 @@ export async function updateAgentModel(agentId: string, modelRef: string | null)
       throw new Error(`Agent "${agentId}" not found`);
     }
 
-    const normalizedModelRef = typeof modelRef === 'string' ? modelRef.trim() : '';
+    const normalizedModelRef = typeof modelRef === 'string' ? toOpenClawModelRef(modelRef.trim()) : '';
     const nextEntry: AgentListEntry = { ...entries[index] };
 
     if (!normalizedModelRef) {
@@ -711,7 +743,7 @@ export async function updateDefaultModel(modelRef: string | null): Promise<Agent
     const config = await readOpenClawConfig() as AgentConfigDocument;
     const { agentsConfig, entries } = normalizeAgentsConfig(config);
 
-    const normalizedModelRef = typeof modelRef === 'string' ? modelRef.trim() : '';
+    const normalizedModelRef = typeof modelRef === 'string' ? toOpenClawModelRef(modelRef.trim()) : '';
 
     const nextDefaults: AgentDefaultsConfig = { ...agentsConfig.defaults };
 
@@ -741,7 +773,7 @@ export async function batchUpdateAgentModels(modelRef: string | null): Promise<A
     const config = await readOpenClawConfig() as AgentConfigDocument;
     const { agentsConfig, entries } = normalizeAgentsConfig(config);
 
-    const normalizedModelRef = typeof modelRef === 'string' ? modelRef.trim() : '';
+    const normalizedModelRef = typeof modelRef === 'string' ? toOpenClawModelRef(modelRef.trim()) : '';
 
     if (normalizedModelRef && !isValidModelRef(normalizedModelRef)) {
       throw new Error('modelRef must be in "provider/model" format');
