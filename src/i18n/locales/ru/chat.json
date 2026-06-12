@@ -190,7 +190,10 @@
         "pickQuickCmd": "Выбрать быструю команду",
         "quickCmdPickerTitle": "Быстрые команды OpenClaw",
         "quickCmdSearchPlaceholder": "Поиск команд",
-        "quickCmdEmpty": "Подходящие команды не найдены"
+        "quickCmdEmpty": "Подходящие команды не найдены",
+        "preparingSession": "Подготовка сессии…",
+        "sessionInitTakingLong": "Инициализация сессии, первое использование может занять некоторое время…",
+        "sessionInitStillWorking": "Инициализация сессии продолжается, пожалуйста, подождите…"
     },
     "historyBuckets": {
         "today": "Сегодня",

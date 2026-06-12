@@ -12,8 +12,9 @@
  * - Welcome screen with quick prompts
  * - Message hover actions (copy, timestamp)
  */
-import { useEffect, useState, useRef, useCallback, memo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft, Loader2, Wrench, Copy, Check,
   ChevronDown, ChevronRight, Send, Shield,
@@ -480,6 +481,30 @@ export function AgentChat() {
   const [skillSearch, setSkillSearch] = useState('');
   const [permissionMode, setPermissionMode] = useState<'default' | 'plan' | 'full_auto'>('default');
   const [permMenuOpen, setPermMenuOpen] = useState(false);
+  const { t } = useTranslation('chat');
+
+  // Track how long the current send has been waiting for a response so we can
+  // show progressive status messages during long session initialization.
+  const [lastUserMessageAt, setLastUserMessageAt] = useState<number | null>(null);
+  const [sendElapsedMs, setSendElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!streaming || !lastUserMessageAt) {
+      setSendElapsedMs(0);
+      return undefined;
+    }
+    const update = () => setSendElapsedMs(Date.now() - lastUserMessageAt);
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [streaming, lastUserMessageAt]);
+
+  // Progressive status label shown while waiting for the first response.
+  const sessionInitLabel = useMemo(() => {
+    if (sendElapsedMs < 5000) return undefined;
+    if (sendElapsedMs < 20000) return t('composer.preparingSession');
+    if (sendElapsedMs < 60000) return t('composer.sessionInitTakingLong');
+    return t('composer.sessionInitStillWorking');
+  }, [sendElapsedMs, t]);
 
   // History states
   const [historySessions, setHistorySessions] = useState<Array<{
@@ -924,6 +949,7 @@ export function AgentChat() {
 
     if (!textOverride) setInput('');
     setStreaming(true);
+    setLastUserMessageAt(Date.now());
     setError(null);
 
     setMessages((prev) => [...prev, { role: 'user', content: text || '[文件附件]', timestamp: Date.now() }]);
@@ -1239,7 +1265,9 @@ export function AgentChat() {
         {streaming && messages[messages.length - 1]?.role !== 'assistant' && (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">{agentInfo.name} 思考中...</span>
+            <span className="text-sm">
+              {sessionInitLabel ?? `${agentInfo.name} ${t('executionGraph.thinkingLabel')}...`}
+            </span>
           </div>
         )}
         <div ref={messagesEndRef} />

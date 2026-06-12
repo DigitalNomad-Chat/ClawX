@@ -190,7 +190,10 @@
         "pickQuickCmd": "选择快捷指令",
         "quickCmdPickerTitle": "OpenClaw 快捷指令",
         "quickCmdSearchPlaceholder": "搜索快捷指令",
-        "quickCmdEmpty": "未找到匹配的快捷指令"
+        "quickCmdEmpty": "未找到匹配的快捷指令",
+        "preparingSession": "正在准备会话…",
+        "sessionInitTakingLong": "正在初始化会话，首次使用可能需要一些时间…",
+        "sessionInitStillWorking": "会话初始化中，请继续等待…"
     },
     "historyBuckets": {
         "today": "今天",

@@ -145,6 +145,20 @@ export function Chat() {
   }, [currentSessionKey, closeArtifactPanel]);
   const [childTranscripts, setChildTranscripts] = useState<Record<string, RawMessage[]>>({});
 
+  // Track how long the current send has been waiting for a response so we can
+  // show progressive status messages during long session initialization.
+  const [sendElapsedMs, setSendElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!sending || !lastUserMessageAt) {
+      setSendElapsedMs(0);
+      return undefined;
+    }
+    const update = () => setSendElapsedMs(Date.now() - lastUserMessageAt);
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [sending, lastUserMessageAt]);
+
   // Callback for file cards in chat messages — opens the in-app preview
   // panel instead of the system default editor.
   const handleOpenAttachedFile = useCallback((file: AttachedFileMeta) => {
@@ -312,6 +326,16 @@ export function Chat() {
   const hasRunningStreamToolStatus = streamingTools.some((tool) => tool.status === 'running');
   const shouldRenderStreaming = sending && (hasStreamText || hasStreamTools || hasStreamImages || hasStreamToolStatus);
   const hasAnyStreamContent = hasStreamText || hasStreamThinking || hasStreamTools || hasStreamImages || hasStreamToolStatus;
+
+  // Progressive status label shown while waiting for the first response.
+  // New sessions can take ~150s to initialize, so we give the user explicit
+  // feedback instead of a silent bouncing-dots indicator.
+  const sessionInitLabel = useMemo(() => {
+    if (sendElapsedMs < 5000) return undefined;
+    if (sendElapsedMs < 20000) return t('composer.preparingSession');
+    if (sendElapsedMs < 60000) return t('composer.sessionInitTakingLong');
+    return t('composer.sessionInitStillWorking');
+  }, [sendElapsedMs, t]);
 
   const isEmpty = messages.length === 0 && !sending;
   const subagentCompletionInfos = messages.map((message) => parseSubagentCompletionInfo(message));
@@ -859,6 +883,7 @@ export function Chat() {
                                 steps={card.steps}
                                 active={card.active}
                                 suppressThinking={card.suppressThinking}
+                                waitingLabel={sessionInitLabel}
                                 expanded={expanded}
                                 onExpandedChange={(next) =>
                                   setGraphExpandedOverrides((prev) => ({ ...prev, [runKey]: next }))
@@ -930,7 +955,7 @@ export function Chat() {
 
                     {/* Typing indicator when sending but no stream content yet */}
                     {sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph && (
-                      <TypingIndicator />
+                      <TypingIndicator label={sessionInitLabel} />
                     )}
                   </div>
                 ),
@@ -1072,7 +1097,7 @@ function WelcomeScreen() {
 
 // ── Typing Indicator ────────────────────────────────────────────
 
-function TypingIndicator() {
+function TypingIndicator({ label }: { label?: string }) {
   return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
@@ -1083,6 +1108,9 @@ function TypingIndicator() {
           <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
           <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
           <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          {label && (
+            <span className="ml-1.5 text-sm text-muted-foreground">{label}</span>
+          )}
         </div>
       </div>
     </div>

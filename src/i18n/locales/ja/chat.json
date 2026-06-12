@@ -190,7 +190,10 @@
         "pickQuickCmd": "クイックコマンドを選択",
         "quickCmdPickerTitle": "OpenClaw クイックコマンド",
         "quickCmdSearchPlaceholder": "コマンドを検索",
-        "quickCmdEmpty": "一致するコマンドがありません"
+        "quickCmdEmpty": "一致するコマンドがありません",
+        "preparingSession": "セッションを準備中…",
+        "sessionInitTakingLong": "セッションを初期化中です。初回使用は時間がかかる場合があります…",
+        "sessionInitStillWorking": "セッションの初期化中です。しばらくお待ちください…"
     },
     "historyBuckets": {
         "today": "今日",

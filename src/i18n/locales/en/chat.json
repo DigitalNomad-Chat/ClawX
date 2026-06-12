@@ -190,7 +190,10 @@
         "pickQuickCmd": "Choose quick command",
         "quickCmdPickerTitle": "OpenClaw Quick Commands",
         "quickCmdSearchPlaceholder": "Search commands",
-        "quickCmdEmpty": "No matching commands found"
+        "quickCmdEmpty": "No matching commands found",
+        "preparingSession": "Preparing session…",
+        "sessionInitTakingLong": "Initializing session, first use may take a while…",
+        "sessionInitStillWorking": "Session initialization in progress, please wait…"
     },
     "historyBuckets": {
         "today": "Today",

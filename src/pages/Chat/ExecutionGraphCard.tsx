@@ -14,6 +14,11 @@ interface ExecutionGraphCardProps {
   /** Hide the trailing "Thinking ..." indicator even when active. */
   suppressThinking?: boolean;
   /**
+   * Optional label shown in the trailing indicator when the graph is active
+   * but has no real steps yet (e.g. during long session initialization).
+   */
+  waitingLabel?: string;
+  /**
    * When provided, the card becomes fully controlled: the parent owns the
    * expand state (e.g. to persist across remounts) and toggling goes through
    * `onExpandedChange`. When omitted, the card manages its own local state.
@@ -182,6 +187,7 @@ export function ExecutionGraphCard({
   steps,
   active,
   suppressThinking = false,
+  waitingLabel,
   expanded: controlledExpanded,
   onExpandedChange,
 }: ExecutionGraphCardProps) {
@@ -315,8 +321,14 @@ export function ExecutionGraphCard({
             >
               <div className="w-6 shrink-0" />
               <div className="min-w-0 flex-1 text-sm text-muted-foreground">
-                <span className="font-medium">{t('executionGraph.thinkingLabel')}</span>
-                <AnimatedDots className="ml-1 inline-flex text-sm" />
+                <span className="font-medium">
+                  {steps.length === 0 && waitingLabel
+                    ? waitingLabel
+                    : t('executionGraph.thinkingLabel')}
+                </span>
+                {!(steps.length === 0 && waitingLabel) && (
+                  <AnimatedDots className="ml-1 inline-flex text-sm" />
+                )}
               </div>
             </div>
           </div>
