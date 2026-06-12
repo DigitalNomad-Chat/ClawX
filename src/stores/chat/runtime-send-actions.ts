@@ -134,8 +134,8 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
       clearHistoryPoll();
       clearErrorRecoveryTimer();
 
-      const POLL_START_DELAY = 3_000;
-      const POLL_INTERVAL = 4_000;
+      const POLL_START_DELAY = 1_500;
+      const POLL_INTERVAL = 2_000;
       const pollHistory = () => {
         const state = get();
         if (!state.sending) { clearHistoryPoll(); return; }
