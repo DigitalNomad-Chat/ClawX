@@ -160,6 +160,10 @@ export class GatewayManager extends EventEmitter {
   private lastSpawnSummary: string | null = null;
   private recentStartupStderrLines: string[] = [];
   private pendingRequests: Map<string, PendingGatewayRequest> = new Map();
+  /** Timestamp of the most recent RPC request sent (for latency correlation). */
+  private _lastRpcSentAt = 0;
+  /** Method name of the most recent RPC request. */
+  private _lastRpcMethod = '';
   private deviceIdentity: DeviceIdentity | null = null;
   private restartInFlight: Promise<void> | null = null;
   private readonly connectionMonitor = new GatewayConnectionMonitor();
@@ -841,6 +845,12 @@ export class GatewayManager extends EventEmitter {
    */
   async rpc<T>(method: string, params?: unknown, timeoutMs = 30000): Promise<T> {
     const startedAt = Date.now();
+    // Only track chat.send for agent-delay correlation; other RPCs (e.g.
+    // chat.history polling) must not overwrite the chat.send timestamp.
+    if (method === 'chat.send') {
+      this._lastRpcSentAt = startedAt;
+      this._lastRpcMethod = method;
+    }
     return await new Promise<T>((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error('Gateway not connected'));
@@ -854,7 +864,7 @@ export class GatewayManager extends EventEmitter {
         rejectPendingGatewayRequest(this.pendingRequests, id, new Error(`RPC timeout: ${method}`));
       }, timeoutMs);
 
-      // Store pending request
+      // Store pending request with timing info
       this.pendingRequests.set(id, {
         resolve: resolve as (value: unknown) => void,
         reject,
@@ -875,29 +885,33 @@ export class GatewayManager extends EventEmitter {
         rejectPendingGatewayRequest(this.pendingRequests, id, new Error(`Failed to send RPC request: ${error}`));
       }
     }).then((result) => {
+      const elapsed = Date.now() - startedAt;
+      logger.info(`[gateway:rpc] ${method} resolved in ${elapsed}ms`);
       this.recordRpcSuccess();
       if (isCoreRpcMethod(method)) {
         this.capabilityMonitor.recordCoreProbe({
           ok: true,
           checkedAt: Date.now(),
-          durationMs: Date.now() - startedAt,
+          durationMs: elapsed,
         });
       }
       const capability = classifyCapabilityMethod(method);
       if (capability) {
-        this.capabilityMonitor.recordCapabilitySuccess(capability, result, Date.now() - startedAt);
+        this.capabilityMonitor.recordCapabilitySuccess(capability, result, elapsed);
       }
       return result;
     }).catch((error) => {
+      const elapsed = Date.now() - startedAt;
+      logger.warn(`[gateway:rpc] ${method} failed after ${elapsed}ms: ${error}`);
       const capability = classifyCapabilityMethod(method);
       if (capability) {
-        this.capabilityMonitor.recordCapabilityFailure(capability, error, Date.now() - startedAt);
+        this.capabilityMonitor.recordCapabilityFailure(capability, error, elapsed);
       }
       if (isTransportRpcFailure(method, error)) {
         this.capabilityMonitor.recordCoreProbe({
           ok: false,
           checkedAt: Date.now(),
-          durationMs: Date.now() - startedAt,
+          durationMs: elapsed,
           error: error instanceof Error ? error.message : String(error),
         });
         this.recordRpcFailure(method);
@@ -1170,6 +1184,18 @@ export class GatewayManager extends EventEmitter {
 
     // Handle OpenClaw protocol event format: { type: "event", event: "...", payload: {...} }
     if (msg.type === 'event' && typeof msg.event === 'string') {
+      // Diagnostic: track gap between last chat.send RPC and first agent lifecycle start event
+      if (msg.event === 'agent' && msg.payload) {
+        const payload = msg.payload as Record<string, unknown>;
+        const params = (payload.params ?? payload) as Record<string, unknown>;
+        const stream = params.stream as string | undefined;
+        const data = (params.data ?? params) as Record<string, unknown>;
+        const phase = data.phase ?? params.phase;
+        if (stream === 'lifecycle' && phase === 'start' && this._lastRpcMethod === 'chat.send' && this._lastRpcSentAt > 0) {
+          const agentDelay = Date.now() - this._lastRpcSentAt;
+          logger.info(`[gateway:agent-delay] agent lifecycle start arrived ${agentDelay}ms after chat.send RPC`);
+        }
+      }
       dispatchProtocolEvent(this, msg.event, msg.payload);
       return;
     }
