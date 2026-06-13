@@ -388,16 +388,16 @@ export function MessageStream({
   const handleDraftFinalize = useCallback(
     (draftId: string, message: HallMessage | undefined, _extra?: Record<string, unknown>) => {
       const draft = drafts[draftId];
+      // Immediately remove the draft to avoid double-render with the persisted message
       setDrafts((prev) => {
         const copy = { ...prev };
-        if (copy[draftId]) {
-          copy[draftId] = { ...copy[draftId], status: 'finalized', finalizedMessageId: message?.messageId };
-        }
+        delete copy[draftId];
         return copy;
       });
-      // Persist the finalized message into the store via a lightweight refresh
-      // (The backend already persisted it; we just re-fetch to stay in sync)
-      void fetchMessages({ taskCardId: selectedTaskCardId || undefined, limit: 200 });
+      // Refresh messages in background (non-blocking)
+      void fetchMessages({ taskCardId: selectedTaskCardId || undefined, limit: 200 }).catch(() => {
+        // If fetch fails, the message_created event will handle the refresh
+      });
       onDraftFinalizeExternal?.(draftId, message, draft?.authorLabel);
     },
     [fetchMessages, selectedTaskCardId, onDraftFinalizeExternal, drafts]
@@ -418,9 +418,12 @@ export function MessageStream({
 
   const handleMessageCreated = useCallback(
     (_message: HallMessage) => {
+      // Skip refresh if a draft was just finalized — it already triggered fetchMessages
+      const hasActiveDrafts = Object.values(drafts).some((d) => d.status === 'streaming');
+      if (!hasActiveDrafts) return;
       void fetchMessages({ taskCardId: selectedTaskCardId || undefined, limit: 200 });
     },
-    [fetchMessages, selectedTaskCardId]
+    [fetchMessages, selectedTaskCardId, drafts]
   );
 
   const handleTaskUpdated = useCallback(

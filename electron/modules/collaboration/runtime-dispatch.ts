@@ -30,7 +30,7 @@ import {
   appendMessage,
 } from "./store";
 import { buildDispatchPrompt, inferDiscussionDomain, type DispatchMode, type HallOperatorIntent } from "./prompt-builder";
-import { sanitizeAgentReply, inferHallResponseLanguage } from "./content-sanitizer";
+import { sanitizeAgentReply, inferHallResponseLanguage, extractStructuredBlock } from "./content-sanitizer";
 import type { ParsedStructuredBlock } from "./content-sanitizer";
 import { enforceConcreteDeliverable } from "./deliverable-enforcer";
 import { checkTaskBudget, consumeTaskBudget } from "./budget-governance";
@@ -330,6 +330,8 @@ async function runAgentWithStreaming(
       finalRawMessage = msg;
       finalRunId = eventRunId ?? runId;
       finished = true;
+      // Cancel fallback poller immediately to prevent duplicate deltas
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (msg) {
         finalizeDraft(streamPublishInput, extractMessageText(msg));
       }
@@ -420,7 +422,16 @@ async function loadRunContextHistory(
     if (!baselineFingerprint) return messages;
     // Return only messages that appeared after the baseline fingerprint
     const idx = messages.findIndex((m) => fingerprintHistoryMessage(m) === baselineFingerprint);
-    return idx >= 0 ? messages.slice(idx + 1) : messages;
+    const newMessages = idx >= 0 ? messages.slice(idx + 1) : messages;
+
+    // Filter: only keep assistant-generated content (thinking, tool_use, tool_result).
+    // Exclude user-injected system prompts and user messages from context history.
+    return newMessages.filter((m) => {
+      const role = m.role;
+      if (role === "assistant") return true;
+      if (role === "tool_result" || role === "tool-result") return true;
+      return false;
+    });
   } catch (err) {
     console.warn("[runtime-dispatch] loadRunContextHistory failed:", err instanceof Error ? err.message : err);
     return [];
@@ -571,23 +582,34 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
   // Record estimated consumption
   await consumeTaskBudget(taskCard, runResult.rawText);
 
-  // Sanitize reply
-  const { visibleText, structuredBlock, artifactRefs } = sanitizeAgentReply(runResult.rawText);
+  // --- Preserve the streamed text as the primary visible content ---
+  // The streamed text is what the user saw in real-time — never overwrite it with a fallback.
+  const streamedVisibleText = stripStructuredBlockOnly(runResult.rawText);
+
+  // Parse structured block for task card updates (still needed)
+  const { structuredBlock, artifactRefs: structuredArtifactRefs } = extractStructuredBlock(runResult.rawText);
 
   // Infer language
   const language = inferHallResponseLanguage(
     `${runResult.rawText}\n${triggerMessage?.content ?? ""}\n${taskCard.title}\n${taskCard.description}`,
   );
 
-  // Enforce concrete deliverable
+  // Enforce is ONLY used for:
+  //   1. Detecting if a retry is needed (inject nextStep back to the agent)
+  //   2. Extracting structured metadata
+  // It is NO LONGER used to override the visible content.
   const enforceResult = enforceConcreteDeliverable(
     mode,
     mode === "discussion" ? operatorIntent?.text : taskCard.currentExecutionItem?.task,
-    visibleText,
+    streamedVisibleText,
     structuredBlock,
     language,
     operatorIntent,
   );
+
+  // --- Build final visible content ---
+  // Always use the streamed text. Never fall back to "XX参与了讨论".
+  const finalVisibleContent = streamedVisibleText || buildMinimalSummary(mode, participant, language);
 
   // Load context history produced during this run (thinking/tool_use/tool_result turns).
   let contextHistory = await loadRunContextHistory(ctx, sessionKey, baselineFingerprint);
@@ -632,14 +654,15 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     // Auto-retry at most once. If already retried, use fallback and don't block.
     if (retryCount >= 1) {
       console.log("[runtime-dispatch] Max retries reached (%d), using fallback", retryCount);
-      const fallbackContent = buildFallbackVisibleContent(mode, participant, language);
+      // Use the streamed text or a minimal summary — never "XX参与了讨论".
+      const fallbackContent = streamedVisibleText || buildMinimalSummary(mode, participant, language);
 
-      const message = await persistResult(fallbackContent, structuredBlock, artifactRefs, runResult.runId, {
+      const message = await persistResult(fallbackContent, structuredBlock, structuredArtifactRefs, runResult.runId, {
         retryFailed: true,
         retryReason: enforceResult.retryReason,
       });
 
-      await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant, hall.participants);
+      await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, structuredArtifactRefs, participant, hall.participants);
 
       return {
         success: true,
@@ -678,8 +701,9 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
 
       // If retry still fails, fall through to persist with fallback (but don't block)
       if (retryEnforceResult.nextAction !== "retry") {
-        // Retry succeeded — persist, and return
-        const finalVisible = retryEnforceResult.content || retrySanitized.visibleText || buildFallbackVisibleContent(mode, participant, language);
+        // Retry succeeded — persist the streamed text from the retry, not enforce result
+        const retryStreamedText = stripStructuredBlockOnly(retryRunResult.rawText);
+        const finalVisible = retryStreamedText || buildMinimalSummary(mode, participant, language);
 
         const message = await persistResult(finalVisible, retrySanitized.structuredBlock, retrySanitized.artifactRefs, retryRunResult.runId, {
           retrySucceeded: true,
@@ -700,16 +724,16 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
       }
     }
 
-    // Retry failed or timed out — persist original/fallback, do not block
-    console.log("[runtime-dispatch] Retry failed or timed out, using fallback");
-    const fallbackContent = buildFallbackVisibleContent(mode, participant, language);
+    // Retry failed or timed out — persist streamed text or minimal summary, do not block
+    console.log("[runtime-dispatch] Retry failed or timed out, using streamed text");
+    const fallbackContent = streamedVisibleText || buildMinimalSummary(mode, participant, language);
 
-    const message = await persistResult(fallbackContent, structuredBlock, artifactRefs, runResult.runId, {
+    const message = await persistResult(fallbackContent, structuredBlock, structuredArtifactRefs, runResult.runId, {
       retryFailed: true,
       retryReason: enforceResult.retryReason,
     });
 
-    await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant);
+    await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, structuredArtifactRefs, participant);
 
     return {
       success: true,
@@ -723,14 +747,13 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
   }
 
   // Normal success path
-  // Build final visible content
-  const finalVisibleContent = enforceResult.content || visibleText || buildFallbackVisibleContent(mode, participant, language);
+  // finalVisibleContent was already built above (streamed text or minimal summary)
 
   // Persist message
-  const message = await persistResult(finalVisibleContent, structuredBlock, artifactRefs, runResult.runId);
+  const message = await persistResult(finalVisibleContent, structuredBlock, structuredArtifactRefs, runResult.runId);
 
   // Update TaskCard from structured block
-  await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant, hall.participants);
+  await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, structuredArtifactRefs, participant, hall.participants);
 
   // Infer next action
   const nextAction = structuredBlock?.nextAction ?? inferNextActionFromMode(mode, structuredBlock);
@@ -761,30 +784,35 @@ function resolveRuntimeMessageKind(
   return "status";
 }
 
+/**
+ * Strip only the <hall-structured> block and its JSON payload from raw text.
+ * Preserves all user-visible content including natural language phrases.
+ */
+function stripStructuredBlockOnly(raw: string): string {
+  const match = /\u003chall-structured\u003e[\s\S]*?\u003c\/hall-structured\u003e/i.exec(raw);
+  if (!match) return raw.trim();
+  return (raw.slice(0, match.index) + raw.slice(match.index + match[0].length)).trim();
+}
+
+/**
+ * Lightweight summary when streamed text is empty (fallback, not "XX参与了讨论").
+ */
+function buildMinimalSummary(mode: DispatchMode, participant: HallParticipant, language: "zh" | "en"): string {
+  const isZh = language === "zh";
+  if (mode === "discussion") return isZh ? `${participant.displayName} 发表了观点` : `${participant.displayName} shared their thoughts`;
+  if (mode === "handoff") return isZh ? `${participant.displayName} 完成了当前步骤` : `${participant.displayName} completed the current step`;
+  if (mode === "review") return isZh ? `${participant.displayName} 提交了评审意见` : `${participant.displayName} submitted a review`;
+  return isZh ? `${participant.displayName} 执行了任务` : `${participant.displayName} executed the task`;
+}
+
 function buildFallbackVisibleContent(
   mode: DispatchMode,
   participant: HallParticipant,
   language: "zh" | "en",
 ): string {
-  const isZh = language === "zh";
-  if (mode === "discussion") {
-    return isZh
-      ? `${participant.displayName} 参与了讨论。`
-      : `${participant.displayName} joined the discussion.`;
-  }
-  if (mode === "handoff") {
-    return isZh
-      ? `${participant.displayName} 完成了当前步骤。`
-      : `${participant.displayName} completed the current step.`;
-  }
-  if (mode === "review") {
-    return isZh
-      ? `${participant.displayName} 提交了评审意见。`
-      : `${participant.displayName} submitted a review.`;
-  }
-  return isZh
-    ? `${participant.displayName} 执行了任务。`
-    : `${participant.displayName} executed the task.`;
+  // Deprecated: use buildMinimalSummary instead.
+  // Kept for backward compatibility with any existing call sites.
+  return buildMinimalSummary(mode, participant, language);
 }
 
 function buildMessagePayload(
