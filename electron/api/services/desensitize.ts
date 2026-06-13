@@ -312,7 +312,7 @@ export function desensitize(text: string): DesensitizeResult {
   // 8. 护照号
   result = replaceMatches(
     'PASSPORT',
-    /(?<=(?:护照号|护照号码|护照编号|护照NO|护照No|Passport\s*(?:No|Number|#)?)[:：\.\s]*)[A-Za-z]\d{7,9}|[A-Za-z]{2}\d{7,9}\b/gi,
+    /(?<=(?:护照号|护照号码|护照编号|护照NO|护照No|Passport\s*(?:No|Number|#)?)[:：.\s]*)[A-Za-z]\d{7,9}|[A-Za-z]{2}\d{7,9}\b/gi,
     result,
     (m) => isLikelyPassportNumber(m),
   );
@@ -360,7 +360,7 @@ export function desensitize(text: string): DesensitizeResult {
   // 11. 保单号
   result = replaceMatches(
     'POLICY_NUMBER',
-    /(?<=(?:保单号|保险单号|投保单号|保险合同编号|保险编号|保单号码|保险单号码|投保单号码|保险凭证号|保险凭证编号|保险凭证号码)[:：\.\s号]*)[A-Za-z0-9\-]{6,30}(?=[\s\n,，。；;:、]|$)/g,
+    /(?<=(?:保单号|保险单号|投保单号|保险合同编号|保险编号|保单号码|保险单号码|投保单号码|保险凭证号|保险凭证编号|保险凭证号码)[:：.\s号]*)[A-Za-z0-9-]{6,30}(?=[\s\n,，。；;:、]|$)/g,
     result,
   );
 
