@@ -423,7 +423,16 @@ export function markSensitive(
   existingMap: SensitiveMap,
   selection: string,
   type: string,
+  options: { replaceAll?: boolean } = {},
 ): { text: string; map: SensitiveMap } {
+  const trimmed = selection.trim();
+  if (!trimmed) return { text, map: existingMap };
+
+  // 防止用户选中已包含占位符的文本再次标记
+  if (/__PII_\w+_\d{8}__/.test(trimmed)) {
+    return { text, map: existingMap };
+  }
+
   const existingCounters = Object.keys(existingMap)
     .map((k) => {
       const m = k.match(/__PII_\w+_(\d+)__/);
@@ -433,9 +442,16 @@ export function markSensitive(
   const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
 
   const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
-  const newText = text.replace(selection, placeholder);
 
-  const newMap = { ...existingMap, [placeholder]: selection };
+  if (options.replaceAll) {
+    if (!text.includes(trimmed)) return { text, map: existingMap };
+    const newText = text.split(trimmed).join(placeholder);
+    const newMap = { ...existingMap, [placeholder]: trimmed };
+    return { text: newText, map: newMap };
+  }
+
+  const newText = text.replace(trimmed, placeholder);
+  const newMap = { ...existingMap, [placeholder]: trimmed };
   return { text: newText, map: newMap };
 }
 
