@@ -75,7 +75,7 @@ export function inferHallResponseLanguage(source: string | undefined): "zh" | "e
 //  Structured block parser
 // ---------------------------------------------------------------------------
 
-function extractStructuredBlock(rawText: string): { visibleText: string; structured: ParsedStructuredBlock } {
+export function extractStructuredBlock(rawText: string): { visibleText: string; structured: ParsedStructuredBlock } {
   const match = /\u003chall-structured\u003e\s*([\s\S]*?)\s*\u003c\/hall-structured\u003e/i.exec(rawText);
   if (!match) {
     const dangling = rawText.search(/\u003chall-structured\u003e/i);
