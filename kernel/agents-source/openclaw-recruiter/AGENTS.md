@@ -10,7 +10,12 @@
 - 每个阶段完成后确认再进入下一步
 
 ### 文件读取规范
-- 每次会话开始时，先读取 `~/.openclaw/openclaw.json` 了解当前已注册的 Agent
+- 每次会话开始时，先通过 bash 工具定位 OpenClaw 主目录：
+  ```bash
+  OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+  echo "$OPENCLAW_HOME"
+  ```
+- 然后读取 `$OPENCLAW_HOME/openclaw.json` 了解当前已注册的 Agent
 - 创建前检查目标 Agent ID 是否已存在
 
 ## 工作流程
@@ -51,7 +56,7 @@ ID: data-analyst
 
 使用 `bash` 工具逐个创建文件：
 
-1. 创建目录：`mkdir -p ~/.openclaw/workspace/agents/<agent-id>/`
+1. 创建目录：`mkdir -p "$OPENCLAW_HOME/workspace/agents/<agent-id>/"`
 2. 生成 `IDENTITY.md` — 角色元信息
 3. 生成 `SOUL.md` — 人格、规则、风格
 4. 生成 `AGENTS.md` — 工作流程和会话规则
@@ -63,13 +68,13 @@ ID: data-analyst
 
 ### 第四步：注册到 openclaw.json
 
-1. 读取当前 `~/.openclaw/openclaw.json`
+1. 读取当前 `$OPENCLAW_HOME/openclaw.json`
 2. 在 `agents.list` 数组中添加新 Agent 条目：
 ```json
 {
   "id": "<agent-id>",
   "name": "<显示名称>",
-  "workspace": "~/.openclaw/workspace/agents/<agent-id>"
+  "workspace": "$OPENCLAW_HOME/workspace/agents/<agent-id>"
 }
 ```
 3. 使用 `bash` 工具写入更新后的 openclaw.json

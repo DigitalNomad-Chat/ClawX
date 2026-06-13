@@ -12,7 +12,12 @@
 - 清理绑定关系
 
 ### 文件读取规范
-- 每次会话开始时，读取 `~/.openclaw/openclaw.json` 获取所有已注册 Agent
+- 每次会话开始时，先通过 bash 工具定位 OpenClaw 主目录：
+  ```bash
+  OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+  echo "$OPENCLAW_HOME"
+  ```
+- 然后读取 `$OPENCLAW_HOME/openclaw.json` 获取所有已注册 Agent
 - 检查 `agents.list`、`bindings` 等相关配置
 
 ## 工作流程
@@ -20,7 +25,7 @@
 ### 第一步：盘点
 
 列出所有已注册的 Agent：
-1. 读取 `~/.openclaw/openclaw.json` 的 `agents.list`
+1. 读取 `$OPENCLAW_HOME/openclaw.json` 的 `agents.list`
 2. 对每个 Agent，检查其配置目录是否存在
 3. 标注状态：活跃（目录完整）/ 闲置（目录存在但无使用记录）/ 异常（目录缺失）
 4. 用户选择要清理的 Agent
@@ -61,10 +66,10 @@
 
 ### 第三步：安全归档
 
-1. 创建归档目录：`~/.openclaw/archives/agents/<agent-id>-<timestamp>/`
+1. 创建归档目录：`mkdir -p "$OPENCLAW_HOME/archives/agents/<agent-id>-<timestamp>/"`
 2. 复制 Agent 完整配置：
-   - `cp -r ~/.openclaw/workspace/agents/<agent-id> <archive>/workspace/`
-   - `cp -r ~/.openclaw/agents/<agent-id> <archive>/runtime/`（如果存在）
+   - `cp -r "$OPENCLAW_HOME/workspace/agents/<agent-id>" <archive>/workspace/`
+   - `cp -r "$OPENCLAW_HOME/agents/<agent-id>" <archive>/runtime/`（如果存在）
 3. 保存注册信息快照：
    - 提取 openclaw.json 中该 Agent 的注册条目
    - 保存到 `<archive>/registration-snapshot.json`
@@ -77,13 +82,13 @@
 ```
 🗑️ 清理确认：Agent `xxx`
 
-已归档到：~/.openclaw/archives/agents/xxx-20260520-143000/
+已归档到：$OPENCLAW_HOME/archives/agents/xxx-20260520-143000/
 归档内容：workspace/ + runtime/ + registration-snapshot.json
 
 即将执行：
   1. 从 openclaw.json 移除注册
-  2. 删除 ~/.openclaw/workspace/agents/xxx/
-  3. 删除 ~/.openclaw/agents/xxx/
+  2. 删除 $OPENCLAW_HOME/workspace/agents/xxx/
+  3. 删除 $OPENCLAW_HOME/agents/xxx/
   4. 清理相关 bindings
 
 ⚠️ 此操作不可自动撤销（但可从归档手动恢复）
@@ -104,7 +109,7 @@
 ```
 ✅ Agent `xxx` 清理完成！
 
-📦 归档位置：~/.openclaw/archives/agents/xxx-20260520-143000/
+📦 归档位置：$OPENCLAW_HOME/archives/agents/xxx-20260520-143000/
 📋 清理内容：
    ✅ openclaw.json 注册信息已移除
    ✅ workspace/agents/xxx/ 已删除

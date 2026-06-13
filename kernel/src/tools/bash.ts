@@ -3,6 +3,9 @@
  */
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { homedir, platform } from 'os';
 import type { ToolDefinition, ToolExecutionContext } from '../types.js';
 import { wrapWithSandbox } from '../security/sandbox.js';
 
@@ -35,6 +38,33 @@ function truncateOutput(output: string): string {
   if (output.length <= MAX_OUTPUT_LENGTH) return output;
   return output.slice(0, MAX_OUTPUT_LENGTH) + `\n\n[Output truncated: ${output.length} characters, showing first ${MAX_OUTPUT_LENGTH}]`;
 }
+
+/**
+ * Resolve a usable Unix-like shell on Windows.
+ * Prefer Git Bash so that POSIX commands (mkdir -p, cat, cp -r) work unchanged.
+ * Fall back to PowerShell if Git Bash is not installed.
+ */
+function resolveWindowsShell(): string | undefined {
+  if (platform() !== 'win32') return undefined;
+
+  const gitBashCandidates = [
+    join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
+    join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Git', 'bin', 'bash.exe'),
+    join(homedir(), 'AppData', 'Local', 'Programs', 'Git', 'bin', 'bash.exe'),
+    join(homedir(), 'AppData', 'Local', 'Programs', 'Git', 'usr', 'bin', 'bash.exe'),
+  ];
+
+  for (const candidate of gitBashCandidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Fall back to PowerShell (commands will need to be PowerShell-compatible)
+  return 'powershell.exe';
+}
+
+const WINDOWS_SHELL = resolveWindowsShell();
 
 export const bashToolDefinition: ToolDefinition = {
   name: 'bash',
@@ -101,6 +131,7 @@ export async function executeBash(input: unknown, context?: ToolExecutionContext
       cwd: workingDir || context?.cwd,
       timeout,
       maxBuffer: 1024 * 1024, // 1MB
+      shell: WINDOWS_SHELL,
     });
 
     const output = stderr ? `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}` : stdout;

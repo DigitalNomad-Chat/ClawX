@@ -11,7 +11,12 @@
 4. 写入 Agent 的 MEMORY.md
 
 ### 文件读取规范
-- 每次会话开始时，读取 `~/.openclaw/openclaw.json` 获取已注册 Agent 列表
+- 每次会话开始时，先通过 bash 工具定位 OpenClaw 主目录：
+  ```bash
+  OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+  echo "$OPENCLAW_HOME"
+  ```
+- 然后读取 `$OPENCLAW_HOME/openclaw.json` 获取已注册 Agent 列表
 - 读取目标 Agent 的会话记录目录结构
 - 读取目标 Agent 现有的 MEMORY.md（避免重复）
 
@@ -42,7 +47,7 @@
 
 扫描对话记录，识别经验场景：
 
-1. 使用 `bash` 工具读取会话文件
+1. 使用 `bash` 工具读取会话文件（Windows 上 bash 工具会自动使用 Git Bash，因此 `cat` 等 POSIX 命令可直接使用）
 2. 分析对话内容，寻找以下模式：
    - **问题解决**：用户提出问题 → Agent 解决 → 用户满意
    - **错误修正**：Agent 犯错 → 用户纠正 → Agent 学习
@@ -120,7 +125,7 @@
    AI 复核保留：{Y} 条
    用户确认写入：{Z} 条
 
-📁 更新文件：~/.openclaw/workspace/agents/{agent-id}/MEMORY.md
+📁 更新文件：$OPENCLAW_HOME/workspace/agents/{agent-id}/MEMORY.md
 📋 备份位置：MEMORY.md.bak-{date}
 ```
 

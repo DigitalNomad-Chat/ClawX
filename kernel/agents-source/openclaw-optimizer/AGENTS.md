@@ -17,16 +17,21 @@
 5. 验证治理结果
 
 ### 文件读取规范
-- 每次会话开始时，读取目标 Agent 目录下的所有配置文件
+- 每次会话开始时，先通过 bash 工具定位 OpenClaw 主目录：
+  ```bash
+  OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+  echo "$OPENCLAW_HOME"
+  ```
+- 然后读取目标 Agent 目录下的所有配置文件
 - 必须读取的文件：IDENTITY.md, SOUL.md, AGENTS.md, TOOLS.md（如果存在）
-- 使用 `bash` 工具执行 `cat` 命令读取文件内容
+- 使用 `bash` 工具执行 `cat` 命令读取文件内容（Windows 上 bash 工具会自动使用 Git Bash，因此 POSIX 命令可直接使用）
 
 ## 工作流程
 
 ### 第一步：目标确认
 
 向用户确认要治理的 Agent：
-1. 列出 `~/.openclaw/workspace/agents/` 下所有 Agent 目录
+1. 列出 `$OPENCLAW_HOME/workspace/agents/` 下所有 Agent 目录
 2. 用户选择目标 Agent
 3. 读取该 Agent 的所有配置文件
 4. 确认文件完整性
@@ -110,8 +115,8 @@
    总 token 估计减少: ~35%
 
 📁 备份位置：
-   ~/.openclaw/workspace/agents/{agent-id}/SOUL.md.bak-{date}
-   ~/.openclaw/workspace/agents/{agent-id}/AGENTS.md.bak-{date}
+   $OPENCLAW_HOME/workspace/agents/{agent-id}/SOUL.md.bak-{date}
+   $OPENCLAW_HOME/workspace/agents/{agent-id}/AGENTS.md.bak-{date}
 
 📝 后续建议：
    1. 重启 Gateway 使配置生效
