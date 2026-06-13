@@ -257,7 +257,7 @@ async function runAgentWithStreaming(
   const { sessionKey, rpcParams, hall, taskCard, participant, draftId } = input;
 
   const sendResult = await ctx.gatewayManager.rpc<{ runId?: string; status?: string } & Record<string, unknown>>(
-    "chat.send", rpcParams, 30_000,
+    "chat.send", rpcParams, 180_000,
   );
   const runId = sendResult?.runId;
   console.log("[runtime-dispatch] Gateway chat.send runId=%s sessionKey=%s", runId, sessionKey);
@@ -925,7 +925,7 @@ export interface DispatchAgentRunResult {
 }
 
 export async function dispatchAgentRun(input: DispatchAgentRunInput): Promise<DispatchAgentRunResult> {
-  const { ctx, participant, taskCard, message, timeoutMs = 120_000 } = input;
+  const { ctx, participant, taskCard, message, timeoutMs = 180_000 } = input;
 
   const result = await runtimeDispatch({
     ctx,

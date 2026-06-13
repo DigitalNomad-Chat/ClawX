@@ -2409,8 +2409,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       let result: { success: boolean; result?: { runId?: string }; error?: string };
 
-      // Longer timeout for chat sends to tolerate high-latency networks (avoids connect error)
-      const CHAT_SEND_TIMEOUT_MS = 120_000;
+      // Longer timeout for chat sends to tolerate high-latency networks and cold
+      // starts on Windows, where the first inference can take 90+ seconds.
+      const CHAT_SEND_TIMEOUT_MS = 180_000;
 
       if (hasMedia) {
         result = await hostApiFetch<{ success: boolean; result?: { runId?: string }; error?: string }>(

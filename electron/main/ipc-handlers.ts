@@ -1397,8 +1397,9 @@ function registerGatewayHandlers(
 
       logger.info(`[chat:sendWithMedia] Sending: message="${message.substring(0, 100)}", attachments=${imageAttachments.length}, fileRefs=${fileReferences.length}`);
 
-      // Longer timeout for chat sends to tolerate high-latency networks (avoids connect error)
-      const timeoutMs = 120000;
+      // Longer timeout for chat sends to tolerate high-latency networks and cold
+      // starts on Windows, where the first inference can take 90+ seconds.
+      const timeoutMs = 180000;
       const result = await gatewayManager.rpc('chat.send', rpcParams, timeoutMs);
       logger.info(`[chat:sendWithMedia] RPC result: ${JSON.stringify(result)}`);
       return { success: true, result };

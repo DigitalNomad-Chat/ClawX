@@ -121,7 +121,9 @@ export async function handleGatewayRoutes(
       if (imageAttachments.length > 0) {
         rpcParams.attachments = imageAttachments;
       }
-      const result = await ctx.gatewayManager.rpc('chat.send', rpcParams, 120000);
+      // Longer timeout for chat sends to tolerate high-latency networks and cold
+      // starts on Windows, where the first inference can take 90+ seconds.
+      const result = await ctx.gatewayManager.rpc('chat.send', rpcParams, 180000);
       sendJson(res, 200, { success: true, result });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
