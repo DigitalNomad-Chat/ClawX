@@ -1,7 +1,7 @@
 /**
  * DesensitizeEditor — Review and manually adjust sensitive info masking
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Shield,
   Check,
@@ -9,11 +9,12 @@ import {
   RotateCcw,
   ChevronRight,
   ChevronDown,
-  Eye,
-  EyeOff,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DesensitizeDiffViewer } from '@/components/desensitize/DesensitizeDiffViewer';
+import type { SensitiveMap } from '@/lib/desensitize';
 
 interface DesensitizeEditorProps {
   originalText: string;
@@ -21,6 +22,7 @@ interface DesensitizeEditorProps {
   sensitiveMap: Record<string, string>;
   onConfirm: (map: Record<string, string>, text: string) => void;
   onCancel: () => void;
+  onChange?: (text: string, map: Record<string, string>) => void;
 }
 
 const typeLabels: Record<string, string> = {
@@ -54,11 +56,24 @@ export function DesensitizeEditor({
   sensitiveMap,
   onConfirm,
   onCancel,
+  onChange,
 }: DesensitizeEditorProps) {
   const [map, setMap] = useState<Record<string, string>>({ ...sensitiveMap });
   const [text, setText] = useState(desensitizedText);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [showAllOriginal, setShowAllOriginal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  useEffect(() => {
+    setMap({ ...sensitiveMap });
+    setText(desensitizedText);
+  }, [sensitiveMap, desensitizedText]);
+
+  const handleChange = useCallback((newText: string, newMap: SensitiveMap) => {
+    setText(newText);
+    setMap(newMap);
+    onChange?.(newText, newMap);
+  }, [onChange]);
 
   const toggleExpand = useCallback((placeholder: string) => {
     setExpandedItems((prev) => {
@@ -73,18 +88,17 @@ export function DesensitizeEditor({
   }, []);
 
   const handleRemove = useCallback((placeholder: string) => {
-    setMap((prev) => {
-      const next = { ...prev };
-      delete next[placeholder];
-      return next;
-    });
-    setText((prev) =>
-      prev.replace(
-        new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-        map[placeholder] || sensitiveMap[placeholder] || placeholder,
-      ),
+    const original = map[placeholder] || sensitiveMap[placeholder] || placeholder;
+    const nextMap = { ...map };
+    delete nextMap[placeholder];
+    const nextText = text.replace(
+      new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+      original,
     );
-  }, [map, sensitiveMap]);
+    setMap(nextMap);
+    setText(nextText);
+    onChange?.(nextText, nextMap);
+  }, [map, text, sensitiveMap, onChange]);
 
   const entries = Object.entries(map);
 
@@ -104,6 +118,12 @@ export function DesensitizeEditor({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {!isEditing && (
+            <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => { setEditText(text); setIsEditing(true); }}>
+              <Pencil className="h-3.5 w-3.5" />
+              编辑内容
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onCancel}>
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             重新处理
@@ -119,35 +139,38 @@ export function DesensitizeEditor({
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-4xl space-y-5">
           {/* Preview */}
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-medium text-muted-foreground">脱敏预览</div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground"
-                onClick={() => setShowAllOriginal(!showAllOriginal)}
-              >
-                {showAllOriginal ? (
-                  <>
-                    <EyeOff className="h-3 w-3 mr-1" />
-                    隐藏原文
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-3 w-3 mr-1" />
-                    显示原文
-                  </>
-                )}
-              </Button>
-            </div>
-            <div className="max-h-48 overflow-y-auto rounded-md bg-card p-3">
-              {showAllOriginal ? (
-                <pre className="text-sm whitespace-pre-wrap break-words text-foreground/80 leading-relaxed">{originalText}</pre>
-              ) : (
-                <pre className="text-sm whitespace-pre-wrap break-words text-foreground/80 leading-relaxed">{text}</pre>
-              )}
-            </div>
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2 h-[calc(100vh-360px)] min-h-[320px] flex flex-col">
+            <div className="text-xs font-medium text-muted-foreground">脱敏预览</div>
+            <DesensitizeDiffViewer
+              originalText={originalText}
+              desensitizedText={text}
+              sensitiveMap={map}
+              onChange={handleChange}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+              editText={editText}
+              setEditText={setEditText}
+              onSaveEdit={() => {
+                const usedPlaceholders = new Set<string>();
+                const regex = /__PII_\w+_\d{8}__/g;
+                let match: RegExpExecArray | null;
+                while ((match = regex.exec(editText)) !== null) {
+                  usedPlaceholders.add(match[0]);
+                }
+                const cleanedMap: Record<string, string> = {};
+                for (const [placeholder, original] of Object.entries(map)) {
+                  if (usedPlaceholders.has(placeholder)) {
+                    cleanedMap[placeholder] = original;
+                  }
+                }
+                handleChange(editText, cleanedMap);
+                setIsEditing(false);
+              }}
+              onCancelEdit={() => {
+                setEditText('');
+                setIsEditing(false);
+              }}
+            />
           </div>
 
           {/* Sensitive Items List */}
