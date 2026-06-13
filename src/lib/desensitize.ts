@@ -51,6 +51,57 @@ export function markSensitive(
   return { text: newText, map: newMap };
 }
 
+export interface BatchMarkItem {
+  keyword: string;
+  type: string;
+}
+
+export function batchMarkSensitive(
+  text: string,
+  existingMap: SensitiveMap,
+  items: BatchMarkItem[],
+): { text: string; map: SensitiveMap } {
+  if (!items.length) return { text, map: existingMap };
+
+  let currentText = text;
+  let currentMap = { ...existingMap };
+
+  for (const { keyword, type } of items) {
+    const trimmed = keyword.trim();
+    if (!trimmed) continue;
+    if (hasPlaceholders(trimmed)) continue;
+
+    const result = markSensitiveAll(currentText, currentMap, trimmed, type);
+    currentText = result.text;
+    currentMap = result.map;
+  }
+
+  return { text: currentText, map: currentMap };
+}
+
+function markSensitiveAll(
+  text: string,
+  existingMap: SensitiveMap,
+  keyword: string,
+  type: string,
+): { text: string; map: SensitiveMap } {
+  const existingCounters = Object.keys(existingMap)
+    .map((k) => {
+      const m = k.match(/__PII_\w+_(\d+)__/);
+      return m ? parseInt(m[1], 10) : 0;
+    })
+    .filter((n) => !isNaN(n));
+  const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
+
+  const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
+
+  if (!text.includes(keyword)) return { text, map: existingMap };
+
+  const newText = text.split(keyword).join(placeholder);
+  const newMap = { ...existingMap, [placeholder]: keyword };
+  return { text: newText, map: newMap };
+}
+
 export function hasPlaceholders(text: string): boolean {
   return /__PII_\w+_\d{8}__/.test(text);
 }
