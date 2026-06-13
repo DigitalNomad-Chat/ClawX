@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { desensitize, restore, markSensitive } from '../../electron/api/services/desensitize';
+import { desensitize, restore, markSensitive, batchMarkSensitive } from '../../electron/api/services/desensitize';
 import { markSensitive as markSensitiveFrontend } from '../../src/lib/desensitize';
 
 describe('desensitize service', () => {
@@ -128,5 +128,55 @@ describe('desensitize service', () => {
       expect(backendResult).toEqual({ text: 'hello', map: {} });
       expect(frontendResult).toEqual({ text: 'hello', map: {} });
     });
+  });
+});
+
+describe('batchMarkSensitive', () => {
+  it('replaces multiple keywords with placeholders', () => {
+    const result = batchMarkSensitive(
+      '张三的电话是13800138000，李四的电话是13900139000',
+      {},
+      [
+        { keyword: '13800138000', type: 'PHONE' },
+        { keyword: '13900139000', type: 'PHONE' },
+      ],
+    );
+    expect(result.text).toContain('__PII_PHONE_00000001__');
+    expect(result.text).toContain('__PII_PHONE_00000002__');
+    expect(result.map['__PII_PHONE_00000001__']).toBe('13800138000');
+    expect(result.map['__PII_PHONE_00000002__']).toBe('13900139000');
+  });
+
+  it('replaces all occurrences of the same keyword', () => {
+    const result = batchMarkSensitive('张三 张三 张三', {}, [{ keyword: '张三', type: 'NAME' }]);
+    expect(result.text).toBe('__PII_NAME_00000001__ __PII_NAME_00000001__ __PII_NAME_00000001__');
+    expect(Object.keys(result.map)).toHaveLength(1);
+    expect(result.map['__PII_NAME_00000001__']).toBe('张三');
+  });
+
+  it('skips empty keywords', () => {
+    const result = batchMarkSensitive('text', {}, [{ keyword: '   ', type: 'NAME' }]);
+    expect(result.text).toBe('text');
+    expect(Object.keys(result.map)).toHaveLength(0);
+  });
+
+  it('skips keywords that contain placeholders', () => {
+    const result = batchMarkSensitive('__PII_PHONE_00000001__', { '__PII_PHONE_00000001__': '138' }, [
+      { keyword: '__PII_PHONE_00000001__', type: 'NAME' },
+    ]);
+    expect(result.text).toBe('__PII_PHONE_00000001__');
+  });
+
+  it('reuses existing counter correctly', () => {
+    const result = batchMarkSensitive('foo bar', { '__PII_NAME_00000005__': 'x' }, [
+      { keyword: 'foo', type: 'PHONE' },
+    ]);
+    expect(result.text).toContain('__PII_PHONE_00000006__');
+  });
+
+  it('skips keywords not found in text', () => {
+    const result = batchMarkSensitive('hello world', {}, [{ keyword: 'missing', type: 'NAME' }]);
+    expect(result.text).toBe('hello world');
+    expect(Object.keys(result.map)).toHaveLength(0);
   });
 });
