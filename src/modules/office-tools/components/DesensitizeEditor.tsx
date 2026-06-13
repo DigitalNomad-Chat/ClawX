@@ -10,10 +10,12 @@ import {
   ChevronRight,
   ChevronDown,
   Pencil,
+  Settings2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DesensitizeDiffViewer } from '@/components/desensitize/DesensitizeDiffViewer';
+import { BatchDesensitizePanel } from '@/components/desensitize/BatchDesensitizePanel';
 import type { SensitiveMap } from '@/lib/desensitize';
 
 interface DesensitizeEditorProps {
@@ -63,6 +65,7 @@ export function DesensitizeEditor({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [showManager, setShowManager] = useState(false);
 
   useEffect(() => {
     setMap({ ...sensitiveMap });
@@ -124,6 +127,12 @@ export function DesensitizeEditor({
               编辑内容
             </Button>
           )}
+          {!isEditing && !showManager && (
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowManager(true)}>
+              <Settings2 className="h-3.5 w-3.5" />
+              管理脱敏词
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onCancel}>
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             重新处理
@@ -136,102 +145,116 @@ export function DesensitizeEditor({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto max-w-4xl space-y-5">
-          {/* Preview */}
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2 h-[calc(100vh-360px)] min-h-[320px] flex flex-col">
-            <div className="text-xs font-medium text-muted-foreground">脱敏预览</div>
-            <DesensitizeDiffViewer
-              originalText={originalText}
-              desensitizedText={text}
-              sensitiveMap={map}
-              onChange={handleChange}
-              isEditing={isEditing}
-              setIsEditing={setIsEditing}
-              editText={editText}
-              setEditText={setEditText}
-              onSaveEdit={() => {
-                const usedPlaceholders = new Set<string>();
-                const regex = /__PII_\w+_\d{8}__/g;
-                let match: RegExpExecArray | null;
-                while ((match = regex.exec(editText)) !== null) {
-                  usedPlaceholders.add(match[0]);
-                }
-                const cleanedMap: Record<string, string> = {};
-                for (const [placeholder, original] of Object.entries(map)) {
-                  if (usedPlaceholders.has(placeholder)) {
-                    cleanedMap[placeholder] = original;
-                  }
-                }
-                handleChange(editText, cleanedMap);
-                setIsEditing(false);
-              }}
-              onCancelEdit={() => {
-                setEditText('');
-                setIsEditing(false);
-              }}
-            />
-          </div>
+      <div className="flex-1 overflow-hidden">
+        {showManager ? (
+          <BatchDesensitizePanel
+            originalText={originalText}
+            desensitizedText={text}
+            sensitiveMap={map}
+            onChange={(newText, newMap) => {
+              handleChange(newText, newMap);
+            }}
+            onBack={() => setShowManager(false)}
+          />
+        ) : (
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mx-auto max-w-4xl space-y-5">
+              {/* Preview */}
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2 h-[calc(100vh-360px)] min-h-[320px] flex flex-col">
+                <div className="text-xs font-medium text-muted-foreground">脱敏预览</div>
+                <DesensitizeDiffViewer
+                  originalText={originalText}
+                  desensitizedText={text}
+                  sensitiveMap={map}
+                  onChange={handleChange}
+                  isEditing={isEditing}
+                  setIsEditing={setIsEditing}
+                  editText={editText}
+                  setEditText={setEditText}
+                  onSaveEdit={() => {
+                    const usedPlaceholders = new Set<string>();
+                    const regex = /__PII_\w+_\d{8}__/g;
+                    let match: RegExpExecArray | null;
+                    while ((match = regex.exec(editText)) !== null) {
+                      usedPlaceholders.add(match[0]);
+                    }
+                    const cleanedMap: Record<string, string> = {};
+                    for (const [placeholder, original] of Object.entries(map)) {
+                      if (usedPlaceholders.has(placeholder)) {
+                        cleanedMap[placeholder] = original;
+                      }
+                    }
+                    handleChange(editText, cleanedMap);
+                    setIsEditing(false);
+                  }}
+                  onCancelEdit={() => {
+                    setEditText('');
+                    setIsEditing(false);
+                  }}
+                />
+              </div>
 
-          {/* Sensitive Items List */}
-          <div className="space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">敏感信息列表</div>
-            {entries.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/60 bg-card/30 py-8 text-center text-sm text-muted-foreground">
-                未识别到敏感信息
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {entries.map(([placeholder, original]) => {
-                  const typeMatch = placeholder.match(/__PII_(\w+)_\d+__/);
-                  const type = typeMatch ? typeMatch[1] : 'UNKNOWN';
-                  const label = typeLabels[type] || type;
-                  const isExpanded = expandedItems.has(placeholder);
-                  return (
-                    <div
-                      key={placeholder}
-                      className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5"
-                    >
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0">
-                        {label}
-                      </Badge>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-foreground font-mono truncate">{placeholder}</div>
-                        {isExpanded && (
-                          <div className="mt-1 text-sm text-destructive font-mono break-all">
-                            原始值: {original}
+              {/* Sensitive Items List */}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-muted-foreground">敏感信息列表</div>
+                {entries.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 bg-card/30 py-8 text-center text-sm text-muted-foreground">
+                    未识别到敏感信息
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {entries.map(([placeholder, original]) => {
+                      const typeMatch = placeholder.match(/__PII_(\w+)_\d+__/);
+                      const type = typeMatch ? typeMatch[1] : 'UNKNOWN';
+                      const label = typeLabels[type] || type;
+                      const isExpanded = expandedItems.has(placeholder);
+                      return (
+                        <div
+                          key={placeholder}
+                          className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/40 px-3 py-2.5"
+                        >
+                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0">
+                            {label}
+                          </Badge>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-foreground font-mono truncate">{placeholder}</div>
+                            {isExpanded && (
+                              <div className="mt-1 text-sm text-destructive font-mono break-all">
+                                原始值: {original}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => toggleExpand(placeholder)}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleRemove(placeholder)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => toggleExpand(placeholder)}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemove(placeholder)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
