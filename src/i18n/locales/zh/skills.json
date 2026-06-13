@@ -64,7 +64,7 @@
             "scripts": "脚本",
             "scriptsDesc": "可执行的脚本与命令",
             "hooks": "Hooks",
-            "hooksDesc": "注入到 OpenClaw 生命周期的钩子",
+            "hooksDesc": "注入到 Hermes 生命周期的钩子",
             "assets": "资源",
             "assetsDesc": "模板、参考资料与静态资源",
             "empty": "此技能未包含可预览的文件。",

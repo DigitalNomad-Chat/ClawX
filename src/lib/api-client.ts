@@ -706,7 +706,7 @@ export function createGatewayWsTransportInvoker(options: GatewayWsTransportOptio
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'openclaw-control-ui',
+          id: 'clawdock-ui',
           displayName: 'ClawDock UI',
           version: '1.0.0',
           platform: window.electron?.platform ?? 'unknown',

@@ -43,7 +43,7 @@ import {
 } from '@/types/channel';
 import {
   buildQrChannelEventName,
-  isCanonicalOpenClawAccountId,
+  isCanonicalAccountId,
   usesPluginManagedQrAccounts,
 } from '@/lib/channel-alias';
 import { toast } from 'sonner';
@@ -439,7 +439,7 @@ export function ChannelConfigModal({
           setConnecting(false);
           return;
         }
-        if (!isCanonicalOpenClawAccountId(nextAccountId)) {
+        if (!isCanonicalAccountId(nextAccountId)) {
           const message = t('account.invalidCanonicalId');
           setAccountIdError(message);
           toast.error(message);

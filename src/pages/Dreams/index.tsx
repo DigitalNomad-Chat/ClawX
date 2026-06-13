@@ -111,8 +111,10 @@ const DREAM_ACTION_METHODS: Record<DreamActionKey, string> = {
   resetGrounded: 'doctor.memory.resetGroundedShortTerm',
 };
 
-const DIARY_START_MARKER = '<!-- openclaw:dreaming:diary:start -->';
-const DIARY_END_MARKER = '<!-- openclaw:dreaming:diary:end -->';
+const DIARY_START_MARKER_LEGACY = '<!-- openclaw:dreaming:diary:start -->';
+const DIARY_END_MARKER_LEGACY = '<!-- openclaw:dreaming:diary:end -->';
+const DIARY_START_MARKER = '<!-- clawdock:dreaming:diary:start -->';
+const DIARY_END_MARKER = '<!-- clawdock:dreaming:diary:end -->';
 
 function buildDreamingEnabledPatchRaw(enabled: boolean): string {
   return JSON.stringify({
@@ -150,10 +152,15 @@ function normalizeDreamingStatus(response: unknown): DreamingStatus | null {
 }
 
 function getDiaryBody(content: string): string {
-  const start = content.indexOf(DIARY_START_MARKER);
-  const end = content.indexOf(DIARY_END_MARKER);
+  let start = content.indexOf(DIARY_START_MARKER);
+  let end = content.indexOf(DIARY_END_MARKER);
+  if (start < 0) {
+    start = content.indexOf(DIARY_START_MARKER_LEGACY);
+    end = content.indexOf(DIARY_END_MARKER_LEGACY);
+  }
   if (start >= 0 && end > start) {
-    return content.slice(start + DIARY_START_MARKER.length, end);
+    const markerLen = start === content.indexOf(DIARY_START_MARKER) ? DIARY_START_MARKER.length : DIARY_START_MARKER_LEGACY.length;
+    return content.slice(start + markerLen, end);
   }
   return content;
 }

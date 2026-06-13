@@ -86,6 +86,13 @@ export function getClawDockConfigDir(): string {
 }
 
 /**
+ * Get ClawDock skills directory
+ */
+export function getClawDockSkillsDir(): string {
+  return join(getClawDockConfigDir(), 'skills');
+}
+
+/**
  * Get ClawDock logs directory
  */
 export function getLogsDir(): string {

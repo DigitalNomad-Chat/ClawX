@@ -1,8 +1,8 @@
 {
     "title": "梦境",
-    "subtitle": "在 ClawDock 内查看 OpenClaw 的记忆信号、梦境日记和维护操作。",
+    "subtitle": "在 ClawDock 内查看 Hermes 的记忆信号、梦境日记和维护操作。",
     "openFullUi": "打开完整 Dreams",
-    "gatewayNotReady": "OpenClaw 网关仍在启动或已断开。网关可用后会加载 Dreams 数据。",
+    "gatewayNotReady": "Hermes 网关仍在启动或已断开。网关可用后会加载 Dreams 数据。",
     "metrics": {
         "shortTerm": "短期条目",
         "grounded": "已落地信号",
@@ -66,7 +66,7 @@
         "noSnippet": "暂无片段。"
     },
     "errors": {
-        "openFullUi": "无法打开完整 OpenClaw Dreams UI。",
+        "openFullUi": "无法打开完整 Hermes Dreams UI。",
         "configHashMissing": "无法更新梦境，因为配置 base hash 不可用。",
         "memoryInitializing": "梦境记忆仍在初始化。请在网关完成启动后重试。"
     }

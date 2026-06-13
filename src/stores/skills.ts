@@ -25,10 +25,6 @@ type GatewaySkillStatus = {
   filePath?: string;
 };
 
-type GatewaySkillsStatusResult = {
-  skills?: GatewaySkillStatus[];
-};
-
 type ClawHubListResult = {
   slug: string;
   version?: string;
@@ -93,20 +89,16 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     }
     try {
       // Fetch all skill sources in parallel to reduce first-load latency.
-      const gatewayDataPromise = useGatewayStore.getState().rpc<GatewaySkillsStatusResult>('skills.status');
+      const runtimeSkillsPromise = hostApiFetch<{ success: boolean; skills?: GatewaySkillStatus[]; error?: string }>('/api/skills/status');
       const clawhubResultPromise = hostApiFetch<{ success: boolean; results?: ClawHubListResult[]; error?: string }>('/api/clawhub/list');
       const configResultPromise = hostApiFetch<Record<string, { apiKey?: string; env?: Record<string, string> }>>('/api/skills/configs');
-      const [gatewayDataResult, clawhubResult, configResult] = await Promise.allSettled([
-        gatewayDataPromise,
+      const [runtimeSkillsResult, clawhubResult, configResult] = await Promise.allSettled([
+        runtimeSkillsPromise,
         clawhubResultPromise,
         configResultPromise,
       ]);
 
-      if (gatewayDataResult.status !== 'fulfilled') {
-        throw gatewayDataResult.reason;
-      }
-
-      const gatewayData = gatewayDataResult.value;
+      const runtimeData = runtimeSkillsResult.status === 'fulfilled' ? runtimeSkillsResult.value : undefined;
       const clawhubData = clawhubResult.status === 'fulfilled' ? clawhubResult.value : undefined;
       const configData = configResult.status === 'fulfilled' && configResult.value && typeof configResult.value === 'object'
         ? configResult.value
@@ -115,9 +107,9 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
       let combinedSkills: Skill[] = [];
       const currentSkills = get().skills;
 
-      // Map gateway skills info
-      if (gatewayData.skills) {
-        combinedSkills = gatewayData.skills.map((s: GatewaySkillStatus) => {
+      // Map runtime skills info (from Hermes Gateway or fallback)
+      if (runtimeData?.skills) {
+        combinedSkills = runtimeData.skills.map((s: GatewaySkillStatus) => {
           // Merge with direct config if available
           const directConfig = configData[s.skillKey] || {};
 

@@ -94,10 +94,10 @@ function resolveSkillSourceLabel(skill: Skill, t: TFunction<'skills'>): string {
     if (skill.isBundled) return t('source.badge.bundled', { defaultValue: 'Bundled' });
     return t('source.badge.unknown', { defaultValue: 'Unknown source' });
   }
-  if (source === 'openclaw-bundled') return t('source.badge.bundled', { defaultValue: 'Bundled' });
-  if (source === 'openclaw-managed') return t('source.badge.managed', { defaultValue: 'Managed' });
-  if (source === 'openclaw-workspace') return t('source.badge.workspace', { defaultValue: 'Workspace' });
-  if (source === 'openclaw-extra') return t('source.badge.extra', { defaultValue: 'Extra dirs' });
+  if (source === 'clawdock-bundled' || source === 'openclaw-bundled') return t('source.badge.bundled', { defaultValue: 'Bundled' });
+  if (source === 'clawdock-managed' || source === 'openclaw-managed') return t('source.badge.managed', { defaultValue: 'Managed' });
+  if (source === 'clawdock-workspace' || source === 'openclaw-workspace') return t('source.badge.workspace', { defaultValue: 'Workspace' });
+  if (source === 'clawdock-extra' || source === 'openclaw-extra') return t('source.badge.extra', { defaultValue: 'Extra dirs' });
   if (source === 'agents-skills-personal') return t('source.badge.agentsPersonal', { defaultValue: 'Personal .agents' });
   if (source === 'agents-skills-project') return t('source.badge.agentsProject', { defaultValue: 'Project .agents' });
   return source;
@@ -409,7 +409,7 @@ export function Skills() {
 
   const handleOpenSkillsFolder = useCallback(async () => {
     try {
-      const skillsDir = await invokeIpc<string>('openclaw:getSkillsDir');
+      const skillsDir = await invokeIpc<string>('clawdock:getSkillsDir');
       if (!skillsDir) {
         throw new Error('Skills directory not available');
       }
@@ -444,10 +444,10 @@ export function Skills() {
     }
   }, [t]);
 
-  const [skillsDirPath, setSkillsDirPath] = useState('~/.openclaw/skills');
+  const [skillsDirPath, setSkillsDirPath] = useState('~/.clawdock/skills');
 
   useEffect(() => {
-    invokeIpc<string>('openclaw:getSkillsDir')
+    invokeIpc<string>('clawdock:getSkillsDir')
       .then((dir) => setSkillsDirPath(dir as string))
       .catch(console.error);
   }, []);

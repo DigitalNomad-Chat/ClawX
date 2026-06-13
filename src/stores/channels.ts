@@ -1,22 +1,18 @@
 /**
- * Channels State Store
- * Manages messaging channel state
+ * Channels State Store (Hermes version)
+ *
+ * Manages messaging platform state via Host API.
+ * Replaces legacy OpenClaw Gateway JSON-RPC with direct HTTP calls.
  */
 import { create } from 'zustand';
 import { hostApiFetch } from '@/lib/host-api';
-import {
-  isChannelRuntimeConnected,
-  pickChannelRuntimeStatus,
-  type ChannelRuntimeAccountSnapshot,
-} from '@/lib/channel-status';
-import { useGatewayStore } from './gateway';
 import { CHANNEL_NAMES, type Channel, type ChannelType } from '../types/channel';
-import { toOpenClawChannelType, toUiChannelType } from '@/lib/channel-alias';
 
 interface AddChannelParams {
   type: ChannelType;
   name: string;
   token?: string;
+  [key: string]: string | undefined;
 }
 
 interface ChannelsState {
@@ -34,12 +30,7 @@ interface ChannelsState {
   setChannels: (channels: Channel[]) => void;
   updateChannel: (channelId: string, updates: Partial<Channel>) => void;
   clearError: () => void;
-  scheduleAutoReconnect: (channelId: string) => void;
-  clearAutoReconnect: (channelId: string) => void;
 }
-
-const reconnectTimers = new Map<string, NodeJS.Timeout>();
-const reconnectAttempts = new Map<string, number>();
 
 function splitChannelId(channelId: string): { channelType: string; accountId?: string } {
   const separatorIndex = channelId.indexOf('-');
@@ -60,142 +51,60 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   fetchChannels: async () => {
     set({ loading: true, error: null });
     try {
-      const data = await useGatewayStore.getState().rpc<{
-          channelOrder?: string[];
-          channels?: Record<string, unknown>;
-          channelAccounts?: Record<string, Array<{
-            accountId?: string;
-            configured?: boolean;
-            connected?: boolean;
-            running?: boolean;
-            lastError?: string;
-            name?: string;
-            linked?: boolean;
-            lastConnectedAt?: number | null;
-            lastInboundAt?: number | null;
-            lastOutboundAt?: number | null;
-            lastProbeAt?: number | null;
-            probe?: {
-              ok?: boolean;
-            } | null;
-          }>>;
-          channelDefaultAccountId?: Record<string, string>;
-      }>('channels.status', { probe: false });
-      if (data) {
-        const channels: Channel[] = [];
+      const data = await hostApiFetch<{ channels?: string[] }>('/api/channels');
+      const configuredTypes = data?.channels || [];
 
-        // Parse the complex channels.status response into simple Channel objects
-        const channelOrder = data.channelOrder || Object.keys(data.channels || {});
-        for (const channelId of channelOrder) {
-          const uiChannelId = toUiChannelType(channelId) as ChannelType;
-          const gatewayChannelId = toOpenClawChannelType(channelId);
-          const summary = (data.channels as Record<string, unknown> | undefined)?.[channelId] as Record<string, unknown> | undefined;
-          const configured =
-            typeof summary?.configured === 'boolean'
-              ? summary.configured
-              : typeof (summary as { running?: boolean })?.running === 'boolean'
-                ? true
-                : false;
-          if (!configured) continue;
+      const channels: Channel[] = configuredTypes.map((type) => ({
+        id: type,
+        type: type as ChannelType,
+        name: CHANNEL_NAMES[type as ChannelType] || type,
+        status: 'connected',
+      }));
 
-          const accounts = data.channelAccounts?.[channelId] || [];
-          const defaultAccountId = data.channelDefaultAccountId?.[channelId];
-          const summarySignal = summary as { error?: string; lastError?: string } | undefined;
-          const primaryAccount =
-            (defaultAccountId ? accounts.find((a) => a.accountId === defaultAccountId) : undefined) ||
-            accounts.find((a) => isChannelRuntimeConnected(a as ChannelRuntimeAccountSnapshot)) ||
-            accounts[0];
-
-          const status: Channel['status'] = pickChannelRuntimeStatus(accounts, summarySignal);
-          const summaryError =
-            typeof summarySignal?.error === 'string'
-              ? summarySignal.error
-              : typeof summarySignal?.lastError === 'string'
-                ? summarySignal.lastError
-                : undefined;
-
-          channels.push({
-            id: `${uiChannelId}-${primaryAccount?.accountId || 'default'}`,
-            type: uiChannelId,
-            name: primaryAccount?.name || CHANNEL_NAMES[uiChannelId] || uiChannelId,
-            status,
-            accountId: primaryAccount?.accountId,
-            error:
-              (typeof primaryAccount?.lastError === 'string' ? primaryAccount.lastError : undefined) ||
-              (typeof summaryError === 'string' ? summaryError : undefined),
-            metadata: {
-              gatewayChannelId,
-            },
-          });
-        }
-
-        set({ channels, loading: false });
-      } else {
-        // Gateway not available - try to show channels from local config
-        set({ channels: [], loading: false });
-      }
+      set({ channels, loading: false });
     } catch {
-      // Gateway not connected, show empty
       set({ channels: [], loading: false });
     }
   },
 
   addChannel: async (params) => {
     try {
-      const result = await useGatewayStore.getState().rpc<Channel>('channels.add', params);
-
-      if (result) {
-        set((state) => ({
-          channels: [...state.channels, result],
-        }));
-        return result;
-      } else {
-        // If gateway is not available, create a local channel for now
-        const newChannel: Channel = {
-          id: `local-${Date.now()}`,
-          type: params.type,
-          name: params.name,
-          status: 'disconnected',
-        };
-        set((state) => ({
-          channels: [...state.channels, newChannel],
-        }));
-        return newChannel;
+      const { type, name, token, ...rest } = params;
+      const values: Record<string, string> = { enabled: 'true', ...rest };
+      if (token) {
+        values.token = token;
       }
-    } catch {
-      // Create local channel if gateway unavailable
+
+      await hostApiFetch(`/api/channels/${encodeURIComponent(type)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ values }),
+      });
+
       const newChannel: Channel = {
-        id: `local-${Date.now()}`,
-        type: params.type,
-        name: params.name,
-        status: 'disconnected',
+        id: type,
+        type: type as ChannelType,
+        name: name || CHANNEL_NAMES[type as ChannelType] || type,
+        status: 'connected',
       };
       set((state) => ({
         channels: [...state.channels, newChannel],
       }));
       return newChannel;
+    } catch (error) {
+      console.error('Failed to add channel:', error);
+      throw error;
     }
   },
 
   deleteChannel: async (channelId) => {
-    // Extract channel type from the channelId (format: "channelType-accountId")
     const { channelType } = splitChannelId(channelId);
-    const gatewayChannelType = toOpenClawChannelType(channelType);
 
     try {
-      // Delete the channel configuration from openclaw.json
-      await hostApiFetch(`/api/channels/config/${encodeURIComponent(channelType)}`, {
+      await hostApiFetch(`/api/channels/${encodeURIComponent(channelType)}`, {
         method: 'DELETE',
       });
     } catch (error) {
       console.error('Failed to delete channel config:', error);
-    }
-
-    try {
-      await useGatewayStore.getState().rpc('channels.delete', { channelId: gatewayChannelType });
-    } catch (error) {
-      // Continue with local deletion even if gateway fails
-      console.error('Failed to delete channel from gateway:', error);
     }
 
     // Remove from local state
@@ -208,10 +117,12 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
     const { updateChannel } = get();
     updateChannel(channelId, { status: 'connecting', error: undefined });
 
+    const { channelType } = splitChannelId(channelId);
+
     try {
-      const { channelType, accountId } = splitChannelId(channelId);
-      await useGatewayStore.getState().rpc('channels.connect', {
-        channelId: `${toOpenClawChannelType(channelType)}${accountId ? `-${accountId}` : ''}`,
+      await hostApiFetch(`/api/channels/${encodeURIComponent(channelType)}`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled: true }),
       });
       updateChannel(channelId, { status: 'connected' });
     } catch (error) {
@@ -220,13 +131,14 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   },
 
   disconnectChannel: async (channelId) => {
-    const { updateChannel, clearAutoReconnect } = get();
-    clearAutoReconnect(channelId);
+    const { updateChannel } = get();
+
+    const { channelType } = splitChannelId(channelId);
 
     try {
-      const { channelType, accountId } = splitChannelId(channelId);
-      await useGatewayStore.getState().rpc('channels.disconnect', {
-        channelId: `${toOpenClawChannelType(channelType)}${accountId ? `-${accountId}` : ''}`,
+      await hostApiFetch(`/api/channels/${encodeURIComponent(channelType)}`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled: false }),
       });
     } catch (error) {
       console.error('Failed to disconnect channel:', error);
@@ -236,10 +148,8 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   },
 
   requestQrCode: async (channelType) => {
-    return await useGatewayStore.getState().rpc<{ qrCode: string; sessionId: string }>(
-      'channels.requestQr',
-      { type: toOpenClawChannelType(channelType) },
-    );
+    // QR code login is not yet implemented for Hermes.
+    throw new Error(`QR code login not supported for ${channelType} in Hermes mode`);
   },
 
   setChannels: (channels) => set({ channels }),
@@ -247,43 +157,10 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   updateChannel: (channelId, updates) => {
     set((state) => ({
       channels: state.channels.map((channel) =>
-        channel.id === channelId ? { ...channel, ...updates } : channel
+        channel.id === channelId ? { ...channel, ...updates } : channel,
       ),
     }));
   },
 
   clearError: () => set({ error: null }),
-
-  scheduleAutoReconnect: (channelId) => {
-    if (reconnectTimers.has(channelId)) return;
-    
-    const attempts = reconnectAttempts.get(channelId) || 0;
-    // Exponential backoff capped at 2 minutes
-    const delay = Math.min(5000 * Math.pow(2, attempts), 120000);
-    
-    console.log(`[Watchdog] Scheduling auto-reconnect for ${channelId} in ${delay}ms (attempt ${attempts + 1})`);
-    
-    const timer = setTimeout(() => {
-      reconnectTimers.delete(channelId);
-      const state = get();
-      const channel = state.channels.find((c) => c.id === channelId);
-      
-      if (channel && (channel.status === 'disconnected' || channel.status === 'error')) {
-        reconnectAttempts.set(channelId, attempts + 1);
-        console.log(`[Watchdog] Executing auto-reconnect for ${channelId} (attempt ${attempts + 1})`);
-        state.connectChannel(channelId).catch(() => {});
-      }
-    }, delay);
-    
-    reconnectTimers.set(channelId, timer);
-  },
-
-  clearAutoReconnect: (channelId) => {
-    const timer = reconnectTimers.get(channelId);
-    if (timer) {
-      clearTimeout(timer);
-      reconnectTimers.delete(channelId);
-    }
-    reconnectAttempts.delete(channelId);
-  },
 }));

@@ -1,6 +1,6 @@
 /**
- * Import from OpenClaw Dialog
- * Discovers providers from OpenClaw's store and lets user select which to import.
+ * Import from Legacy Dialog
+ * Discovers providers from legacy OpenClaw store and lets user select which to import.
  */
 import { useState, useCallback } from 'react';
 import { Download, Loader2, Check, AlertCircle, Key, Server } from 'lucide-react';
@@ -52,7 +52,7 @@ export function ImportFromOpenClawDialog({
         const withKeys = (result.providers || []).filter((p) => p.hasApiKey);
         setSelectedIds(new Set(withKeys.map((p) => p.id)));
       } else {
-        setError(result.error || '无法读取 OpenClaw 配置');
+        setError(result.error || '无法读取旧版配置');
       }
     } catch (err) {
       setError((err as Error).message);
@@ -116,10 +116,10 @@ export function ImportFromOpenClawDialog({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
-            从 OpenClaw 导入
+            从旧版导入
           </SheetTitle>
           <SheetDescription>
-            检测 OpenClaw 已配置的 AI 服务商，选择要导入的配置
+            检测旧版 OpenClaw 已配置的 AI 服务商，选择要导入的配置
           </SheetDescription>
         </SheetHeader>
 
@@ -129,11 +129,11 @@ export function ImportFromOpenClawDialog({
             <div className="flex flex-col items-center gap-4 py-8">
               <Server className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                点击下方按钮检测 OpenClaw 已配置的服务商
+                点击下方按钮检测旧版已配置的服务商
               </p>
               <Button onClick={discover}>
                 <Download className="mr-2 h-4 w-4" />
-                检测 OpenClaw 配置
+                检测旧版配置
               </Button>
             </div>
           )}

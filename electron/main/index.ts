@@ -48,6 +48,8 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from 
 
 import { startHostApiServer } from '../api/server';
 import { HostEventBus } from '../api/event-bus';
+// Hermes Server imports are deferred to startMainApp() so that
+// process.env.HERMES_WEB_UI_HOME is set before server/src/config.ts is evaluated.
 import { registerExtensions, shutdownExtensions } from '../extensions';
 import { initModules, shutdownModules } from '../modules/registry';
 import { deviceOAuthManager } from '../utils/device-oauth';
@@ -321,6 +323,12 @@ async function initialize(): Promise<void> {
 }
 
 async function startMainApp(): Promise<void> {
+  // Configure Hermes Server environment before any server code runs
+  process.env.HERMES_WEB_UI_HOME = join(app.getPath('userData'), 'hermes');
+  process.env.PORT = '8648';
+  process.env.HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN = '0';
+  process.env.HERMES_DATA_DIR = join(app.getPath('userData'), 'hermes', 'data');
+
   // Initialize logger first
   logger.init();
   logger.info('=== ClawDock Application Starting ===');
@@ -401,6 +409,18 @@ async function startMainApp(): Promise<void> {
     eventBus: hostEventBus,
     mainWindow: window,
   });
+
+  // Start Hermes Server (Koa + Socket.IO backend)
+  if (!isE2EMode) {
+    const { startHermesServer } = await import('../../server/src/index');
+    void startHermesServer().then(() => {
+      logger.info('Hermes Server started successfully');
+    }).catch((error) => {
+      logger.error('Hermes Server failed to start:', error);
+    });
+  } else {
+    logger.info('Hermes Server start skipped in E2E mode');
+  }
 
   // Initialize extension system
   await extensionRegistry.initialize({
@@ -535,23 +555,25 @@ async function startMainApp(): Promise<void> {
     hostEventBus.emit('channel:whatsapp-error', error);
   });
 
-  // Start Gateway automatically (this seeds missing bootstrap files with full templates)
+  // Start Gateway automatically (legacy OpenClaw mode)
   const gatewayAutoStart = await getSetting('gatewayAutoStart');
   if (!isE2EMode && gatewayAutoStart) {
     try {
       await syncAllProviderAuthToRuntime();
-      logger.debug('Auto-starting Gateway...');
+      logger.debug('Auto-starting Legacy Gateway...');
       await gatewayManager.start();
-      logger.info('Gateway auto-start succeeded');
+      logger.info('Legacy Gateway auto-start succeeded');
     } catch (error) {
-      logger.error('Gateway auto-start failed:', error);
+      logger.error('Legacy Gateway auto-start failed:', error);
       mainWindow?.webContents.send('gateway:error', String(error));
     }
   } else if (isE2EMode) {
-    logger.info('Gateway auto-start skipped in E2E mode');
+    logger.info('Legacy Gateway auto-start skipped in E2E mode');
   } else {
-    logger.info('Gateway auto-start disabled in settings');
+    logger.info('Legacy Gateway auto-start disabled in settings');
   }
+
+  if (!isE2EMode) {
 
   // Merge ClawDock context snippets into the workspace bootstrap files.
   // The gateway seeds workspace files asynchronously after its HTTP server
@@ -572,6 +594,7 @@ async function startMainApp(): Promise<void> {
     }).catch((error) => {
       logger.warn('CLI auto-install failed:', error);
     });
+  }
   }
 }
 
@@ -670,6 +693,13 @@ if (gotTheLock) {
       logger.warn('gatewayManager.stop() error during quit:', err);
     });
 
+    // Stop Hermes Server
+    const hermesStopPromise = import('../../server/src/index')
+      .then(({ stopHermesServer }) => stopHermesServer())
+      .catch((err) => {
+        logger.warn('stopHermesServer() error during quit:', err);
+      });
+
     // Stop independent kernel extensions
     const extensionsStopPromise = shutdownExtensions().catch((err) => {
       logger.warn('shutdownExtensions() error during quit:', err);
@@ -682,7 +712,10 @@ if (gotTheLock) {
     });
 
     void Promise.race([
-      Promise.all([stopPromise, extensionsStopPromise]).then(() => 'stopped' as const),
+      stopPromise,
+      hermesStopPromise,
+      extensionsStopPromise,
+      modulesStopPromise,
       timeoutPromise,
     ]).then((result) => {
       if (result === 'timeout') {

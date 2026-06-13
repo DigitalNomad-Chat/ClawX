@@ -129,5 +129,44 @@ export async function handleGatewayRoutes(
     return true;
   }
 
+  // ── Sessions list (proxy to Gateway RPC) ────────────────────
+  if (url.pathname === '/api/sessions' && req.method === 'GET') {
+    try {
+      const result = await ctx.gatewayManager.rpc<Record<string, unknown>>('sessions.list', {});
+      sendJson(res, 200, { success: true, sessions: result?.sessions ?? [] });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  // ── Chat history (proxy to Gateway RPC) ─────────────────────
+  if (url.pathname === '/api/chat/history' && req.method === 'GET') {
+    try {
+      const sessionKey = url.searchParams.get('sessionKey') || '';
+      const limit = parseInt(url.searchParams.get('limit') || '200', 10);
+      const result = await ctx.gatewayManager.rpc<Record<string, unknown>>('chat.history', {
+        sessionKey,
+        limit,
+      });
+      sendJson(res, 200, { success: true, messages: result?.messages ?? [], thinkingLevel: result?.thinkingLevel });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  // ── Chat abort (proxy to Gateway RPC) ───────────────────────
+  if (url.pathname === '/api/chat/abort' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{ sessionKey?: string }>(req);
+      await ctx.gatewayManager.rpc('chat.abort', { sessionKey: body.sessionKey });
+      sendJson(res, 200, { success: true });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
   return false;
 }

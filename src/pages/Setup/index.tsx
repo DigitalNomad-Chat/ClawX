@@ -323,30 +323,23 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   const [checks, setChecks] = useState({
     nodejs: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
-    openclaw: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
+    hermes: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
     gateway: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
   });
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
-  const [openclawDir, setOpenclawDir] = useState('');
-  const [openclawDebug, setOpenclawDebug] = useState<{
-    appIsPackaged: boolean;
-    resourcesPath: string;
-    appPath: string;
-    dirname: string;
-    dirExists: boolean;
-    pkgExists: boolean;
-    distExists: boolean;
-  } | null>(null);
+  const [hermesInstallCommand] = useState('pip install hermes-agent');
+  const [hermesError, setHermesError] = useState<string | null>(null);
   const gatewayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const runChecks = useCallback(async () => {
     // Reset checks
     setChecks({
       nodejs: { status: 'checking', message: '' },
-      openclaw: { status: 'checking', message: '' },
+      hermes: { status: 'checking', message: '' },
       gateway: { status: 'checking', message: '' },
     });
+    setHermesError(null);
 
     // Check Node.js — always available in Electron
     setChecks((prev) => ({
@@ -354,57 +347,45 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
       nodejs: { status: 'success', message: t('runtime.status.success') },
     }));
 
-    // Check OpenClaw package status
+    // Check Hermes installation status
     try {
-      const openclawStatus = await invokeIpc('openclaw:status') as {
-        packageExists: boolean;
-        isBuilt: boolean;
-        dir: string;
-        version?: string;
-        debug?: {
-          appIsPackaged: boolean;
-          resourcesPath: string;
-          appPath: string;
-          dirname: string;
-          dirExists: boolean;
-          pkgExists: boolean;
-          distExists: boolean;
-        };
+      const hermesStatus = await invokeIpc('hermes:status') as {
+        success: boolean;
+        installed?: boolean;
+        error?: string;
       };
 
-      setOpenclawDir(openclawStatus.dir);
-      setOpenclawDebug(openclawStatus.debug ?? null);
-
-      if (!openclawStatus.packageExists) {
+      if (!hermesStatus.success) {
+        setHermesError(hermesStatus.error || 'Unknown error');
         setChecks((prev) => ({
           ...prev,
-          openclaw: {
+          hermes: {
             status: 'error',
-            message: `OpenClaw package not found at: ${openclawStatus.dir}`
+            message: hermesStatus.error || 'Hermes check failed'
           },
         }));
-      } else if (!openclawStatus.isBuilt) {
+      } else if (!hermesStatus.installed) {
         setChecks((prev) => ({
           ...prev,
-          openclaw: {
+          hermes: {
             status: 'error',
-            message: 'OpenClaw package found but dist is missing'
+            message: 'Hermes not installed. Run: pip install hermes-agent'
           },
         }));
       } else {
-        const versionLabel = openclawStatus.version ? ` v${openclawStatus.version}` : '';
         setChecks((prev) => ({
           ...prev,
-          openclaw: {
+          hermes: {
             status: 'success',
-            message: `OpenClaw package ready${versionLabel}`
+            message: 'Hermes installed'
           },
         }));
       }
     } catch (error) {
+      setHermesError(String(error));
       setChecks((prev) => ({
         ...prev,
-        openclaw: { status: 'error', message: `Check failed: ${error}` },
+        hermes: { status: 'error', message: `Check failed: ${error}` },
       }));
     }
 
@@ -441,7 +422,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
   // Update canProceed when gateway status changes
   useEffect(() => {
     const allPassed = checks.nodejs.status === 'success'
-      && checks.openclaw.status === 'success'
+      && checks.hermes.status === 'success'
       && (checks.gateway.status === 'success' || gatewayStatus.state === 'running');
     onStatusChange(allPassed);
   }, [checks, gatewayStatus, onStatusChange]);
@@ -594,27 +575,20 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-4 p-3 rounded-lg bg-muted/50">
           <div className="text-left min-w-0">
-            <span>{t('runtime.openclaw')}</span>
-            {openclawDir && (
+            <span>{t('runtime.hermes')}</span>
+            {checks.hermes.status === 'error' && (
               <p className="text-xs text-muted-foreground mt-0.5 font-mono break-all">
-                {openclawDir}
+                {hermesInstallCommand}
               </p>
             )}
-            {/* Debug info */}
-            {openclawDebug && (
-              <div className="mt-2 p-2 rounded bg-black/30 text-[10px] font-mono space-y-0.5">
-                <div>isPackaged: {openclawDebug.appIsPackaged ? 'true' : 'false'}</div>
-                <div>resourcesPath: {openclawDebug.resourcesPath}</div>
-                <div>appPath: {openclawDebug.appPath}</div>
-                <div>dirname: {openclawDebug.dirname}</div>
-                <div>dirExists: {openclawDebug.dirExists ? 'true' : 'false'}</div>
-                <div>pkgExists: {openclawDebug.pkgExists ? 'true' : 'false'}</div>
-                <div>distExists: {openclawDebug.distExists ? 'true' : 'false'}</div>
-              </div>
+            {hermesError && (
+              <p className="text-xs text-red-400 mt-0.5 font-mono break-all">
+                {hermesError}
+              </p>
             )}
           </div>
           <div className="flex justify-end self-start mt-0.5">
-            {renderStatus(checks.openclaw.status, checks.openclaw.message)}
+            {renderStatus(checks.hermes.status, checks.hermes.message)}
           </div>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-4 p-3 rounded-lg bg-muted/50">
@@ -632,7 +606,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         </div>
       </div>
 
-      {(checks.nodejs.status === 'error' || checks.openclaw.status === 'error') && (
+      {(checks.nodejs.status === 'error' || checks.hermes.status === 'error') && (
         <div className="mt-4 p-4 rounded-lg bg-red-900/20 border border-red-500/20">
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />

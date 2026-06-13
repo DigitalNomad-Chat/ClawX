@@ -4,6 +4,7 @@ import type { ClawHubService } from '../gateway/clawhub';
 import type { HostEventBus } from './event-bus';
 
 export interface HostApiContext {
+  // Legacy OpenClaw gateway manager (to be removed after full migration)
   gatewayManager: GatewayManager;
   clawHubService: ClawHubService;
   eventBus: HostEventBus;

@@ -1,18 +1,18 @@
 /**
  * Chat Page
- * Native React implementation communicating with OpenClaw Gateway
- * via gateway:rpc IPC. Session selector, thinking toggle, and refresh
- * are in the toolbar; messages render with markdown + streaming.
+ * Communicates with Hermes Server via Socket.IO /chat-run.
+ * Session selector, thinking toggle, and refresh are in the toolbar;
+ * messages render with markdown + streaming.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
-import { useGatewayStore } from '@/stores/gateway';
 import { useAgentsStore } from '@/stores/agents';
 import { useArtifactPanel } from '@/stores/artifact-panel';
 import { hostApiFetch } from '@/lib/host-api';
+import { connectHermesSocket, disconnectHermesSocket } from '@/lib/hermes-socket';
 import { invokeIpc } from '@/lib/api-client';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChatMessage } from './ChatMessage';
@@ -100,9 +100,6 @@ const streamingTimestampStore = new Map<string, number>();
 
 export function Chat() {
   const { t } = useTranslation('chat');
-  const gatewayStatus = useGatewayStore((s) => s.status);
-  const isGatewayRunning = gatewayStatus.state === 'running';
-
   const messages = useChatStore((s) => s.messages);
   const currentSessionKey = useChatStore((s) => s.currentSessionKey);
   const currentAgentId = useChatStore((s) => s.currentAgentId);
@@ -240,6 +237,14 @@ export function Chat() {
   useEffect(() => {
     void fetchAgents();
   }, [fetchAgents]);
+
+  // Connect to Hermes Socket.IO on mount
+  useEffect(() => {
+    void connectHermesSocket();
+    return () => {
+      disconnectHermesSocket();
+    };
+  }, []);
 
   useEffect(() => {
     const completions = messages
@@ -1003,7 +1008,7 @@ export function Chat() {
       <ChatInput
         onSend={handleSend}
         onStop={abortRun}
-        disabled={!isGatewayRunning}
+        disabled={false}
         sending={sending || hasActiveExecutionGraph}
         isEmpty={isEmpty}
       />

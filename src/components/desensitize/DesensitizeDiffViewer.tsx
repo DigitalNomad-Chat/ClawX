@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatPlaceholderType, markSensitive, hasPlaceholders, type SensitiveMap } from '@/lib/desensitize';
@@ -30,6 +29,18 @@ interface DesensitizeDiffViewerProps {
   desensitizedText: string;
   sensitiveMap: SensitiveMap;
   onChange: (text: string, map: SensitiveMap) => void;
+  /** When provided, edit mode is controlled by the caller. */
+  isEditing?: boolean;
+  /** When provided, the caller manages edit mode state. */
+  setIsEditing?: (v: boolean) => void;
+  /** When provided, the caller provides the edit-area value. */
+  editText?: string;
+  /** When provided, the caller provides the edit-area onChange handler. */
+  setEditText?: (v: string) => void;
+  /** Callback invoked when the caller's edit-area is saved. */
+  onSaveEdit?: () => void;
+  /** Callback invoked when the caller's edit-area is cancelled. */
+  onCancelEdit?: () => void;
   className?: string;
 }
 
@@ -38,10 +49,24 @@ export function DesensitizeDiffViewer({
   desensitizedText,
   sensitiveMap,
   onChange,
+  isEditing: isEditingProp,
+  setIsEditing: setIsEditingProp,
+  editText: editTextProp,
+  setEditText: setEditTextProp,
+  onSaveEdit,
+  onCancelEdit,
   className,
 }: DesensitizeDiffViewerProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState('');
+  // ── Internal edit-mode state (when not controlled by caller) ──
+  const [isEditingInternal, setIsEditingInternal] = useState(false);
+  const [editTextInternal, setEditTextInternal] = useState('');
+
+  // Use props when provided, otherwise fall back to internal state
+  const isEditing = isEditingProp ?? isEditingInternal;
+  const setIsEditing = setIsEditingProp ?? setIsEditingInternal;
+  const editText = editTextProp ?? editTextInternal;
+  const setEditText = setEditTextProp ?? setEditTextInternal;
+
   const readonlyContentRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ visible: boolean; x: number; y: number; text: string }>({
     visible: false,
@@ -121,6 +146,10 @@ export function DesensitizeDiffViewer({
 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
+      // Approximate max dimensions of the float menu in CSS pixels.
+      // The menu wraps SENSITIVE_TYPES buttons in a flex-wrap container,
+      // so actual height varies; 320 is the max-width and 120 is a
+      // reasonable full-height estimate for layout calculations.
       const menuWidth = 320;
       const menuHeight = 120;
 
@@ -176,19 +205,20 @@ export function DesensitizeDiffViewer({
     return () => document.removeEventListener('click', handler);
   }, [menu.visible, hideMenu]);
 
-  const enterEditMode = useCallback(() => {
+  // ── Internal edit-mode helpers (used when caller does not supply controls) ──
+  const internalEnterEditMode = useCallback(() => {
     setEditText(desensitizedText);
     setIsEditing(true);
     hideMenu();
     window.getSelection()?.removeAllRanges();
-  }, [desensitizedText, hideMenu]);
+  }, [desensitizedText, setIsEditing, hideMenu]);
 
-  const cancelEdit = useCallback(() => {
+  const internalCancelEdit = useCallback(() => {
     setIsEditing(false);
     setEditText('');
-  }, []);
+  }, [setIsEditing, setEditText]);
 
-  const saveEdit = useCallback(() => {
+  const internalSaveEdit = useCallback(() => {
     const usedPlaceholders = new Set<string>();
     const regex = /__PII_\w+_\d{8}__/g;
     let match: RegExpExecArray | null;
@@ -205,7 +235,14 @@ export function DesensitizeDiffViewer({
 
     onChange(editText, cleanedMap);
     setIsEditing(false);
-  }, [editText, sensitiveMap, onChange]);
+  }, [editText, sensitiveMap, onChange, setIsEditing]);
+
+  // When caller supplies onSaveEdit, use it as the save handler; otherwise use internal.
+  const handleSaveEdit = onSaveEdit ?? internalSaveEdit;
+  const handleCancelEdit = onCancelEdit ?? internalCancelEdit;
+  // When not controlled, trigger internal enter-edit when user clicks the edit area header.
+  // The edit button itself is rendered by the caller, so we keep internalEnterEditMode
+  // available but do NOT render an inline button here.
 
   return (
     <div className={cn('flex flex-col gap-3 flex-1 min-h-0 overflow-hidden', className)}>
@@ -243,12 +280,12 @@ export function DesensitizeDiffViewer({
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">已脱敏</span>
               )}
             </div>
-            {!isEditing && (
-              <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 px-2" onClick={enterEditMode}>
-                <Pencil className="h-3 w-3" />
-                编辑内容
-              </Button>
-            )}
+            {/*
+              The edit button is intentionally NOT rendered inside this component.
+              Callers should place their own action button in the header area above.
+              Clicking the edit button should call internalEnterEditMode() (when not
+              externally controlled) or set the caller's isEditing/editText state.
+            */}
           </div>
 
           {isEditing ? (
@@ -259,12 +296,10 @@ export function DesensitizeDiffViewer({
                 onChange={(e) => setEditText(e.target.value)}
               />
               <div className="flex items-center justify-end gap-2 shrink-0">
-                <Button variant="outline" size="sm" onClick={cancelEdit}>
-                  <X className="h-3.5 w-3.5 mr-1" />
+                <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                   取消
                 </Button>
-                <Button size="sm" onClick={saveEdit}>
-                  <Check className="h-3.5 w-3.5 mr-1" />
+                <Button size="sm" onClick={handleSaveEdit}>
                   保存
                 </Button>
               </div>
