@@ -206,13 +206,6 @@ export function DesensitizeDiffViewer({
   }, [menu.visible, hideMenu]);
 
   // ── Internal edit-mode helpers (used when caller does not supply controls) ──
-  const internalEnterEditMode = useCallback(() => {
-    setEditText(desensitizedText);
-    setIsEditing(true);
-    hideMenu();
-    window.getSelection()?.removeAllRanges();
-  }, [desensitizedText, setIsEditing, hideMenu]);
-
   const internalCancelEdit = useCallback(() => {
     setIsEditing(false);
     setEditText('');
@@ -237,12 +230,9 @@ export function DesensitizeDiffViewer({
     setIsEditing(false);
   }, [editText, sensitiveMap, onChange, setIsEditing]);
 
-  // When caller supplies onSaveEdit, use it as the save handler; otherwise use internal.
+  // When caller supplies onSaveEdit/onCancelEdit, use them; otherwise fall back to internal.
   const handleSaveEdit = onSaveEdit ?? internalSaveEdit;
   const handleCancelEdit = onCancelEdit ?? internalCancelEdit;
-  // When not controlled, trigger internal enter-edit when user clicks the edit area header.
-  // The edit button itself is rendered by the caller, so we keep internalEnterEditMode
-  // available but do NOT render an inline button here.
 
   return (
     <div className={cn('flex flex-col gap-3 flex-1 min-h-0 overflow-hidden', className)}>
