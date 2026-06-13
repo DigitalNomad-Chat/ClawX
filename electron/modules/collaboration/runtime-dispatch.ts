@@ -37,6 +37,7 @@ import { checkTaskBudget, consumeTaskBudget } from "./budget-governance";
 import { loadAgentPersona } from "./persona-loader";
 import { pickPrimaryParticipantByRole } from "./role-resolver";
 import { publishCollabEvent } from "./event-publisher";
+import { publishDraftStart, publishDraftChunk, publishDraftChunkRaw, abortDraft } from "./stream-publisher";
 
 // ---------------------------------------------------------------------------
 //  Types
@@ -229,6 +230,208 @@ async function pollHistoryForAssistantReply(
   return null;
 }
 
+interface StreamedAgentRunResult {
+  rawText: string;
+  rawMessage: Record<string, unknown> | undefined;
+  runId: string | undefined;
+  sessionKey: string;
+}
+
+/**
+ * Subscribe to Gateway chat:message events for a single run.
+ * Falls back to polling if no streaming event arrives within 5 seconds.
+ */
+async function runAgentWithStreaming(
+  ctx: HostApiContext,
+  input: {
+    sessionKey: string;
+    rpcParams: Record<string, unknown>;
+    hall: CollaborationHall;
+    taskCard: HallTaskCard;
+    participant: HallParticipant;
+    draftId: string;
+  },
+  onDelta: (deltaText: string, rawMessage: Record<string, unknown>) => void,
+  timeoutMs = 180_000,
+): Promise<StreamedAgentRunResult> {
+  const { sessionKey, rpcParams, hall, taskCard, participant, draftId } = input;
+
+  const sendResult = await ctx.gatewayManager.rpc<{ runId?: string; status?: string } & Record<string, unknown>>(
+    "chat.send", rpcParams, 30_000,
+  );
+  const runId = sendResult?.runId;
+  console.log("[runtime-dispatch] Gateway chat.send runId=%s sessionKey=%s", runId, sessionKey);
+
+  let lastStreamedText = "";
+  let finished = false;
+  let finalRawMessage: Record<string, unknown> | undefined;
+  let finalRunId = runId;
+  let fallbackPoller: Promise<void> | undefined;
+  let fallbackActive = false;
+  let streamObserved = false;
+  let abortReason: string | undefined;
+
+  const streamPublishInput = {
+    draftId,
+    taskCardId: taskCard.taskCardId,
+    participantId: participant.participantId,
+    participantLabel: participant.displayName,
+    hallId: hall.hallId,
+  };
+
+  const cleanup = () => {
+    ctx.gatewayManager.off("chat:message", listener);
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (overallTimer) clearTimeout(overallTimer);
+  };
+
+  const listener = (data: { message?: unknown }) => {
+    const eventData = data as unknown as Record<string, unknown>;
+    const payload =
+      eventData && typeof eventData === "object" && "message" in eventData && typeof eventData.message === "object"
+        ? (eventData.message as Record<string, unknown>)
+        : eventData;
+    if (!payload || typeof payload !== "object") return;
+
+    const eventRunId = payload.runId != null ? String(payload.runId) : undefined;
+    const eventSessionKey = payload.sessionKey != null ? String(payload.sessionKey) : undefined;
+    const state = String(payload.state || "");
+
+    if (!eventRunId && !eventSessionKey) return;
+    if (runId && eventRunId && eventRunId !== runId) return;
+    if (eventSessionKey && eventSessionKey !== sessionKey) return;
+
+    const msg = payload.message as Record<string, unknown> | undefined;
+
+    if (state === "started") {
+      streamObserved = true;
+      return;
+    }
+
+    if (state === "delta") {
+      streamObserved = true;
+      const text = msg ? extractMessageText(msg) : "";
+      let delta = "";
+      if (text.length > lastStreamedText.length && lastStreamedText && text.startsWith(lastStreamedText)) {
+        delta = text.slice(lastStreamedText.length);
+      } else if (text.length > lastStreamedText.length) {
+        delta = text.slice(lastStreamedText.length);
+      }
+      lastStreamedText = text;
+      if (delta) {
+        onDelta(delta, msg ?? {});
+      }
+      publishDraftChunkRaw(streamPublishInput, delta, msg ?? {});
+      return;
+    }
+
+    if (state === "final") {
+      streamObserved = true;
+      finalRawMessage = msg;
+      finalRunId = eventRunId ?? runId;
+      finished = true;
+      if (msg) {
+        finalizeDraft(streamPublishInput, extractMessageText(msg));
+      }
+      cleanup();
+      return;
+    }
+
+    if (state === "error" || state === "aborted") {
+      streamObserved = true;
+      abortReason = state === "error" ? "Agent 执行出错" : "Agent 执行被中断";
+      finished = true;
+      cleanup();
+    }
+  };
+
+  ctx.gatewayManager.on("chat:message", listener);
+
+  const fallbackTimer = setTimeout(() => {
+    if (finished || streamObserved) return;
+    console.log("[runtime-dispatch] No streaming event after 5s, starting fallback poll");
+    fallbackActive = true;
+    fallbackPoller = pollHistoryForAssistantReply(
+      ctx,
+      sessionKey,
+      timeoutMs - 5_000,
+      (delta, _fullText) => {
+        onDelta(delta, {});
+        publishDraftChunk(streamPublishInput, delta);
+      },
+    ).then((text) => {
+      if (!finished) {
+        finalRawMessage = text ? { role: "assistant", content: text } : undefined;
+        finalRunId = runId;
+        finished = true;
+        if (text) {
+          finalizeDraft(streamPublishInput, text);
+        }
+        cleanup();
+      }
+    }).catch(() => {
+      if (!finished) {
+        finished = true;
+        cleanup();
+      }
+    });
+  }, 5_000);
+
+  const overallTimer = setTimeout(() => {
+    if (!finished) {
+      console.error("[runtime-dispatch] runAgentWithStreaming timed out after %dms", timeoutMs);
+      finished = true;
+      cleanup();
+    }
+  }, timeoutMs);
+
+  return new Promise((resolve, reject) => {
+    const check = setInterval(() => {
+      if (finished) {
+        clearInterval(check);
+        if (fallbackPoller && !fallbackActive) {
+          // This branch should not happen; fallbackActive guards the promise.
+        }
+        if (finalRawMessage) {
+          resolve({
+            rawText: extractMessageText(finalRawMessage),
+            rawMessage: finalRawMessage,
+            runId: finalRunId,
+            sessionKey,
+          });
+        } else {
+          reject(new Error(abortReason || "Agent 未返回有效回复（超时）"));
+        }
+      }
+    }, 50);
+  });
+}
+
+async function loadRunContextHistory(
+  ctx: HostApiContext,
+  sessionKey: string,
+  baselineFingerprint?: string,
+): Promise<HistoryMessage[]> {
+  try {
+    const history = await ctx.gatewayManager.rpc<HistoryResult>(
+      "chat.history", { sessionKey, limit: 200 }, 15_000,
+    );
+    const messages = history?.messages ?? [];
+    if (!baselineFingerprint) return messages;
+    // Return only messages that appeared after the baseline fingerprint
+    const idx = messages.findIndex((m) => fingerprintHistoryMessage(m) === baselineFingerprint);
+    return idx >= 0 ? messages.slice(idx + 1) : messages;
+  } catch (err) {
+    console.warn("[runtime-dispatch] loadRunContextHistory failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+function fingerprintHistoryMessage(message: HistoryMessage): string {
+  const text = (extractMessageText(message.content) || extractMessageText(message.text) || "").slice(0, 200);
+  return `${message.role || ""}|${text}|${JSON.stringify(message.content).slice(0, 200)}`;
+}
+
 // ---------------------------------------------------------------------------
 //  Main dispatch
 // ---------------------------------------------------------------------------
@@ -297,100 +500,83 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     };
   }
 
-  // Call Gateway — chat.send is async; it returns { runId } immediately.
-  // We then poll chat.history until an assistant message appears or we time out.
-  const rpcParams: Record<string, unknown> = {
-    sessionKey,
-    message: `${prompt.systemPrompt}\n\n${prompt.userMessage}`,
-    deliver: true,
-    idempotencyKey: randomUUID(),
+  const draftId = input.draftId || `draft-${randomUUID()}`;
+  const ownDraftLifecycle = !input.draftId;
+
+  // Capture baseline fingerprint before sending so we can extract new history turns later.
+  let baselineFingerprint: string | undefined;
+  try {
+    const baseline = await ctx.gatewayManager.rpc<HistoryResult>(
+      "chat.history", { sessionKey, limit: 200 }, 15_000,
+    );
+    const messages = baseline?.messages ?? [];
+    if (messages.length > 0) {
+      baselineFingerprint = fingerprintHistoryMessage(messages[messages.length - 1]);
+    }
+  } catch (err) {
+    console.warn("[runtime-dispatch] Failed to capture history baseline:", err instanceof Error ? err.message : err);
+  }
+
+  // Helper to execute one agent run with real streaming + fallback polling.
+  const executeOnce = async (extraInstruction?: string): Promise<StreamedAgentRunResult> => {
+    const message = extraInstruction
+      ? `${prompt.systemPrompt}\n\n${prompt.userMessage}\n\n[系统指令] ${extraInstruction}`
+      : `${prompt.systemPrompt}\n\n${prompt.userMessage}`;
+    const rpcParams: Record<string, unknown> = {
+      sessionKey,
+      message,
+      deliver: true,
+      idempotencyKey: randomUUID(),
+    };
+
+    publishDraftStart({
+      draftId,
+      taskCardId: taskCard.taskCardId,
+      participantId: participant.participantId,
+      participantLabel: participant.displayName,
+      hallId: hall.hallId,
+    });
+
+    return runAgentWithStreaming(
+      ctx,
+      { sessionKey, rpcParams, hall, taskCard, participant, draftId },
+      (_delta, _rawMessage) => {
+        // Streaming deltas are already published by runAgentWithStreaming via stream-publisher.
+      },
+      180_000,
+    );
   };
 
-  console.log("[runtime-dispatch] Calling gatewayManager.rpc chat.send sessionKey=%s", sessionKey);
-
-  const draftId = input.draftId || `draft-${randomUUID()}`;
-  const ownDraftLifecycle = !input.draftId; // true = runtime-dispatch owns finalize/abort
-
-  let rawReply: string;
+  let runResult: StreamedAgentRunResult;
   try {
-    // Phase 1: Send the message and obtain runId
-    const sendResult = await ctx.gatewayManager.rpc<{ runId?: string; status?: string } & Record<string, unknown>>(
-      "chat.send", rpcParams, 30_000,
-    );
-    console.log("[runtime-dispatch] Gateway chat.send result keys=%j", Object.keys(sendResult ?? {}));
-
-    // Publish draft_start event
-    publishCollabEvent({
-      type: "invalidate",
-      hallId: hall.hallId,
-      taskCardId: taskCard.taskCardId,
-      reason: "draft_chunk",
-      payload: {
-        draftId,
-        chunk: `${participant.displayName} 正在思考…`,
-        authorLabel: participant.displayName,
-        authorSemanticRole: participant.semanticRole,
-      },
-    });
-
-    // Phase 2: Poll chat.history for the assistant reply, streaming deltas
-    rawReply = await pollHistoryForAssistantReply(ctx, sessionKey, 180_000, (delta, _fullText) => {
-      publishCollabEvent({
-        type: "invalidate",
-        hallId: hall.hallId,
-        taskCardId: taskCard.taskCardId,
-        reason: "draft_chunk",
-        payload: {
-          draftId,
-          chunk: delta,
-          authorLabel: participant.displayName,
-          authorSemanticRole: participant.semanticRole,
-        },
-      });
-    });
-
-    if (!rawReply) {
-      if (ownDraftLifecycle) {
-        publishCollabEvent({
-          type: "invalidate",
-          hallId: hall.hallId,
-          taskCardId: taskCard.taskCardId,
-          reason: "draft_abort",
-          payload: {
-            draftId,
-            abortReason: "Agent 未返回有效回复（超时）",
-          },
-        });
-      }
-      return { success: false, sessionKey, error: "Agent 未返回有效回复（超时）" };
-    }
+    runResult = await executeOnce();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("[runtime-dispatch] Gateway RPC error:", errorMessage);
     if (ownDraftLifecycle) {
-      publishCollabEvent({
-        type: "invalidate",
-        hallId: hall.hallId,
-        taskCardId: taskCard.taskCardId,
-        reason: "draft_abort",
-        payload: {
+      abortDraft(
+        {
           draftId,
-          abortReason: errorMessage,
+          taskCardId: taskCard.taskCardId,
+          participantId: participant.participantId,
+          participantLabel: participant.displayName,
+          hallId: hall.hallId,
         },
-      });
+        errorMessage,
+      );
     }
     return { success: false, sessionKey, error: errorMessage };
   }
 
   // Record estimated consumption
-  await consumeTaskBudget(taskCard, rawReply);
+  await consumeTaskBudget(taskCard, runResult.rawText);
 
   // Sanitize reply
-  const { visibleText, structuredBlock, artifactRefs } = sanitizeAgentReply(rawReply);
+  const { visibleText, structuredBlock, artifactRefs } = sanitizeAgentReply(runResult.rawText);
 
   // Infer language
   const language = inferHallResponseLanguage(
-    `${rawReply}\n${triggerMessage?.content ?? ""}\n${taskCard.title}\n${taskCard.description}`,
+    `${runResult.rawText}\n${triggerMessage?.content ?? ""}\n${taskCard.title}\n${taskCard.description}`,
   );
 
   // Enforce concrete deliverable
@@ -403,32 +589,54 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     operatorIntent,
   );
 
+  // Load context history produced during this run (thinking/tool_use/tool_result turns).
+  let contextHistory = await loadRunContextHistory(ctx, sessionKey, baselineFingerprint);
+  if (contextHistory.length === 0 && runResult.rawMessage) {
+    contextHistory = [runResult.rawMessage as HistoryMessage];
+  }
+
+  const persistResult = async (
+    finalVisible: string,
+    finalStructured: ParsedStructuredBlock | undefined,
+    finalArtifactRefs: TaskArtifact[],
+    finalRunId: string | undefined,
+    extraPayload: Record<string, unknown> = {},
+  ): Promise<HallMessage> => {
+    const messageKind = resolveRuntimeMessageKind(mode, operatorIntent);
+    return appendMessage({
+      hallId: taskCard.hallId,
+      kind: messageKind,
+      authorParticipantId: participant.participantId,
+      authorLabel: participant.displayName,
+      authorSemanticRole: participant.semanticRole,
+      content: finalVisible,
+      taskCardId: taskCard.taskCardId,
+      taskId: taskCard.taskId,
+      payload: {
+        ...buildMessagePayload(
+          finalStructured ?? ({} as ParsedStructuredBlock),
+          finalArtifactRefs,
+          sessionKey,
+          finalRunId,
+          contextHistory,
+        ),
+        taskStage: taskCard.stage,
+        taskStatus: taskCard.status,
+        ...extraPayload,
+      },
+    });
+  };
+
   // If retry needed, handle according to retry count cap
   if (enforceResult.nextAction === "retry") {
-    const retryContent = enforceResult.content || visibleText || buildFallbackVisibleContent(mode, participant, language);
-
     // Auto-retry at most once. If already retried, use fallback and don't block.
     if (retryCount >= 1) {
       console.log("[runtime-dispatch] Max retries reached (%d), using fallback", retryCount);
       const fallbackContent = buildFallbackVisibleContent(mode, participant, language);
-      const fallbackMessageKind = resolveRuntimeMessageKind(mode, operatorIntent);
 
-      const message = await appendMessage({
-        hallId: taskCard.hallId,
-        kind: fallbackMessageKind,
-        authorParticipantId: participant.participantId,
-        authorLabel: participant.displayName,
-        authorSemanticRole: participant.semanticRole,
-        content: fallbackContent,
-        taskCardId: taskCard.taskCardId,
-        taskId: taskCard.taskId,
-        payload: {
-          ...buildMessagePayload(structuredBlock, artifactRefs, sessionKey),
-          taskStage: taskCard.stage,
-          taskStatus: taskCard.status,
-          retryFailed: true,
-          retryReason: enforceResult.retryReason,
-        },
+      const message = await persistResult(fallbackContent, structuredBlock, artifactRefs, runResult.runId, {
+        retryFailed: true,
+        retryReason: enforceResult.retryReason,
       });
 
       await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant, hall.participants);
@@ -447,42 +655,18 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     // First retry: inject retry instruction and re-call Gateway
     console.log("[runtime-dispatch] Retry %d -> %d, injecting instruction", retryCount, retryCount + 1);
 
-    const retryMessage = `${prompt.systemPrompt}\n\n${prompt.userMessage}\n\n[系统指令] ${enforceResult.nextStep || "请提供具体交付物。"}`;
-    const retryRpcParams: Record<string, unknown> = {
-      sessionKey,
-      message: retryMessage,
-      deliver: true,
-      idempotencyKey: randomUUID(),
-    };
-
-    let retryRawReply: string | null = null;
+    let retryRunResult: StreamedAgentRunResult | undefined;
     try {
-      const retrySendResult = await ctx.gatewayManager.rpc<{ runId?: string; status?: string } & Record<string, unknown>>(
-        "chat.send", retryRpcParams, 30_000,
-      );
-      console.log("[runtime-dispatch] Retry send result keys=%j", Object.keys(retrySendResult ?? {}));
-      retryRawReply = await pollHistoryForAssistantReply(ctx, sessionKey, 180_000, (delta, _fullText) => {
-        publishCollabEvent({
-          type: "invalidate",
-          hallId: hall.hallId,
-          taskCardId: taskCard.taskCardId,
-          reason: "draft_chunk",
-          payload: {
-            draftId,
-            chunk: delta,
-            authorLabel: participant.displayName,
-            authorSemanticRole: participant.semanticRole,
-          },
-        });
-      });
+      retryRunResult = await executeOnce(enforceResult.nextStep || "请提供具体交付物。");
     } catch (retryErr) {
       const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
       console.error("[runtime-dispatch] Retry Gateway error:", msg);
     }
 
-    if (retryRawReply) {
+    if (retryRunResult) {
       // Re-run sanitize + enforce on retry result
-      const retrySanitized = sanitizeAgentReply(retryRawReply);
+      await consumeTaskBudget(taskCard, retryRunResult.rawText);
+      const retrySanitized = sanitizeAgentReply(retryRunResult.rawText);
       const retryEnforceResult = enforceConcreteDeliverable(
         mode,
         mode === "discussion" ? operatorIntent?.text : taskCard.currentExecutionItem?.task,
@@ -494,27 +678,11 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
 
       // If retry still fails, fall through to persist with fallback (but don't block)
       if (retryEnforceResult.nextAction !== "retry") {
-        // Retry succeeded — record consumption, persist, and return
-        await consumeTaskBudget(taskCard, retryRawReply);
-
+        // Retry succeeded — persist, and return
         const finalVisible = retryEnforceResult.content || retrySanitized.visibleText || buildFallbackVisibleContent(mode, participant, language);
-        const retryMessageKind = resolveRuntimeMessageKind(mode, operatorIntent);
 
-        const message = await appendMessage({
-          hallId: taskCard.hallId,
-          kind: retryMessageKind,
-          authorParticipantId: participant.participantId,
-          authorLabel: participant.displayName,
-          authorSemanticRole: participant.semanticRole,
-          content: finalVisible,
-          taskCardId: taskCard.taskCardId,
-          taskId: taskCard.taskId,
-          payload: {
-            ...buildMessagePayload(retrySanitized.structuredBlock, retrySanitized.artifactRefs, sessionKey),
-            taskStage: taskCard.stage,
-            taskStatus: taskCard.status,
-            retrySucceeded: true,
-          },
+        const message = await persistResult(finalVisible, retrySanitized.structuredBlock, retrySanitized.artifactRefs, retryRunResult.runId, {
+          retrySucceeded: true,
         });
 
         await applyStructuredBlockToTaskCard(taskCard.taskCardId, retrySanitized.structuredBlock, retrySanitized.artifactRefs, participant, hall.participants);
@@ -534,25 +702,11 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
 
     // Retry failed or timed out — persist original/fallback, do not block
     console.log("[runtime-dispatch] Retry failed or timed out, using fallback");
-    const fallbackMessageKind = resolveRuntimeMessageKind(mode, operatorIntent);
     const fallbackContent = buildFallbackVisibleContent(mode, participant, language);
 
-    const message = await appendMessage({
-      hallId: taskCard.hallId,
-      kind: fallbackMessageKind,
-      authorParticipantId: participant.participantId,
-      authorLabel: participant.displayName,
-      authorSemanticRole: participant.semanticRole,
-      content: fallbackContent,
-      taskCardId: taskCard.taskCardId,
-      taskId: taskCard.taskId,
-      payload: {
-        ...buildMessagePayload(structuredBlock, artifactRefs, sessionKey),
-        taskStage: taskCard.stage,
-        taskStatus: taskCard.status,
-        retryFailed: true,
-        retryReason: enforceResult.retryReason,
-      },
+    const message = await persistResult(fallbackContent, structuredBlock, artifactRefs, runResult.runId, {
+      retryFailed: true,
+      retryReason: enforceResult.retryReason,
     });
 
     await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant);
@@ -568,28 +722,12 @@ export async function runtimeDispatch(input: RuntimeDispatchInput): Promise<Runt
     };
   }
 
-  // Determine message kind
-  const messageKind = resolveRuntimeMessageKind(mode, operatorIntent);
-
+  // Normal success path
   // Build final visible content
   const finalVisibleContent = enforceResult.content || visibleText || buildFallbackVisibleContent(mode, participant, language);
 
   // Persist message
-  const message = await appendMessage({
-    hallId: taskCard.hallId,
-    kind: messageKind,
-    authorParticipantId: participant.participantId,
-    authorLabel: participant.displayName,
-    authorSemanticRole: participant.semanticRole,
-    content: finalVisibleContent,
-    taskCardId: taskCard.taskCardId,
-    taskId: taskCard.taskId,
-    payload: {
-      ...buildMessagePayload(structuredBlock, artifactRefs, sessionKey),
-      taskStage: taskCard.stage,
-      taskStatus: taskCard.status,
-    },
-  });
+  const message = await persistResult(finalVisibleContent, structuredBlock, artifactRefs, runResult.runId);
 
   // Update TaskCard from structured block
   await applyStructuredBlockToTaskCard(taskCard.taskCardId, structuredBlock, artifactRefs, participant, hall.participants);
@@ -653,6 +791,8 @@ function buildMessagePayload(
   structured: ParsedStructuredBlock,
   artifactRefs: TaskArtifact[],
   sessionKey: string,
+  runId?: string,
+  rawContentBlocks?: HistoryMessage[],
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = { sessionKey };
   if (structured.proposal) payload.proposal = structured.proposal;
@@ -661,6 +801,8 @@ function buildMessagePayload(
   if (structured.executor) payload.nextOwnerParticipantId = structured.executor;
   if (structured.latestSummary) payload.status = structured.latestSummary;
   if (artifactRefs.length > 0) payload.artifactRefs = artifactRefs;
+  if (runId) payload.runId = runId;
+  if (rawContentBlocks && rawContentBlocks.length > 0) payload.rawContentBlocks = rawContentBlocks;
   return payload;
 }
 

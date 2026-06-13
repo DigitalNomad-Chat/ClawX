@@ -11,9 +11,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCollaborationStore } from '../store';
 import { useCollabStream } from '../hooks/useCollabStream';
 import type { HallMessage, HallParticipant, HallTaskCard } from '../types';
+import type { RawMessage, ToolStatus } from '@/stores/chat';
+import { collectToolUpdates, upsertToolStatuses } from '@/stores/chat/helpers';
 import { MentionInput } from './MentionInput';
 import { DecisionPanel } from './DecisionPanel';
 import { PixelAvatar } from './PixelAvatar';
+import { CollabStreamMessage } from './CollabStreamMessage';
+import { CollabExecutionContext } from './CollabExecutionContext';
 import {
   MessageSquare,
   RefreshCw,
@@ -92,6 +96,8 @@ interface DraftItem {
   authorLabel: string;
   authorSemanticRole?: string;
   content: string;
+  rawMessage: RawMessage | null;
+  streamingTools: ToolStatus[];
   status: 'streaming' | 'finalized' | 'aborted';
   abortedReason?: string;
   finalizedMessageId?: string;
@@ -165,6 +171,7 @@ function StreamMessageItem({
 }) {
   const isSystem = message.kind === 'system';
   const isHandoff = message.kind === 'handoff';
+  const [showContext, setShowContext] = useState(false);
 
   if (isSystem) {
     return (
@@ -225,6 +232,17 @@ function StreamMessageItem({
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
           </div>
         </div>
+        {message.payload?.rawContentBlocks && message.payload.rawContentBlocks.length > 0 && (
+          <button
+            className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            onClick={() => setShowContext((v) => !v)}
+          >
+            {showContext ? '隐藏上下文' : '查看上下文'}
+          </button>
+        )}
+        {showContext && message.payload?.rawContentBlocks && (
+          <CollabExecutionContext messages={message.payload.rawContentBlocks} />
+        )}
         {isHandoff && <HandoffPayload payload={message.payload} />}
       </div>
     </div>
@@ -249,16 +267,17 @@ function DraftMessageItem({ draft }: { draft: DraftItem }) {
         </div>
         <div
           className={cn(
-            'rounded-lg px-3 py-2 text-sm whitespace-pre-wrap shadow-sm',
+            'rounded-lg px-3 py-2 text-sm shadow-sm',
             draft.status === 'aborted'
               ? 'border border-destructive/20 bg-destructive/5 text-destructive'
               : 'border border-primary/20 bg-primary/5'
           )}
         >
-          {draft.content}
-          {draft.status === 'streaming' && (
-            <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-primary align-middle" />
-          )}
+          <CollabStreamMessage
+            rawMessage={draft.rawMessage}
+            streamingTools={draft.streamingTools}
+            isStreaming={draft.status === 'streaming'}
+          />
         </div>
         {draft.status === 'aborted' && draft.abortedReason && (
           <p className="text-[11px] text-destructive">
@@ -326,14 +345,25 @@ export function MessageStream({
         authorLabel = thinkingMatch?.[1] || undefined;
       }
       const authorSemanticRole = extra?.authorSemanticRole as string | undefined;
+      const rawMessage = extra?.rawMessage as RawMessage | undefined;
 
       setDrafts((prev) => {
         const existing = prev[draftId];
+        let nextTools = existing?.streamingTools ?? [];
+        if (rawMessage) {
+          const updates = collectToolUpdates(rawMessage, 'delta');
+          nextTools = updates.length > 0 ? upsertToolStatuses(nextTools, updates) : nextTools;
+        }
         if (existing) {
           authorLabel = existing.authorLabel;
           return {
             ...prev,
-            [draftId]: { ...existing, content: existing.content + chunk },
+            [draftId]: {
+              ...existing,
+              content: existing.content + chunk,
+              rawMessage: rawMessage ?? existing.rawMessage,
+              streamingTools: nextTools,
+            },
           };
         }
         return {
@@ -343,6 +373,8 @@ export function MessageStream({
             authorLabel: authorLabel || 'Agent',
             authorSemanticRole,
             content: chunk,
+            rawMessage: rawMessage ?? null,
+            streamingTools: nextTools,
             status: 'streaming',
             createdAt: Date.now(),
           },

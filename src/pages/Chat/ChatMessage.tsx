@@ -5,24 +5,27 @@
  * surfaced via ExecutionGraphCard, not inside message bubbles.
  */
 import { useState, useCallback, useEffect, memo } from 'react';
-import { Sparkles, Copy, Check, ChevronDown, ChevronRight, Wrench, FileText, Film, Music, FileArchive, File, X, FolderOpen, ZoomIn, Loader2, CheckCircle2, AlertCircle, Play, Eye, EyeOff } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import { createPortal } from 'react-dom';
+import { Sparkles, Copy, Check, File, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { invokeIpc, statFile } from '@/lib/api-client';
+import { statFile } from '@/lib/api-client';
 import type { RawMessage, AttachedFileMeta } from '@/stores/chat';
 import { extractText, extractImages, extractToolUse, formatTimestamp } from './message-utils';
-import { repairMarkdown } from '@/lib/markdown-repair';
 import { restoreText } from '@/lib/desensitize';
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { useStreamArtifactStore } from '@/stores/stream-artifact';
-import { useArtifactPanel } from '@/stores/artifact-panel';
 import { useDesensitizeViewStore } from '@/stores/desensitize-view';
-import type { StreamArtifactType } from '@/lib/artifact/types';
+import {
+  ToolStatusBar,
+  ToolCard,
+  FileCard,
+  ImageThumbnail,
+  ImagePreviewCard,
+  ImageLightbox,
+  MessageBubble,
+  DIRECTORY_MIME_TYPE,
+  fileNameFromPath,
+  trimPathTerminators,
+  imageSrc,
+} from '@/components/chat-message-parts';
 
 interface ChatMessageProps {
   message: RawMessage;
@@ -53,10 +56,6 @@ interface ChatMessageProps {
    */
   onOpenFile?: (file: AttachedFileMeta) => void;
 }
-
-interface ExtractedImage { url?: string; data?: string; mimeType: string; }
-
-const DIRECTORY_MIME_TYPE = 'application/x-directory';
 
 function isChatPreviewDocument(file: AttachedFileMeta): boolean {
   const name = file.fileName.toLowerCase();
@@ -97,24 +96,6 @@ function previewMimeFromPath(filePath: string): string | null {
   if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
   if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   return null;
-}
-
-function fileNameFromPath(filePath: string): string {
-  return filePath.split(/[\\/]/).pop() || 'file';
-}
-
-function trimPathTerminators(filePath: string): string {
-  return filePath.replace(/[，。；;,.!?]+$/u, '');
-}
-
-const PREVIEWABLE_LANG_MAP: Record<string, StreamArtifactType> = {
-  html: 'html',
-  svg: 'svg',
-  mermaid: 'mermaid',
-};
-
-function getPreviewableType(lang: string): StreamArtifactType | null {
-  return PREVIEWABLE_LANG_MAP[lang.toLowerCase()] || null;
 }
 
 function extractPreviewDocumentPaths(text: string): AttachedFileMeta[] {
@@ -174,43 +155,6 @@ function extractPreviewDocumentPaths(text: string): AttachedFileMeta[] {
   }
 
   return refs;
-}
-
-/**
- * Normalize LaTeX delimiters so `remark-math` can detect them.
- *
- * Many LLMs emit LaTeX using `\(` / `\)` for inline math and `\[` / `\]`
- * for block math (OpenAI style), which are NOT recognized by remark-math.
- * remark-math only parses `$...$` and `$$...$$`.
- *
- * We convert the backslash-paren/bracket forms to dollar-sign forms so the
- * math is rendered regardless of which convention the model uses.
- *
- * Transformations are skipped inside fenced/inline code spans to avoid
- * clobbering code samples that legitimately contain `\(` etc.
- */
-function normalizeLatexDelimiters(input: string): string {
-  if (!input || (input.indexOf('\\(') === -1 && input.indexOf('\\[') === -1)) {
-    return input;
-  }
-
-  const parts = input.split(/(```[\s\S]*?```|`[^`\n]*`)/g);
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (!part) continue;
-    if (part.startsWith('```') || part.startsWith('`')) continue;
-    let next = part.replace(/\\\[([\s\S]+?)\\\]/g, (_m, body: string) => `\n$$\n${body.trim()}\n$$\n`);
-    next = next.replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body}$`);
-    parts[i] = next;
-  }
-  return parts.join('');
-}
-
-/** Resolve an ExtractedImage to a displayable src string, or null if not possible. */
-function imageSrc(img: ExtractedImage): string | null {
-  if (img.url) return img.url;
-  if (img.data) return `data:${img.mimeType};base64,${img.data}`;
-  return null;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -515,56 +459,6 @@ export const ChatMessage = memo(function ChatMessage({
   );
 });
 
-function formatDuration(durationMs?: number): string | null {
-  if (!durationMs || !Number.isFinite(durationMs)) return null;
-  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
-  return `${(durationMs / 1000).toFixed(1)}s`;
-}
-
-function ToolStatusBar({
-  tools,
-}: {
-  tools: Array<{
-    id?: string;
-    toolCallId?: string;
-    name: string;
-    status: 'running' | 'completed' | 'error';
-    durationMs?: number;
-    summary?: string;
-  }>;
-}) {
-  return (
-    <div className="w-full space-y-1">
-      {tools.map((tool) => {
-        const duration = formatDuration(tool.durationMs);
-        const isRunning = tool.status === 'running';
-        const isError = tool.status === 'error';
-        return (
-          <div
-            key={tool.toolCallId || tool.id || tool.name}
-            className={cn(
-              'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors',
-              isRunning && 'border-primary/30 bg-primary/5 text-foreground',
-              !isRunning && !isError && 'border-border/50 bg-muted/20 text-muted-foreground',
-              isError && 'border-destructive/30 bg-destructive/5 text-destructive',
-            )}
-          >
-            {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
-            {!isRunning && !isError && <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />}
-            {isError && <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />}
-            <Wrench className="h-3 w-3 shrink-0 opacity-60" />
-            <span className="font-mono text-xs font-medium">{tool.name}</span>
-            {duration && <span className="text-tiny opacity-60">{tool.summary ? `(${duration})` : duration}</span>}
-            {tool.summary && (
-              <span className="truncate text-tiny opacity-70">{tool.summary}</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Assistant hover bar (timestamp + copy, shown on group hover) ─
 
 function AssistantHoverBar({ text, timestamp }: { text: string; timestamp?: number }) {
@@ -593,354 +487,3 @@ function AssistantHoverBar({ text, timestamp }: { text: string; timestamp?: numb
   );
 }
 
-// ── Message Bubble ──────────────────────────────────────────────
-
-function CodeBlockToolbar({
-  code,
-  language,
-}: {
-  code: string;
-  language?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  const previewType = language ? getPreviewableType(language) : null;
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [code]);
-
-  const handlePreview = useCallback(() => {
-    if (!previewType) return;
-    const content = code.replace(/\n$/, '');
-    const artifact = {
-      id: crypto.randomUUID(),
-      type: previewType,
-      title: `${previewType.toUpperCase()} 预览`,
-      content,
-      status: 'complete' as const,
-      meta: { language: language || undefined },
-      position: { start: 0, end: content.length },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      sessionKey: 'manual-preview',
-    };
-    useStreamArtifactStore.getState().addArtifact(artifact);
-    useArtifactPanel.getState().openContent();
-  }, [code, language, previewType]);
-
-  return (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 dark:bg-white/5 rounded-t-lg border-b border-border/30">
-      <span className="text-xs text-muted-foreground font-mono">{language || 'text'}</span>
-      <div className="flex items-center gap-1">
-        {previewType && (
-          <button
-            onClick={handlePreview}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 rounded transition-colors"
-            title="在面板中预览"
-          >
-            <Play className="h-3 w-3" />
-            <span>预览</span>
-          </button>
-        )}
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 rounded transition-colors"
-          title="复制"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-          <span>{copied ? '已复制' : '复制'}</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MessageBubble({
-  text,
-  isUser,
-  isStreaming,
-}: {
-  text: string;
-  isUser: boolean;
-  isStreaming: boolean;
-}) {
-  // Debounce streaming text to batch rapid tokens and avoid O(n²) re-parses
-  const debouncedText = useDebouncedValue(text, isStreaming ? 30 : 0);
-  // Repair incomplete markdown syntax for streaming content
-  const displayText = isStreaming ? repairMarkdown(normalizeLatexDelimiters(debouncedText)) : normalizeLatexDelimiters(text);
-
-  return (
-    <div
-      className={cn(
-        'relative rounded-2xl px-4 py-3',
-        !isUser && 'w-full',
-        isUser ? 'msg-bubble-user' : 'msg-bubble-ai',
-      )}
-    >
-      {isUser ? (
-        <p className="whitespace-pre-wrap break-words break-all text-sm leading-relaxed">{text}</p>
-      ) : (
-        <div className="prose prose-sm dark:prose-invert max-w-none break-words break-all">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false, output: 'html' }]]}
-            components={{
-              code({ className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '');
-                const language = match?.[1];
-                const isInline = !match && !className;
-                if (isInline) {
-                  return (
-                    <code {...props}>
-                      {children}
-                    </code>
-                  );
-                }
-                const codeText = String(children).replace(/\n$/, '');
-                return (
-                  <div className="my-2 rounded-lg border border-border/30 overflow-hidden">
-                    <CodeBlockToolbar code={codeText} language={language} />
-                    <pre className="m-0 rounded-none bg-muted/30 dark:bg-white/5 px-4 py-3 overflow-x-auto">
-                      <code className={cn(className, 'text-sm font-mono leading-relaxed')} {...props}>
-                        {children}
-                      </code>
-                    </pre>
-                  </div>
-                );
-              },
-              a({ href, children }) {
-                return (
-                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-words break-all">
-                    {children}
-                  </a>
-                );
-              },
-            }}
-          >
-            {displayText}
-          </ReactMarkdown>
-          {isStreaming && (
-            <span className="streaming-cursor" />
-          )}
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// ── File Card (for user-uploaded non-image files) ───────────────
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function FileIcon({ mimeType, className }: { mimeType: string; className?: string }) {
-  if (mimeType === DIRECTORY_MIME_TYPE) return <FolderOpen className={className} />;
-  if (mimeType.startsWith('video/')) return <Film className={className} />;
-  if (mimeType.startsWith('audio/')) return <Music className={className} />;
-  if (mimeType.startsWith('text/') || mimeType === 'application/json' || mimeType === 'application/xml') return <FileText className={className} />;
-  if (mimeType.includes('zip') || mimeType.includes('compressed') || mimeType.includes('archive') || mimeType.includes('tar') || mimeType.includes('rar') || mimeType.includes('7z')) return <FileArchive className={className} />;
-  if (mimeType === 'application/pdf') return <FileText className={className} />;
-  return <File className={className} />;
-}
-
-function FileCard({ file, onOpen }: { file: AttachedFileMeta; onOpen?: (file: AttachedFileMeta) => void }) {
-  const handleOpen = useCallback(() => {
-    if (!file.filePath) return;
-    if (onOpen) {
-      onOpen(file);
-    } else {
-      invokeIpc('shell:openPath', file.filePath);
-    }
-  }, [file, onOpen]);
-
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-3 rounded-xl border border-border/60 px-3 py-2.5 bg-surface-input max-w-[220px]",
-        file.filePath && "cursor-pointer hover:bg-muted transition-all duration-200 hover:shadow-sm hover:border-primary/20"
-      )}
-      onClick={handleOpen}
-      title={file.filePath ? "Open file" : undefined}
-    >
-      <FileIcon mimeType={file.mimeType} className="h-5 w-5 shrink-0 text-primary/70" />
-      <div className="min-w-0 overflow-hidden">
-        <p className="text-xs font-medium truncate">{file.fileName}</p>
-        <p className="text-2xs text-muted-foreground">
-          {file.mimeType === DIRECTORY_MIME_TYPE ? '文件夹' : file.fileSize > 0 ? formatFileSize(file.fileSize) : 'File'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Image Thumbnail (user bubble — square crop with zoom hint) ──
-
-function ImageThumbnail({
-  src,
-  fileName,
-  filePath,
-  base64,
-  mimeType,
-  onPreview,
-}: {
-  src: string;
-  fileName: string;
-  filePath?: string;
-  base64?: string;
-  mimeType?: string;
-  onPreview: () => void;
-}) {
-  void filePath; void base64; void mimeType;
-  return (
-    <div
-      className="relative w-36 h-36 rounded-xl border overflow-hidden border-border/60 bg-muted group/img cursor-zoom-in"
-      onClick={onPreview}
-    >
-      <img src={src} alt={fileName} className="w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/25 transition-colors flex items-center justify-center">
-        <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow" />
-      </div>
-    </div>
-  );
-}
-
-// ── Image Preview Card (assistant bubble — natural size with overlay actions) ──
-
-function ImagePreviewCard({
-  src,
-  fileName,
-  filePath,
-  base64,
-  mimeType,
-  onPreview,
-}: {
-  src: string;
-  fileName: string;
-  filePath?: string;
-  base64?: string;
-  mimeType?: string;
-  onPreview: () => void;
-}) {
-  void filePath; void base64; void mimeType;
-  return (
-    <div
-      className="relative max-w-xs rounded-xl border overflow-hidden border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 group/img cursor-zoom-in"
-      onClick={onPreview}
-    >
-      <img src={src} alt={fileName} className="block w-full" />
-      <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors flex items-center justify-center">
-        <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow" />
-      </div>
-    </div>
-  );
-}
-
-// ── Image Lightbox ───────────────────────────────────────────────
-
-function ImageLightbox({
-  src,
-  fileName,
-  filePath,
-  base64,
-  mimeType,
-  onClose,
-}: {
-  src: string;
-  fileName: string;
-  filePath?: string;
-  base64?: string;
-  mimeType?: string;
-  onClose: () => void;
-}) {
-  void src; void base64; void mimeType; void fileName;
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  const handleShowInFolder = useCallback(() => {
-    if (filePath) {
-      invokeIpc('shell:showItemInFolder', filePath);
-    }
-  }, [filePath]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      {/* Image + buttons stacked */}
-      <div
-        className="flex flex-col items-center gap-3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={src}
-          alt={fileName}
-          className="max-w-[90vw] max-h-[85vh] rounded-lg shadow-2xl object-contain"
-        />
-
-        {/* Action buttons below image */}
-        <div className="flex items-center gap-2">
-          {filePath && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white"
-              onClick={handleShowInFolder}
-              title="在文件夹中显示"
-            >
-              <FolderOpen className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white"
-            onClick={onClose}
-            title="关闭"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-// ── Tool Card ───────────────────────────────────────────────────
-
-function ToolCard({ name, input }: { name: string; input: unknown }) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="rounded-xl border border-border/60 bg-surface-input text-sm overflow-hidden">
-      <button
-        className="flex items-center gap-2 w-full px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors hover:bg-muted/40"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
-        <Wrench className="h-3 w-3 shrink-0 opacity-60" />
-        <span className="font-mono text-xs">{name}</span>
-        {expanded ? <ChevronDown className="h-3 w-3 ml-auto" /> : <ChevronRight className="h-3 w-3 ml-auto" />}
-      </button>
-      {expanded && input != null && (
-        <pre className="px-3 pb-2 text-xs text-foreground/70 overflow-x-auto bg-muted/30 font-mono leading-relaxed">
-          {typeof input === 'string' ? input : JSON.stringify(input, null, 2) as string}
-        </pre>
-      )}
-    </div>
-  );
-}

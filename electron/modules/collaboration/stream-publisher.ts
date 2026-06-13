@@ -17,7 +17,7 @@ export interface StreamPublishInput {
   hallId: string;
 }
 
-export function publishDraftChunk(input: StreamPublishInput, chunk: string): void {
+export function publishDraftStart(input: StreamPublishInput): void {
   publishCollabEvent({
     type: "invalidate",
     hallId: input.hallId,
@@ -25,12 +25,40 @@ export function publishDraftChunk(input: StreamPublishInput, chunk: string): voi
     reason: "draft_chunk",
     payload: {
       draftId: input.draftId,
-      chunk,
+      chunk: `${input.participantLabel} 正在思考…`,
       participantId: input.participantId,
       participantLabel: input.participantLabel,
       timestamp: new Date().toISOString(),
     },
   });
+}
+
+export function publishDraftChunkRaw(
+  input: StreamPublishInput,
+  chunk: string,
+  rawMessage?: Record<string, unknown>,
+): void {
+  const payload: Record<string, unknown> = {
+    draftId: input.draftId,
+    chunk,
+    participantId: input.participantId,
+    participantLabel: input.participantLabel,
+    timestamp: new Date().toISOString(),
+  };
+  if (rawMessage && typeof rawMessage === "object") {
+    payload.rawMessage = rawMessage;
+  }
+  publishCollabEvent({
+    type: "invalidate",
+    hallId: input.hallId,
+    taskCardId: input.taskCardId,
+    reason: "draft_chunk",
+    payload,
+  });
+}
+
+export function publishDraftChunk(input: StreamPublishInput, chunk: string): void {
+  publishDraftChunkRaw(input, chunk);
 }
 
 export function finalizeDraft(

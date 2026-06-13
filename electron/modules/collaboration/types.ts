@@ -98,6 +98,17 @@ export interface HallMessagePayload {
   sessionKey?: string;
   sourceSessionKey?: string;
   sourceTool?: string;
+  /** Gateway run id for this agent execution */
+  runId?: string;
+  /** Raw Gateway history messages produced during this run (thinking/tool_use/tool_result etc.) */
+  rawContentBlocks?: HallRawContentBlock[];
+}
+
+export interface HallRawContentBlock {
+  role?: string;
+  content?: unknown;
+  text?: unknown;
+  [key: string]: unknown;
 }
 
 export interface HallMessage {

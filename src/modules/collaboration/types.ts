@@ -128,6 +128,13 @@ export interface HandoffValidationResult {
   warnings: HandoffValidationWarning[];
 }
 
+export interface HallRawContentBlock {
+  role?: string;
+  content?: unknown;
+  text?: unknown;
+  [key: string]: unknown;
+}
+
 export interface HallMessagePayload {
   projectId?: string;
   taskId?: string;
@@ -148,6 +155,8 @@ export interface HallMessagePayload {
   sessionKey?: string;
   sourceSessionKey?: string;
   sourceTool?: string;
+  runId?: string;
+  rawContentBlocks?: HallRawContentBlock[];
 }
 
 export interface HallMessage {

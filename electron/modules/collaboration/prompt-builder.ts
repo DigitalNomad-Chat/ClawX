@@ -330,13 +330,44 @@ function buildCoworkerContext(hall: CollaborationHall, self: HallParticipant): s
 }
 
 function buildMessageHistory(messages: HallMessage[], self: HallParticipant): string[] {
-  // Take last 15 messages, skip system messages, format compactly
+  // Take last 15 messages, skip system messages, format compactly.
+  // When a message carries rawContentBlocks (thinking/tool_use/tool_result),
+  // append a short summary so the next agent has execution context.
   return messages
     .filter((m) => m.kind !== "system")
     .slice(-15)
     .map((m) => {
       const prefix = m.authorParticipantId === self.participantId ? "[你]" : `[${m.authorLabel}]`;
-      return `${prefix}: ${m.content.slice(0, 400)}${m.content.length > 400 ? "..." : ""}`;
+      let visibleSummary = m.content.slice(0, 400);
+      if (m.content.length > 400) visibleSummary += "...";
+
+      const rawBlocks = m.payload?.rawContentBlocks;
+      if (rawBlocks && rawBlocks.length > 0) {
+        const toolNames: string[] = [];
+        let thinkingSnippet = "";
+        for (const block of rawBlocks) {
+          const content = block.content;
+          if (Array.isArray(content)) {
+            for (const cb of content as Array<Record<string, unknown>>) {
+              if (cb.type === "tool_use") {
+                const name = typeof cb.name === "string" ? cb.name : undefined;
+                if (name) toolNames.push(name);
+              }
+              if (cb.type === "thinking" && typeof cb.thinking === "string" && !thinkingSnippet) {
+                thinkingSnippet = cb.thinking.slice(0, 200);
+              }
+            }
+          }
+        }
+        if (toolNames.length > 0) {
+          visibleSummary += `\n[调用工具: ${[...new Set(toolNames)].join(", ")}]`;
+        }
+        if (thinkingSnippet) {
+          visibleSummary += `\n[思考摘要: ${thinkingSnippet}...]`;
+        }
+      }
+
+      return `${prefix}: ${visibleSummary}`;
     });
 }
 
