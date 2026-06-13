@@ -423,7 +423,6 @@ export function markSensitive(
   existingMap: SensitiveMap,
   selection: string,
   type: string,
-  options: { replaceAll?: boolean } = {},
 ): { text: string; map: SensitiveMap } {
   const trimmed = selection.trim();
   if (!trimmed) return { text, map: existingMap };
@@ -443,14 +442,10 @@ export function markSensitive(
 
   const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
 
-  if (options.replaceAll) {
-    if (!text.includes(trimmed)) return { text, map: existingMap };
-    const newText = text.split(trimmed).join(placeholder);
-    const newMap = { ...existingMap, [placeholder]: trimmed };
-    return { text: newText, map: newMap };
-  }
+  const idx = text.indexOf(trimmed);
+  if (idx === -1) return { text, map: existingMap };
 
-  const newText = text.replace(trimmed, placeholder);
+  const newText = text.slice(0, idx) + placeholder + text.slice(idx + trimmed.length);
   const newMap = { ...existingMap, [placeholder]: trimmed };
   return { text: newText, map: newMap };
 }
