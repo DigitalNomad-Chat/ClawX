@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { parseJsonBody, sendJson } from '../route-utils';
 import type { HostApiContext } from '../context';
-import { desensitize, restore, markSensitive } from '../services/desensitize';
+import { desensitize, restore, markSensitive, batchMarkSensitive } from '../services/desensitize';
+import type { BatchMarkItem } from '../services/desensitize';
 
 export async function handleDesensitizeRoutes(
   req: IncomingMessage,
@@ -79,6 +80,29 @@ export async function handleDesensitizeRoutes(
       }
       const result = restore(body.text, body.map);
       sendJson(res, 200, { success: true, text: result });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  if (url.pathname === '/api/desensitize/batch-mark' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{
+        text: string;
+        map: Record<string, string>;
+        items: BatchMarkItem[];
+      }>(req);
+      if (!body.text || typeof body.text !== 'string' || !body.map || typeof body.map !== 'object') {
+        sendJson(res, 400, { success: false, error: 'text and map fields are required' });
+        return true;
+      }
+      if (!Array.isArray(body.items)) {
+        sendJson(res, 400, { success: false, error: 'items must be an array' });
+        return true;
+      }
+      const result = batchMarkSensitive(body.text, body.map, body.items);
+      sendJson(res, 200, { success: true, ...result });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
     }
