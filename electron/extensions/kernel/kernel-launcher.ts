@@ -13,6 +13,7 @@ import { resolve, dirname } from 'path';
 import { app } from 'electron';
 import type { KernelEvent, KernelRequest } from '../../../kernel/src/types.js';
 import { getActiveLLMProvider } from '../marketplace/kernel-llm-store.js';
+import { prepareWinSpawn } from '../../utils/win-shell.js';
 
 export interface KernelLauncherOptions {
   onEvent?: (event: KernelEvent) => void;
@@ -131,8 +132,11 @@ export class KernelLauncher {
     console.log(`[KernelLauncher] Dev mode — starting kernel via ${hasBundle ? 'pre-built bundle' : 'tsx'}:`, execArgs.join(' '));
 
     return new Promise((resolve, reject) => {
-      const child = spawn(execPath, execArgs, {
+      const { shell, command, args } = prepareWinSpawn(execPath, execArgs);
+      const child = spawn(command, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
+        shell,
+        windowsHide: true,
         env: {
           ...process.env,
           ...providerEnv,

@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kernelClient, type KernelEvent } from '@/lib/kernel-client';
 import { repairMarkdown } from '@/lib/markdown-repair';
+import { useGoClawStore } from '@/modules/goclaw/store';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -587,11 +588,15 @@ export function AgentChat() {
         messages,
         createdAt: historySessions.find((s) => s.sessionId === persistenceSessionId)?.createdAt || Date.now(),
         updatedAt: Date.now(),
-      }).catch((err) => console.error('[AgentChat] Auto-save failed:', err));
+      })
+        .then(() => {
+          void useGoClawStore.getState().loadRecentSessions();
+        })
+        .catch((err) => console.error('[AgentChat] Auto-save failed:', err));
     }, 2000);
 
     return () => clearTimeout(timeout);
-  }, [messages, persistenceSessionId, agentId, agentInfo]);
+  }, [messages, persistenceSessionId, agentId, agentInfo, historySessions]);
 
   // Load skills list
   useEffect(() => {
@@ -850,6 +855,7 @@ export function AgentChat() {
 
         if (histResult.success && histResult.sessions && histResult.sessions.length > 0) {
           setHistorySessions(histResult.sessions as typeof historySessions);
+          void useGoClawStore.getState().loadRecentSessions();
 
           // If navigated with a specific restoreSessionId, restore it directly
           const restoreId = (location.state as { restoreSessionId?: string } | null)?.restoreSessionId;
@@ -887,6 +893,7 @@ export function AgentChat() {
         if (hireResult.success && hireResult.sessionId) {
           setSessionId(hireResult.sessionId);
           setPersistenceSessionId(hireResult.sessionId);
+          void useGoClawStore.getState().loadRecentSessions();
         } else {
           setInitPhase('idle');
         }
@@ -974,6 +981,7 @@ export function AgentChat() {
         sid = hireResult.sessionId;
         setSessionId(sid);
         setPersistenceSessionId(sid);
+        void useGoClawStore.getState().loadRecentSessions();
       }
 
       // Stage attachments to session workspace
