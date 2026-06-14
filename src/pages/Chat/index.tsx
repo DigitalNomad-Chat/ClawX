@@ -633,8 +633,11 @@ export function Chat() {
   }, [userRunCards, messages]);
   const streamingReplyText = userRunCards.find((card) => card.streamingReplyText != null)?.streamingReplyText ?? null;
 
-  // Rows visible to the virtual scroller (folded narration messages are excluded
-  // so Virtuoso never has to render a zero-height item).
+  // Rows visible to the virtual scroller. We exclude messages that would render
+  // as a zero-height item in ChatMessage (folded narration, tool_result, or
+  // completely empty messages). We also exclude tool_use-only messages that fall
+  // inside a run segment, because `suppressToolCards` forces ChatMessage to hide
+  // its tool cards and the message would otherwise collapse to nothing.
   const visibleRows = useMemo(() => {
     const rows: Array<{ msg: RawMessage; originalIdx: number }> = [];
     for (let idx = 0; idx < messages.length; idx += 1) {
@@ -643,16 +646,29 @@ export function Chat() {
       const role = typeof msg.role === 'string' ? msg.role.toLowerCase() : '';
       // Skip tool_result messages — ChatMessage renders them as null
       if (role === 'toolresult' || role === 'tool_result') continue;
-      // Skip empty messages that ChatMessage would render as null
+
       const hasText = extractText(msg).trim().length > 0;
       const hasImages = extractImages(msg).length > 0;
       const hasTools = extractToolUse(msg).length > 0;
       const hasAttachments = msg._attachedFiles && msg._attachedFiles.length > 0;
-      if (!hasText && !hasImages && !hasTools && !hasAttachments) continue;
+      const hasContent = hasText || hasImages || hasTools || hasAttachments;
+
+      // Skip empty messages that ChatMessage would render as null
+      if (!hasContent) continue;
+
+      // Tool-use-only messages hidden by suppressToolCards collapse to zero height
+      const isToolUseOnly = hasTools && !hasText && !hasImages && !hasAttachments;
+      if (isToolUseOnly) {
+        const insideRunSegment = userRunCards.some(
+          (card) => idx > card.triggerIndex && idx <= card.segmentEnd,
+        );
+        if (insideRunSegment) continue;
+      }
+
       rows.push({ msg, originalIdx: idx });
     }
     return rows;
-  }, [messages, foldedNarrationIndices]);
+  }, [messages, foldedNarrationIndices, userRunCards]);
 
   // When the user scrolls to the top and triggers loadMoreHistory, we want to
   // keep the scroll position at the boundary between the newly-loaded older
@@ -908,53 +924,55 @@ export function Chat() {
                       </p>
                     </div>
                   ) : null,
-                Footer: () => (
-                  <div className="mx-auto max-w-4xl">
-                    {/* Streaming message — render when reply text is separated from graph,
-                        OR when there's streaming content without an active graph */}
-                    {shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph) && (
-                      <ChatMessage
-                        message={(() => {
-                          const base = streamMsg
-                            ? {
-                                ...(streamMsg as Record<string, unknown>),
-                                role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
-                                content: streamMsg.content ?? streamText,
-                                timestamp: streamMsg.timestamp ?? streamingTimestamp,
-                              }
-                            : {
-                                role: 'assistant' as const,
-                                content: streamText,
-                                timestamp: streamingTimestamp,
-                              };
-                          if (streamingReplyText != null && Array.isArray(base.content)) {
-                            return {
-                              ...base,
-                              content: (base.content as Array<{ type?: string }>).filter(
-                                (block) => block.type !== 'thinking',
-                              ),
-                            } as RawMessage;
-                          }
-                          return base as RawMessage;
-                        })()}
-                        textOverride={streamingReplyText ?? undefined}
-                        isStreaming
-                        streamingTools={streamingReplyText != null ? [] : streamingTools}
-                        onOpenFile={handleOpenAttachedFile}
-                      />
-                    )}
+                Footer: () => {
+                  const hasStreaming = shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph);
+                  const hasActivity = sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph;
+                  const hasTyping = sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph;
+                  if (!hasStreaming && !hasActivity && !hasTyping) return null;
+                  return (
+                    <div className="mx-auto max-w-4xl">
+                      {/* Streaming message — render when reply text is separated from graph,
+                          OR when there's streaming content without an active graph */}
+                      {hasStreaming && (
+                        <ChatMessage
+                          message={(() => {
+                            const base = streamMsg
+                              ? {
+                                  ...(streamMsg as Record<string, unknown>),
+                                  role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
+                                  content: streamMsg.content ?? streamText,
+                                  timestamp: streamMsg.timestamp ?? streamingTimestamp,
+                                }
+                              : {
+                                  role: 'assistant' as const,
+                                  content: streamText,
+                                  timestamp: streamingTimestamp,
+                                };
+                            if (streamingReplyText != null && Array.isArray(base.content)) {
+                              return {
+                                ...base,
+                                content: (base.content as Array<{ type?: string }>).filter(
+                                  (block) => block.type !== 'thinking',
+                                ),
+                              } as RawMessage;
+                            }
+                            return base as RawMessage;
+                          })()}
+                          textOverride={streamingReplyText ?? undefined}
+                          isStreaming
+                          streamingTools={streamingReplyText != null ? [] : streamingTools}
+                          onOpenFile={handleOpenAttachedFile}
+                        />
+                      )}
 
-                    {/* Activity indicator: waiting for next AI turn after tool execution */}
-                    {sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph && (
-                      <ActivityIndicator phase="tool_processing" />
-                    )}
+                      {/* Activity indicator: waiting for next AI turn after tool execution */}
+                      {hasActivity && <ActivityIndicator phase="tool_processing" />}
 
-                    {/* Typing indicator when sending but no stream content yet */}
-                    {sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph && (
-                      <TypingIndicator label={sessionInitLabel} />
-                    )}
-                  </div>
-                ),
+                      {/* Typing indicator when sending but no stream content yet */}
+                      {hasTyping && <TypingIndicator label={sessionInitLabel} />}
+                    </div>
+                  );
+                },
               }}
             />
           )}
