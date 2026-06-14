@@ -2319,23 +2319,6 @@ function registerAppHandlers(): void {
     app.relaunch();
     app.quit();
   });
-
-  // Hermes Server auth token (for direct API access from renderer)
-  ipcMain.handle('hermesapi:token', () => {
-    const hermesHome = process.env.HERMES_WEB_UI_HOME;
-    if (!hermesHome) {
-      return '';
-    }
-    const tokenPath = join(hermesHome, '.token');
-    try {
-      if (existsSync(tokenPath)) {
-        return readFileSync(tokenPath, 'utf-8').trim();
-      }
-    } catch {
-      // ignore read errors
-    }
-    return '';
-  });
 }
 
 function registerSettingsHandlers(gatewayManager: GatewayManager): void {

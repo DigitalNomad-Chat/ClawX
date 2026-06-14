@@ -410,17 +410,8 @@ async function startMainApp(): Promise<void> {
     mainWindow: window,
   });
 
-  // Start Hermes Server (Koa + Socket.IO backend)
-  if (!isE2EMode) {
-    const { startHermesServer } = await import('../../server/src/index');
-    void startHermesServer().then(() => {
-      logger.info('Hermes Server started successfully');
-    }).catch((error) => {
-      logger.error('Hermes Server failed to start:', error);
-    });
-  } else {
-    logger.info('Hermes Server start skipped in E2E mode');
-  }
+  // Hermes Server (Koa + Socket.IO backend) is not implemented on this branch.
+  // The OpenClaw Gateway provides the chat runtime; skip any Hermes bootstrap.
 
   // Initialize extension system
   await extensionRegistry.initialize({
@@ -693,12 +684,7 @@ if (gotTheLock) {
       logger.warn('gatewayManager.stop() error during quit:', err);
     });
 
-    // Stop Hermes Server
-    const hermesStopPromise = import('../../server/src/index')
-      .then(({ stopHermesServer }) => stopHermesServer())
-      .catch((err) => {
-        logger.warn('stopHermesServer() error during quit:', err);
-      });
+    // Hermes Server is not implemented on this branch; no extra shutdown needed.
 
     // Stop independent kernel extensions
     const extensionsStopPromise = shutdownExtensions().catch((err) => {
@@ -713,7 +699,6 @@ if (gotTheLock) {
 
     void Promise.race([
       stopPromise,
-      hermesStopPromise,
       extensionsStopPromise,
       modulesStopPromise,
       timeoutPromise,

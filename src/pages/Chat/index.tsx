@@ -1,6 +1,6 @@
 /**
  * Chat Page
- * Communicates with Hermes Server via Socket.IO /chat-run.
+ * Communicates with the host API and OpenClaw Gateway.
  * Session selector, thinking toggle, and refresh are in the toolbar;
  * messages render with markdown + streaming.
  */
@@ -12,7 +12,6 @@ import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
 import { useAgentsStore } from '@/stores/agents';
 import { useArtifactPanel } from '@/stores/artifact-panel';
 import { hostApiFetch } from '@/lib/host-api';
-import { connectHermesSocket, disconnectHermesSocket } from '@/lib/hermes-socket';
 import { invokeIpc } from '@/lib/api-client';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChatMessage } from './ChatMessage';
@@ -237,14 +236,6 @@ export function Chat() {
   useEffect(() => {
     void fetchAgents();
   }, [fetchAgents]);
-
-  // Connect to Hermes Socket.IO on mount
-  useEffect(() => {
-    void connectHermesSocket();
-    return () => {
-      disconnectHermesSocket();
-    };
-  }, []);
 
   useEffect(() => {
     const completions = messages
