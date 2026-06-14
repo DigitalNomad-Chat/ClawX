@@ -19,6 +19,13 @@ export function useFeatureGuard(feature: 'collaboration' | 'marketplace'): Featu
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
 
+  // Membership restrictions are temporarily disabled; keep the hooks/variables
+  // alive so re-enabling only requires restoring the check logic below.
+  void feature;
+  void auth;
+  void setLoading;
+  void setUsageInfo;
+
   // NOTE: Membership restrictions temporarily disabled
   const check = useCallback(async (): Promise<boolean> => {
     setAllowed(true);

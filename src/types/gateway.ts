@@ -74,6 +74,7 @@ export interface GatewayHealth {
   version?: string;
   capabilities?: GatewayCapabilitySnapshot;
   presence?: unknown;
+  openclawHealth?: unknown;
 }
 
 /**

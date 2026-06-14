@@ -29,6 +29,8 @@ interface ChannelsState {
   requestQrCode: (channelType: ChannelType) => Promise<{ qrCode: string; sessionId: string }>;
   setChannels: (channels: Channel[]) => void;
   updateChannel: (channelId: string, updates: Partial<Channel>) => void;
+  scheduleAutoReconnect: (channelId: string) => void;
+  clearAutoReconnect: (channelId: string) => void;
   clearError: () => void;
 }
 
@@ -160,6 +162,16 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
         channel.id === channelId ? { ...channel, ...updates } : channel,
       ),
     }));
+  },
+
+  scheduleAutoReconnect: (channelId) => {
+    // Placeholder: auto-reconnect logic for Hermes channels is not yet implemented.
+    console.debug('[channels] scheduleAutoReconnect requested for', channelId);
+  },
+
+  clearAutoReconnect: (channelId) => {
+    // Placeholder: auto-reconnect logic for Hermes channels is not yet implemented.
+    console.debug('[channels] clearAutoReconnect requested for', channelId);
   },
 
   clearError: () => set({ error: null }),
