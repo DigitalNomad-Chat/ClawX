@@ -312,7 +312,7 @@ export function desensitize(text: string): DesensitizeResult {
   // 8. 护照号
   result = replaceMatches(
     'PASSPORT',
-    /(?<=(?:护照号|护照号码|护照编号|护照NO|护照No|Passport\s*(?:No|Number|#)?)[:：\.\s]*)[A-Za-z]\d{7,9}|[A-Za-z]{2}\d{7,9}\b/gi,
+    /(?<=(?:护照号|护照号码|护照编号|护照NO|护照No|Passport\s*(?:No|Number|#)?)[:：.\s]*)[A-Za-z]\d{7,9}|[A-Za-z]{2}\d{7,9}\b/gi,
     result,
     (m) => isLikelyPassportNumber(m),
   );
@@ -360,7 +360,7 @@ export function desensitize(text: string): DesensitizeResult {
   // 11. 保单号
   result = replaceMatches(
     'POLICY_NUMBER',
-    /(?<=(?:保单号|保险单号|投保单号|保险合同编号|保险编号|保单号码|保险单号码|投保单号码|保险凭证号|保险凭证编号|保险凭证号码)[:：\.\s号]*)[A-Za-z0-9\-]{6,30}(?=[\s\n,，。；;:、]|$)/g,
+    /(?<=(?:保单号|保险单号|投保单号|保险合同编号|保险编号|保单号码|保险单号码|投保单号码|保险凭证号|保险凭证编号|保险凭证号码)[:：.\s号]*)[A-Za-z0-9-]{6,30}(?=[\s\n,，。；;:、]|$)/g,
     result,
   );
 
@@ -424,6 +424,14 @@ export function markSensitive(
   selection: string,
   type: string,
 ): { text: string; map: SensitiveMap } {
+  const trimmed = selection.trim();
+  if (!trimmed) return { text, map: existingMap };
+
+  // 防止用户选中已包含占位符的文本再次标记
+  if (/__PII_\w+_\d{8}__/.test(trimmed)) {
+    return { text, map: existingMap };
+  }
+
   const existingCounters = Object.keys(existingMap)
     .map((k) => {
       const m = k.match(/__PII_\w+_(\d+)__/);
@@ -433,9 +441,63 @@ export function markSensitive(
   const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
 
   const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
-  const newText = text.replace(selection, placeholder);
 
-  const newMap = { ...existingMap, [placeholder]: selection };
+  const idx = text.indexOf(trimmed);
+  if (idx === -1) return { text, map: existingMap };
+
+  const newText = text.slice(0, idx) + placeholder + text.slice(idx + trimmed.length);
+  const newMap = { ...existingMap, [placeholder]: trimmed };
+  return { text: newText, map: newMap };
+}
+
+export interface BatchMarkItem {
+  keyword: string;
+  type: string;
+}
+
+export function batchMarkSensitive(
+  text: string,
+  existingMap: SensitiveMap,
+  items: BatchMarkItem[],
+): { text: string; map: SensitiveMap } {
+  if (!items.length) return { text, map: existingMap };
+
+  let currentText = text;
+  let currentMap = { ...existingMap };
+
+  for (const { keyword, type } of items) {
+    const trimmed = keyword.trim();
+    if (!trimmed) continue;
+    if (/__PII_\w+_\d{8}__/.test(trimmed)) continue;
+
+    const result = markSensitiveAllBackend(currentText, currentMap, trimmed, type);
+    currentText = result.text;
+    currentMap = result.map;
+  }
+
+  return { text: currentText, map: currentMap };
+}
+
+function markSensitiveAllBackend(
+  text: string,
+  existingMap: SensitiveMap,
+  keyword: string,
+  type: string,
+): { text: string; map: SensitiveMap } {
+  const existingCounters = Object.keys(existingMap)
+    .map((k) => {
+      const m = k.match(/__PII_\w+_(\d+)__/);
+      return m ? parseInt(m[1], 10) : 0;
+    })
+    .filter((n) => !isNaN(n));
+  const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
+
+  const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
+
+  if (!text.includes(keyword)) return { text, map: existingMap };
+
+  const newText = text.split(keyword).join(placeholder);
+  const newMap = { ...existingMap, [placeholder]: keyword };
   return { text: newText, map: newMap };
 }
 

@@ -3,7 +3,7 @@
  * Registers all IPC handlers for main-renderer communication
  */
 import { ipcMain, BrowserWindow, shell, dialog, app, nativeImage } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, basename, resolve, sep, relative } from 'node:path';
 import crypto from 'node:crypto';
@@ -1563,6 +1563,14 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
     return dir;
   });
 
+  // Get the ClawDock skills directory (~/.clawdock/skills)
+  ipcMain.handle('clawdock:getSkillsDir', () => {
+    const { getClawDockSkillsDir } = require('../utils/paths');
+    const dir = getClawDockSkillsDir();
+    ensureDir(dir);
+    return dir;
+  });
+
   // Get a shell command to run OpenClaw CLI without modifying PATH
   ipcMain.handle('openclaw:getCliCommand', () => {
     try {
@@ -2310,6 +2318,23 @@ function registerAppHandlers(): void {
   ipcMain.handle('app:relaunch', () => {
     app.relaunch();
     app.quit();
+  });
+
+  // Hermes Server auth token (for direct API access from renderer)
+  ipcMain.handle('hermesapi:token', () => {
+    const hermesHome = process.env.HERMES_WEB_UI_HOME;
+    if (!hermesHome) {
+      return '';
+    }
+    const tokenPath = join(hermesHome, '.token');
+    try {
+      if (existsSync(tokenPath)) {
+        return readFileSync(tokenPath, 'utf-8').trim();
+      }
+    } catch {
+      // ignore read errors
+    }
+    return '';
   });
 }
 
@@ -3237,3 +3262,4 @@ function registerFilePreviewHandlers(): void {
     }
   });
 }
+

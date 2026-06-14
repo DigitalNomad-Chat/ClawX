@@ -25,6 +25,14 @@ export function markSensitive(
   selection: string,
   type: string,
 ): { text: string; map: SensitiveMap } {
+  const trimmed = selection.trim();
+  if (!trimmed) return { text, map: existingMap };
+
+  // 防止用户选中已包含占位符的文本再次标记
+  if (hasPlaceholders(trimmed)) {
+    return { text, map: existingMap };
+  }
+
   const existingCounters = Object.keys(existingMap)
     .map((k) => {
       const m = k.match(/__PII_\w+_(\d+)__/);
@@ -34,11 +42,63 @@ export function markSensitive(
   const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
 
   const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
-  const idx = text.indexOf(selection);
+
+  const idx = text.indexOf(trimmed);
   if (idx === -1) return { text, map: existingMap };
 
-  const newText = text.slice(0, idx) + placeholder + text.slice(idx + selection.length);
-  const newMap = { ...existingMap, [placeholder]: selection };
+  const newText = text.slice(0, idx) + placeholder + text.slice(idx + trimmed.length);
+  const newMap = { ...existingMap, [placeholder]: trimmed };
+  return { text: newText, map: newMap };
+}
+
+export interface BatchMarkItem {
+  keyword: string;
+  type: string;
+}
+
+export function batchMarkSensitive(
+  text: string,
+  existingMap: SensitiveMap,
+  items: BatchMarkItem[],
+): { text: string; map: SensitiveMap } {
+  if (!items.length) return { text, map: existingMap };
+
+  let currentText = text;
+  let currentMap = { ...existingMap };
+
+  for (const { keyword, type } of items) {
+    const trimmed = keyword.trim();
+    if (!trimmed) continue;
+    if (hasPlaceholders(trimmed)) continue;
+
+    const result = markSensitiveAll(currentText, currentMap, trimmed, type);
+    currentText = result.text;
+    currentMap = result.map;
+  }
+
+  return { text: currentText, map: currentMap };
+}
+
+function markSensitiveAll(
+  text: string,
+  existingMap: SensitiveMap,
+  keyword: string,
+  type: string,
+): { text: string; map: SensitiveMap } {
+  const existingCounters = Object.keys(existingMap)
+    .map((k) => {
+      const m = k.match(/__PII_\w+_(\d+)__/);
+      return m ? parseInt(m[1], 10) : 0;
+    })
+    .filter((n) => !isNaN(n));
+  const nextCounter = existingCounters.length > 0 ? Math.max(...existingCounters) + 1 : 1;
+
+  const placeholder = `__PII_${type}_${String(nextCounter).padStart(8, '0')}__`;
+
+  if (!text.includes(keyword)) return { text, map: existingMap };
+
+  const newText = text.split(keyword).join(placeholder);
+  const newMap = { ...existingMap, [placeholder]: keyword };
   return { text: newText, map: newMap };
 }
 

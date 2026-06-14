@@ -28,7 +28,7 @@ export interface Skill {
 export interface QuickAccessSkill {
   name: string;
   description: string;
-  source: 'workspace' | 'openclaw' | 'agents' | 'legacy';
+  source: 'workspace' | 'openclaw' | 'clawdock' | 'agents' | 'legacy';
   sourceLabel: string;
   manifestPath: string;
   baseDir: string;

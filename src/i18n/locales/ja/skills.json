@@ -64,7 +64,7 @@
             "scripts": "スクリプト",
             "scriptsDesc": "実行可能なスクリプトとコマンド",
             "hooks": "Hooks",
-            "hooksDesc": "OpenClaw のライフサイクルに注入されるフック",
+            "hooksDesc": "Hermes のライフサイクルに注入されるフック",
             "assets": "アセット",
             "assetsDesc": "テンプレート、参考資料、静的ファイル",
             "empty": "このスキルにはプレビュー可能なファイルがありません。",

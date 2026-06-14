@@ -13,8 +13,8 @@
         "marketplace": "Супер-ассистент",
         "collaboration": "Сотрудничество",
         "deleteSessionConfirm": "Вы уверены, что хотите удалить сессию \"{{label}}\"?",
-        "openClawPage": "Страница OpenClaw",
-        "openClawDreams": "Dreams"
+        "gatewayPage": "Страница Hermes",
+        "dreamDiary": "Dreams"
     },
     "actions": {
         "save": "Сохранить",
@@ -56,7 +56,7 @@
     },
     "gateway": {
         "notRunning": "Шлюз не запущен",
-        "notRunningDesc": "Для использования этой функции требуется запущенный шлюз OpenClaw. Он запустится автоматически, или вы можете запустить его в Настройках.",
+        "notRunningDesc": "Для использования этой функции требуется запущенный шлюз Hermes. Он запустится автоматически, или вы можете запустить его в Настройках.",
         "warning": "Шлюз не запущен."
     }
 }

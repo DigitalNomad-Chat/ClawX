@@ -76,7 +76,7 @@ function isDirectoryAttachment(file: AttachedFileMeta): boolean {
 
 function isSkillFileAttachment(file: AttachedFileMeta): boolean {
   const path = file.filePath ?? '';
-  return /(?:^|[\\/])\.openclaw[\\/]skills[\\/][^\\/]+[\\/].+\.[A-Za-z0-9]+$/i.test(path);
+  return /(?:^|[\\/])\.(?:openclaw|clawdock)[\\/]skills[\\/][^\\/]+[\\/].+\.[A-Za-z0-9]+$/i.test(path);
 }
 
 function validationKindForAttachment(file: AttachedFileMeta): 'file' | 'dir' | null {
@@ -126,11 +126,11 @@ function extractPreviewDocumentPaths(text: string): AttachedFileMeta[] {
   const skillPathPart = '[^\\\\/\\s\\n"\'`()\\x5b\\x5d,<>]+';
   const skillPathTail = '[^\\s\\n"\'`()\\x5b\\x5d,<>]*?';
   const skillDirRegex = new RegExp(
-    `(?<![\\w./:])((?:~[\\\\/]\\.openclaw[\\\\/]skills[\\\\/]${skillPathPart})|(?:(?:\\/|[A-Za-z]:\\\\)${skillPathTail}[\\\\/]\\.openclaw[\\\\/]skills[\\\\/]${skillPathPart}))${skillPathBoundary}`,
+    `(?<![\\w./:])((?:~[\\\\/]\\.(?:openclaw|clawdock)[\\\\/]skills[\\\\/]${skillPathPart})|(?:(?:\\/|[A-Za-z]:\\\\)${skillPathTail}[\\\\/]\\.(?:openclaw|clawdock)[\\\\/]skills[\\\\/]${skillPathPart}))${skillPathBoundary}`,
     'gi',
   );
   const skillMarkdownRegex = new RegExp(
-    `(?<![\\w./:])((?:~[\\\\/]\\.openclaw[\\\\/]skills[\\\\/]${skillPathTail}\\.md)|(?:(?:\\/|[A-Za-z]:\\\\)${skillPathTail}[\\\\/]\\.openclaw[\\\\/]skills[\\\\/]${skillPathTail}\\.md))${skillPathBoundary}`,
+    `(?<![\\w./:])((?:~[\\\\/]\\.(?:openclaw|clawdock)[\\\\/]skills[\\\\/]${skillPathTail}\\.md)|(?:(?:\\/|[A-Za-z]:\\\\)${skillPathTail}[\\\\/]\\.(?:openclaw|clawdock)[\\\\/]skills[\\\\/]${skillPathTail}\\.md))${skillPathBoundary}`,
     'gi',
   );
 

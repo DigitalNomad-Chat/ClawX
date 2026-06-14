@@ -27,7 +27,7 @@
     },
     "welcome": {
         "title": "ClawDockへようこそ",
-        "description": "ClawDockはOpenClawのグラフィカルインターフェースで、お気に入りのメッセージングプラットフォームでAIアシスタントを簡単に使用できます。",
+        "description": "ClawDockはHermes Agentフレームワークのグラフィカルインターフェースで、お気に入りのメッセージングプラットフォームでAIアシスタントを簡単に使用できます。",
         "features": {
             "noCommand": "コマンドライン不要",
             "modernUI": "モダンで美しいインターフェース",
@@ -40,7 +40,7 @@
         "viewLogs": "ログを表示",
         "recheck": "再チェック",
         "nodejs": "Node.js ランタイム",
-        "openclaw": "OpenClaw パッケージ",
+        "hermes": "Hermes ランタイム",
         "gateway": "ゲートウェイサービス",
         "startGateway": "ゲートウェイを起動",
         "status": {
@@ -48,11 +48,11 @@
             "success": "Node.js は利用可能です",
             "error": "失敗",
             "gatewayRunning": "ポート {{port}} で実行中",
-            "packageReady": "OpenClaw パッケージ準備完了"
+            "hermesReady": "Hermes 準備完了"
         },
         "issue": {
             "title": "環境の問題が検出されました",
-            "desc": "OpenClawが正しくインストールされていることを確認してください。詳細はログを確認してください。"
+            "desc": "Hermesが正しくインストールされていることを確認してください（pip install hermes-agent）。詳細はログを確認してください。"
         },
         "logs": {
             "title": "アプリケーションログ",

@@ -1,8 +1,8 @@
 {
     "title": "Dreams",
-    "subtitle": "OpenClaw の記憶シグナル、夢日記、メンテナンス操作を ClawDock 内で確認します。",
+    "subtitle": "Hermes の記憶シグナル、夢日記、メンテナンス操作を ClawDock 内で確認します。",
     "openFullUi": "完全版 Dreams を開く",
-    "gatewayNotReady": "OpenClaw Gateway は起動中または未接続です。接続後に Dreams データを読み込みます。",
+    "gatewayNotReady": "Hermes Gateway は起動中または未接続です。接続後に Dreams データを読み込みます。",
     "metrics": {
         "shortTerm": "短期エントリ",
         "grounded": "固定済みシグナル",
@@ -66,7 +66,7 @@
         "noSnippet": "スニペットはありません。"
     },
     "errors": {
-        "openFullUi": "完全版 OpenClaw Dreams UI を開けません。",
+        "openFullUi": "完全版 Hermes Dreams UI を開けません。",
         "configHashMissing": "config base hash が利用できないため Dreams を更新できません。",
         "memoryInitializing": "Dreams memory はまだ初期化中です。Gateway の起動完了後に再試行してください。"
     }

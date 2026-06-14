@@ -11,6 +11,18 @@ export async function handleSkillRoutes(
   url: URL,
   ctx: HostApiContext,
 ): Promise<boolean> {
+  if (url.pathname === '/api/skills/status' && req.method === 'GET') {
+    try {
+      // Runtime skills are now served by the embedded Hermes Server (:8648).
+      // Host API only returns the static skill configuration.
+      let runtimeSkills: QuickAccessRuntimeSkillStatus[] | undefined;
+      sendJson(res, 200, { success: true, skills: runtimeSkills || [] });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : String(error) });
+    }
+    return true;
+  }
+
   if (url.pathname === '/api/skills/configs' && req.method === 'GET') {
     sendJson(res, 200, await getAllSkillConfigs());
     return true;

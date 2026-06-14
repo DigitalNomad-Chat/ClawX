@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Shield, Upload, Loader2 } from 'lucide-react';
+import { Shield, Upload, Loader2, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { hostApiFetch } from '@/lib/host-api';
 import { toast } from 'sonner';
 import { DesensitizePreview } from './DesensitizePreview';
+import { BatchDesensitizePanel } from './BatchDesensitizePanel';
 import type { SensitiveMap } from '@/lib/desensitize';
 
 interface DesensitizePanelProps {
@@ -21,7 +22,7 @@ interface DesensitizePanelProps {
 }
 
 export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelProps) {
-  const [step, setStep] = useState<'upload' | 'processing' | 'preview'>('upload');
+  const [step, setStep] = useState<'upload' | 'processing' | 'preview' | 'manage'>('upload');
   const [originalText, setOriginalText] = useState('');
   const [desensitizedText, setDesensitizedText] = useState('');
   const [sensitiveMap, setSensitiveMap] = useState<SensitiveMap>({});
@@ -225,7 +226,29 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
           )}
 
           {step === 'preview' && (
-            <DesensitizePreview
+            <>
+              <div className="flex items-center justify-end gap-2 shrink-0 mb-2">
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => setStep('manage')}>
+                  <Settings2 className="h-3.5 w-3.5" />
+                  管理脱敏词
+                </Button>
+              </div>
+              <DesensitizePreview
+                originalText={originalText}
+                desensitizedText={desensitizedText}
+                sensitiveMap={sensitiveMap}
+                onChange={(text, map) => {
+                  setDesensitizedText(text);
+                  setSensitiveMap(map);
+                }}
+                onConfirm={handleConfirm}
+                onReset={reset}
+              />
+            </>
+          )}
+
+          {step === 'manage' && (
+            <BatchDesensitizePanel
               originalText={originalText}
               desensitizedText={desensitizedText}
               sensitiveMap={sensitiveMap}
@@ -233,8 +256,7 @@ export function DesensitizePanel({ open, onClose, onConfirm }: DesensitizePanelP
                 setDesensitizedText(text);
                 setSensitiveMap(map);
               }}
-              onConfirm={handleConfirm}
-              onReset={reset}
+              onBack={() => setStep('preview')}
             />
           )}
         </div>

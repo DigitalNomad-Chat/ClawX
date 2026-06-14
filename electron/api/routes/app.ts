@@ -1,8 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { HostApiContext } from '../context';
-import { parseJsonBody, sendJson } from '../route-utils';
-import { runOpenClawDoctor, runOpenClawDoctorFix } from '../../utils/openclaw-doctor';
-
+import { sendJson } from '../route-utils';
 export async function handleAppRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -24,10 +22,14 @@ export async function handleAppRoutes(
     return true;
   }
 
-  if (url.pathname === '/api/app/openclaw-doctor' && req.method === 'POST') {
-    const body = await parseJsonBody<{ mode?: 'diagnose' | 'fix' }>(req);
-    const mode = body.mode === 'fix' ? 'fix' : 'diagnose';
-    sendJson(res, 200, mode === 'fix' ? await runOpenClawDoctorFix() : await runOpenClawDoctor());
+  // Hermes installation status check (embedded — always available)
+  if (url.pathname === '/api/app/hermes-status' && req.method === 'GET') {
+    sendJson(res, 200, {
+      success: true,
+      installed: true,
+      path: null,
+      installCommand: null,
+    });
     return true;
   }
 

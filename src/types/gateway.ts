@@ -51,8 +51,6 @@ export interface GatewayCapabilitySnapshot {
       error?: string;
     };
   };
-  openclawHealth: GatewayCapabilityProbe;
-  openclawStatus: GatewayCapabilityProbe;
   presence: GatewayCapabilityProbe;
   channels: GatewayCapabilityProbe;
   memory: GatewayCapabilityProbe;
@@ -75,7 +73,6 @@ export interface GatewayHealth {
   uptime?: number;
   version?: string;
   capabilities?: GatewayCapabilitySnapshot;
-  openclawHealth?: unknown;
   presence?: unknown;
 }
 

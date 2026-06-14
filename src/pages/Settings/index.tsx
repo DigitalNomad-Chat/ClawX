@@ -78,8 +78,6 @@ export function Settings() {
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
   const currentVersion = useUpdateStore((state) => state.currentVersion);
   const [controlUiInfo, setControlUiInfo] = useState<ControlUiInfo | null>(null);
-  const [openclawCliCommand, setOpenclawCliCommand] = useState('');
-  const [openclawCliError, setOpenclawCliError] = useState<string | null>(null);
   const [proxyServerDraft, setProxyServerDraft] = useState('');
   const [proxyHttpServerDraft, setProxyHttpServerDraft] = useState('');
   const [proxyHttpsServerDraft, setProxyHttpsServerDraft] = useState('');
@@ -95,19 +93,6 @@ export function Settings() {
   const showCliTools = true;
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
-  const [doctorRunningMode, setDoctorRunningMode] = useState<'diagnose' | 'fix' | null>(null);
-  const [doctorResult, setDoctorResult] = useState<{
-    mode: 'diagnose' | 'fix';
-    success: boolean;
-    exitCode: number | null;
-    stdout: string;
-    stderr: string;
-    command: string;
-    cwd: string;
-    durationMs: number;
-    timedOut?: boolean;
-    error?: string;
-  } | null>(null);
 
   const handleShowLogs = async () => {
     try {
@@ -130,74 +115,6 @@ export function Settings() {
       // ignore
     }
   };
-
-  const handleRunOpenClawDoctor = async (mode: 'diagnose' | 'fix') => {
-    setDoctorRunningMode(mode);
-    try {
-      const result = await hostApiFetch<{
-        mode: 'diagnose' | 'fix';
-        success: boolean;
-        exitCode: number | null;
-        stdout: string;
-        stderr: string;
-        command: string;
-        cwd: string;
-        durationMs: number;
-        timedOut?: boolean;
-        error?: string;
-      }>('/api/app/openclaw-doctor', {
-        method: 'POST',
-        body: JSON.stringify({ mode }),
-      });
-      setDoctorResult(result);
-      if (result.success) {
-        toast.success(mode === 'fix' ? t('developer.doctorFixSucceeded') : t('developer.doctorSucceeded'));
-      } else {
-        toast.error(result.error || (mode === 'fix' ? t('developer.doctorFixFailed') : t('developer.doctorFailed')));
-      }
-    } catch (error) {
-      const message = toUserMessage(error) || (mode === 'fix' ? t('developer.doctorFixRunFailed') : t('developer.doctorRunFailed'));
-      toast.error(message);
-      setDoctorResult({
-        mode,
-        success: false,
-        exitCode: null,
-        stdout: '',
-        stderr: '',
-        command: 'openclaw doctor',
-        cwd: '',
-        durationMs: 0,
-        error: message,
-      });
-    } finally {
-      setDoctorRunningMode(null);
-    }
-  };
-
-  const handleCopyDoctorOutput = async () => {
-    if (!doctorResult) return;
-    const payload = [
-      `command: ${doctorResult.command}`,
-      `cwd: ${doctorResult.cwd}`,
-      `exitCode: ${doctorResult.exitCode ?? 'null'}`,
-      `durationMs: ${doctorResult.durationMs}`,
-      '',
-      '[stdout]',
-      doctorResult.stdout.trim() || '(empty)',
-      '',
-      '[stderr]',
-      doctorResult.stderr.trim() || '(empty)',
-    ].join('\n');
-
-    try {
-      await navigator.clipboard.writeText(payload);
-      toast.success(t('developer.doctorCopied'));
-    } catch (error) {
-      toast.error(`Failed to copy doctor output: ${String(error)}`);
-    }
-  };
-
-
 
   const refreshControlUiInfo = async () => {
     try {
@@ -225,55 +142,14 @@ export function Settings() {
     }
   };
 
-  useEffect(() => {
-    if (!showCliTools) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const result = await invokeIpc<{
-          success: boolean;
-          command?: string;
-          error?: string;
-        }>('openclaw:getCliCommand');
-        if (cancelled) return;
-        if (result.success && result.command) {
-          setOpenclawCliCommand(result.command);
-          setOpenclawCliError(null);
-        } else {
-          setOpenclawCliCommand('');
-          setOpenclawCliError(result.error || 'OpenClaw CLI unavailable');
-        }
-      } catch (error) {
-        if (cancelled) return;
-        setOpenclawCliCommand('');
-        setOpenclawCliError(String(error));
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [devModeUnlocked, showCliTools]);
-
-  const handleCopyCliCommand = async () => {
-    if (!openclawCliCommand) return;
+  const handleCopyHermesInstallCommand = async () => {
     try {
-      await navigator.clipboard.writeText(openclawCliCommand);
+      await navigator.clipboard.writeText('pip install hermes-agent');
       toast.success(t('developer.cmdCopied'));
     } catch (error) {
       toast.error(`Failed to copy command: ${String(error)}`);
     }
   };
-
-  useEffect(() => {
-    const unsubscribe = window.electron.ipcRenderer.on(
-      'openclaw:cli-installed',
-      (...args: unknown[]) => {
-        const installedPath = typeof args[0] === 'string' ? args[0] : '';
-        toast.success(`openclaw CLI installed at ${installedPath}`);
-      },
-    );
-    return () => { unsubscribe?.(); };
-  }, []);
 
   useEffect(() => {
     setWsDiagnosticEnabled(getGatewayWsDiagnosticEnabled());
@@ -805,27 +681,25 @@ export function Settings() {
 
                   {showCliTools && (
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-foreground">{t('developer.cli')}</Label>
+                      <Label className="text-sm font-medium text-foreground">Hermes CLI</Label>
                       <p className="text-sm text-muted-foreground">
-                        {t('developer.cliDesc')}
+                        Hermes is an external Python dependency. Install it via pip to enable Gateway functionality.
                       </p>
                       {isWindows && (
                         <p className="text-xs text-muted-foreground">
-                          {t('developer.cliPowershell')}
+                          On Windows, you may need to run this in PowerShell as Administrator.
                         </p>
                       )}
                       <div className="flex flex-wrap gap-2">
                         <Input
                           readOnly
-                          value={openclawCliCommand}
-                          placeholder={openclawCliError || t('developer.cmdUnavailable')}
+                          value="pip install hermes-agent"
                           className="font-mono text-sm h-10 rounded-xl bg-muted border-transparent flex-1 min-w-[200px]"
                         />
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={handleCopyCliCommand}
-                          disabled={!openclawCliCommand}
+                          onClick={handleCopyHermesInstallCommand}
                           className="rounded-xl h-10 px-4 bg-transparent border hover:bg-muted"
                         >
                           <Copy className="h-4 w-4 mr-2" />
@@ -834,86 +708,6 @@ export function Settings() {
                       </div>
                     </div>
                   )}
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <Label className="text-sm font-medium text-foreground">{t('developer.doctor')}</Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {t('developer.doctorDesc')}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleRunOpenClawDoctor('diagnose')}
-                          disabled={doctorRunningMode !== null}
-                          className="rounded-xl h-10 px-4 bg-transparent border hover:bg-muted"
-                        >
-                          <RefreshCw className={`h-4 w-4 mr-2${doctorRunningMode === 'diagnose' ? ' animate-spin' : ''}`} />
-                          {doctorRunningMode === 'diagnose' ? t('common:status.running') : t('developer.runDoctor')}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleRunOpenClawDoctor('fix')}
-                          disabled={doctorRunningMode !== null}
-                          className="rounded-xl h-10 px-4 bg-transparent border hover:bg-muted"
-                        >
-                          <RefreshCw className={`h-4 w-4 mr-2${doctorRunningMode === 'fix' ? ' animate-spin' : ''}`} />
-                          {doctorRunningMode === 'fix' ? t('common:status.running') : t('developer.runDoctorFix')}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCopyDoctorOutput}
-                          disabled={!doctorResult}
-                          className="rounded-xl h-10 px-4 bg-transparent border hover:bg-muted"
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          {t('common:actions.copy')}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {doctorResult && (
-                      <div className="space-y-3 rounded-2xl border border p-5 bg-muted">
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <Badge variant={doctorResult.success ? 'secondary' : 'destructive'} className="rounded-md px-3 py-1">
-                            {doctorResult.mode === 'fix'
-                              ? (doctorResult.success ? t('developer.doctorFixOk') : t('developer.doctorFixIssue'))
-                              : (doctorResult.success ? t('developer.doctorOk') : t('developer.doctorIssue'))}
-                          </Badge>
-                          <Badge variant="outline" className="rounded-md px-3 py-1">
-                            {t('developer.doctorExitCode')}: {doctorResult.exitCode ?? 'null'}
-                          </Badge>
-                          <Badge variant="outline" className="rounded-md px-3 py-1">
-                            {t('developer.doctorDuration')}: {Math.round(doctorResult.durationMs)}ms
-                          </Badge>
-                        </div>
-                        <div className="space-y-1 text-xs text-muted-foreground font-mono break-all">
-                          <p>{t('developer.doctorCommand')}: {doctorResult.command}</p>
-                          <p>{t('developer.doctorWorkingDir')}: {doctorResult.cwd || '-'}</p>
-                          {doctorResult.error && <p>{t('developer.doctorError')}: {doctorResult.error}</p>}
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-foreground/80">{t('developer.doctorStdout')}</p>
-                            <pre className="max-h-72 overflow-auto rounded-xl border border bg-card p-3 text-xs font-mono whitespace-pre-wrap break-words">
-                              {doctorResult.stdout.trim() || t('developer.doctorOutputEmpty')}
-                            </pre>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-foreground/80">{t('developer.doctorStderr')}</p>
-                            <pre className="max-h-72 overflow-auto rounded-xl border border bg-card p-3 text-xs font-mono whitespace-pre-wrap break-words">
-                              {doctorResult.stderr.trim() || t('developer.doctorOutputEmpty')}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between rounded-2xl border border p-5 bg-transparent">

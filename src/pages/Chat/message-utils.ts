@@ -1,7 +1,6 @@
 /**
  * Message content extraction helpers
- * Ported from OpenClaw's message-extract.ts to handle the various
- * message content formats returned by the Gateway.
+ * Handles the various message content formats returned by the Gateway.
  */
 import type { RawMessage, ContentBlock } from '@/stores/chat';
 
@@ -416,7 +415,7 @@ export function formatTimestamp(timestamp: unknown): string {
   const ts = typeof timestamp === 'number' ? timestamp : Number(timestamp);
   if (!ts || isNaN(ts)) return '';
 
-  // OpenClaw timestamps can be in seconds or milliseconds
+  // Timestamps can be in seconds or milliseconds
   const ms = ts > 1e12 ? ts : ts * 1000;
   const date = new Date(ms);
   const now = new Date();

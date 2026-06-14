@@ -43,7 +43,7 @@ export function TokenTrendChart({ data }: TokenTrendChartProps) {
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <h3 className="text-sm font-medium mb-4">Token 使用趋势（最近 {data.length} 天）</h3>
       <div className="flex items-stretch gap-[2px] h-32">
-        {displayData.map((entry, i) => {
+        {displayData.map((entry) => {
           const heightPct = entry.totalTokens === 0 ? 0 : Math.max((entry.totalTokens / maxTokens) * 100, 4);
           return (
             <div

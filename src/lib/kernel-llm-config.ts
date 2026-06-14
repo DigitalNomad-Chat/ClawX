@@ -343,14 +343,14 @@ export const BUILT_IN_PROVIDERS: BuiltInProvider[] = [
 export const kernelLlmConfig = {
   /** Read full config */
   async readConfig(): Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:readConfig');
+    return window.electron.ipcRenderer.invoke('kernel-llm:readConfig') as Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }>;
   },
 
   /** Add a provider */
   async addProvider(
     provider: KernelLLMProvider,
   ): Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:addProvider', provider);
+    return window.electron.ipcRenderer.invoke('kernel-llm:addProvider', provider) as Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }>;
   },
 
   /** Update a provider */
@@ -364,7 +364,7 @@ export const kernelLlmConfig = {
   async deleteProvider(
     providerId: string,
   ): Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:deleteProvider', providerId);
+    return window.electron.ipcRenderer.invoke('kernel-llm:deleteProvider', providerId) as Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }>;
   },
 
   /** Set active provider + model */
@@ -372,7 +372,7 @@ export const kernelLlmConfig = {
     providerId: string,
     model: string,
   ): Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:setActive', providerId, model);
+    return window.electron.ipcRenderer.invoke('kernel-llm:setActive', providerId, model) as Promise<{ success: boolean; config?: KernelLLMConfig; error?: string }>;
   },
 
   /** Check if active provider is configured */
@@ -385,7 +385,7 @@ export const kernelLlmConfig = {
     error?: string;
     needsSetup?: boolean;
   }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:checkActive');
+    return window.electron.ipcRenderer.invoke('kernel-llm:checkActive') as Promise<{ success: boolean; providerId?: string; providerName?: string; model?: string; api?: KernelApiType; error?: string; needsSetup?: boolean }>;
   },
 
   /** Test API connection */
@@ -395,12 +395,12 @@ export const kernelLlmConfig = {
     apiKey: string,
     model: string,
   ): Promise<{ success: boolean; latency?: number; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:testConnection', api, baseUrl, apiKey, model);
+    return window.electron.ipcRenderer.invoke('kernel-llm:testConnection', api, baseUrl, apiKey, model) as Promise<{ success: boolean; latency?: number; error?: string }>;
   },
 
   /** Hot-update running kernel config */
   async updateProviderConfig(): Promise<{ success: boolean; error?: string }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:updateProviderConfig');
+    return window.electron.ipcRenderer.invoke('kernel-llm:updateProviderConfig') as Promise<{ success: boolean; error?: string }>;
   },
 
   // ─── Import from OpenClaw ────────────────────────────────────────────
@@ -411,7 +411,7 @@ export const kernelLlmConfig = {
     providers?: OpenClawProviderSummary[];
     error?: string;
   }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:discoverOpenClaw');
+    return window.electron.ipcRenderer.invoke('kernel-llm:discoverOpenClaw') as Promise<{ success: boolean; providers?: OpenClawProviderSummary[]; error?: string }>;
   },
 
   /** Import selected OpenClaw providers into kernel LLM store */
@@ -424,6 +424,6 @@ export const kernelLlmConfig = {
     skipped?: number;
     error?: string;
   }> {
-    return window.electron.ipcRenderer.invoke('kernel-llm:importFromOpenClaw', providerIds);
+    return window.electron.ipcRenderer.invoke('kernel-llm:importFromOpenClaw', providerIds) as Promise<{ success: boolean; config?: KernelLLMConfig; imported?: number; skipped?: number; error?: string }>;
   },
 };

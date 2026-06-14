@@ -39,7 +39,7 @@ function canonicalizeAccountId(value: string): string {
     .slice(0, 64);
 }
 
-export function normalizeOpenClawAccountId(value: string | null | undefined, fallback = 'default'): string {
+export function normalizeAccountId(value: string | null | undefined, fallback = 'default'): string {
   const trimmed = (value ?? '').trim();
   if (!trimmed) return fallback;
   const normalized = canonicalizeAccountId(trimmed);
@@ -49,8 +49,8 @@ export function normalizeOpenClawAccountId(value: string | null | undefined, fal
   return normalized;
 }
 
-export function isCanonicalOpenClawAccountId(value: string | null | undefined): boolean {
+export function isCanonicalAccountId(value: string | null | undefined): boolean {
   const trimmed = (value ?? '').trim();
   if (!trimmed) return false;
-  return normalizeOpenClawAccountId(trimmed, '') === trimmed;
+  return normalizeAccountId(trimmed, '') === trimmed;
 }

@@ -60,11 +60,6 @@ function StepDetailCard({ step }: { step: TaskStep }) {
   const canExpand = hasDetail;
   const displayLabel = isThinking ? t('executionGraph.thinkingLabel') : step.label;
 
-  const statusColorClass =
-    step.status === 'completed' ? 'text-status-success'
-    : step.status === 'error' ? 'text-status-error'
-    : 'text-status-running';
-
   const statusBorderClass =
     step.status === 'completed' ? 'border-l-status-success'
     : step.status === 'error' ? 'border-l-status-error'
@@ -118,7 +113,6 @@ function StepDetailCard({ step }: { step: TaskStep }) {
                   step.status === 'completed' && "bg-status-success/10 text-status-success",
                   step.status === 'error' && "bg-status-error/10 text-status-error",
                   step.status === 'running' && "bg-status-running/10 text-status-running",
-                  step.status === 'pending' && "bg-black/5 text-muted-foreground dark:bg-white/10",
                 )}>
                   {t(`taskPanel.stepStatus.${step.status}`)}
                 </span>
