@@ -15,19 +15,55 @@ export interface RuntimeProviderOption {
   configuredModelId?: string;
 }
 
+const MULTI_INSTANCE_PROVIDER_TYPES = new Set(['custom', 'ollama']);
+
+function looksLikeUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export function resolveRuntimeProviderKey(account: ProviderAccount): string {
   if (account.authMode === 'oauth_browser') {
     if (account.vendorId === 'google') return 'google-gemini-cli';
     if (account.vendorId === 'openai') return 'openai-codex';
   }
 
-  if (account.vendorId === 'custom' || account.vendorId === 'ollama') {
-    const suffix = account.id.replace(/-/g, '').slice(0, 8);
-    return `${account.vendorId}-${suffix}`;
+  // OpenClaw uses 'kimi' for the Kimi Coding provider
+  if (account.vendorId === 'kimi-coding') {
+    return 'kimi';
+  }
+
+  // Qwen family providers all map to the OpenClaw 'qwen' provider
+  if (
+    account.vendorId === 'modelstudio'
+    || account.vendorId === 'qwen-coding-cn'
+    || account.vendorId === 'qwen-standard-global'
+    || account.vendorId === 'qwen-standard-cn'
+  ) {
+    return 'qwen';
   }
 
   if (account.vendorId === 'minimax-portal-cn') {
     return 'minimax-portal';
+  }
+
+  if (MULTI_INSTANCE_PROVIDER_TYPES.has(account.vendorId)) {
+    // If the providerId is already a runtime key (e.g. re-seeded from openclaw.json
+    // as "custom-XXXXXXXX"), return it directly to avoid double-hashing.
+    const prefix = `${account.vendorId}-`;
+    if (account.id.startsWith(prefix)) {
+      const tail = account.id.slice(prefix.length);
+      if (tail.length === 8 && !tail.includes('-')) {
+        return account.id;
+      }
+    }
+    // If providerId is not a UUID, treat it as an explicit OpenClaw provider key.
+    // This handles providers that were manually configured in openclaw.json with
+    // meaningful names (e.g. "agnes-ai") rather than UUID-generated ids.
+    if (!looksLikeUUID(account.id)) {
+      return account.id;
+    }
+    const suffix = account.id.replace(/-/g, '').slice(0, 8);
+    return `${account.vendorId}-${suffix}`;
   }
 
   return account.vendorId;
@@ -125,9 +161,16 @@ export function buildConfiguredModelOptions(
   const deduped = new Map<string, ConfiguredModelOption>();
   for (const account of entries) {
     const runtimeProviderKey = resolveRuntimeProviderKey(account);
-    const modelId = account.model!.startsWith(`${runtimeProviderKey}/`)
-      ? account.model!.slice(runtimeProviderKey.length + 1)
-      : account.model!.trim();
+    const rawModel = account.model!.trim();
+    let modelId: string;
+    if (rawModel.startsWith(`${runtimeProviderKey}/`)) {
+      modelId = rawModel.slice(runtimeProviderKey.length + 1);
+    } else if (rawModel.includes('/')) {
+      // Strip any foreign provider prefix and rebuild with the runtime key.
+      modelId = rawModel.split('/').slice(1).join('/');
+    } else {
+      modelId = rawModel;
+    }
     if (!modelId) continue;
     const modelRef = `${runtimeProviderKey}/${modelId}`;
     if (deduped.has(modelRef)) continue;

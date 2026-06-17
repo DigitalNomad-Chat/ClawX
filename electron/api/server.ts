@@ -74,9 +74,42 @@ export function getHostApiToken(): string {
   return hostApiToken;
 }
 
+/**
+ * Promise that resolves when the Host API server is truly accepting connections.
+ * Used by the IPC proxy to avoid returning NETWORK errors during startup race.
+ */
+let serverListeningPromise: Promise<void> | null = null;
+let resolveServerListeningFn: (() => void) | null = null;
+
+/** Initialize the readiness promise. Must be called before server.listen(). */
+export function initServerListening(): Promise<void> {
+  if (serverListeningPromise) return serverListeningPromise;
+  serverListeningPromise = new Promise<void>((resolve) => {
+    resolveServerListeningFn = resolve;
+  });
+  return serverListeningPromise;
+}
+
+/** Resolve the readiness promise so the server is known to be accepting connections. */
+export function resolveServerListening(): void {
+  if (resolveServerListeningFn) {
+    resolveServerListeningFn();
+    resolveServerListeningFn = null;
+  }
+}
+
+/** Returns a promise that resolves when the server is ready, or null if not yet started. */
+export function getServerListeningPromise(): Promise<void> | null {
+  return serverListeningPromise;
+}
+
 export function startHostApiServer(ctx: HostApiContext, port = getPort('CLAWDOCK_HOST_API')): Server {
   // Generate a cryptographically random token for this session.
   hostApiToken = randomBytes(32).toString('hex');
+
+  // Create the readiness promise before listen() so the IPC proxy can
+  // wait for it. The callback in server.listen() resolves it.
+  initServerListening();
 
   const server = createServer(async (req, res) => {
     try {
@@ -142,6 +175,7 @@ export function startHostApiServer(ctx: HostApiContext, port = getPort('CLAWDOCK
 
   server.listen(port, '127.0.0.1', () => {
     logger.info(`Host API server listening on http://127.0.0.1:${port}`);
+    resolveServerListening();
   });
 
   return server;

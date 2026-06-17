@@ -4,6 +4,7 @@
  */
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync, readFileSync } from 'fs';
 import { KernelServer } from './server/ws-server.js';
 import { SessionManager } from './engine/session-manager.js';
 import { runReActLoop } from './engine/react-loop.js';
@@ -17,6 +18,7 @@ import type { KernelEvent, KernelRequest, AIProviderConfig } from './types.js';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const AGENTS_DIR = process.env.KERNEL_AGENTS_DIR || resolve(__dirname, '../agents');
 const SKILLS_DIR = process.env.KERNEL_SKILLS_DIR || resolve(__dirname, '../skills');
+const CUSTOM_AGENTS_DIR = process.env.CUSTOM_AGENTS_DIR || '';
 
 // Global state
 const sessions = new SessionManager();
@@ -35,7 +37,7 @@ async function main() {
     // 预加载所有 agent 配置（解密 + 缓存），使首次 session.create 变为缓存命中
     for (const agent of manifest.agents) {
       try {
-        loadAgentOnDemand(agent.id, AGENTS_DIR);
+        loadAgentOnDemand(agent.id, AGENTS_DIR, CUSTOM_AGENTS_DIR);
       } catch (err) {
         console.error(`[Kernel] Pre-load agent '${agent.id}' failed:`, err);
       }
@@ -43,6 +45,26 @@ async function main() {
     console.log(`[Kernel] All agent configs pre-loaded into cache`);
   } catch (err) {
     console.error('[Kernel] Failed to load manifest:', err);
+  }
+
+  // 预加载自定义明文 Agent
+  if (CUSTOM_AGENTS_DIR) {
+    try {
+      const customManifestPath = resolve(CUSTOM_AGENTS_DIR, 'manifest.json');
+      if (existsSync(customManifestPath)) {
+        const customManifest = JSON.parse(readFileSync(customManifestPath, 'utf8'));
+        for (const agent of customManifest.agents || []) {
+          try {
+            loadAgentOnDemand(agent.id, AGENTS_DIR, CUSTOM_AGENTS_DIR);
+          } catch (err) {
+            console.error(`[Kernel] Pre-load custom agent '${agent.id}' failed:`, err);
+          }
+        }
+        console.log(`[Kernel] Custom agents pre-loaded: ${customManifest.agents.length}`);
+      }
+    } catch (err) {
+      console.error('[Kernel] Failed to pre-load custom agents:', err);
+    }
   }
 
   // Create and start WebSocket server
@@ -93,7 +115,7 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
       const agentId = req.agentId as string;
       try {
         // 按需加载 Agent 配置（解密 + 缓存）
-        const config = loadAgentOnDemand(agentId, AGENTS_DIR);
+        const config = loadAgentOnDemand(agentId, AGENTS_DIR, CUSTOM_AGENTS_DIR);
         const id = sessions.createSession(config);
         yield { type: 'session.created', sessionId: id };
       } catch (err) {
@@ -143,7 +165,7 @@ async function* handleRequest(request: KernelRequest): AsyncGenerator<KernelEven
 
       try {
         // Load agent config (same as session.create)
-        const config = loadAgentOnDemand(aid, AGENTS_DIR);
+        const config = loadAgentOnDemand(aid, AGENTS_DIR, CUSTOM_AGENTS_DIR);
 
         // Create new session with this config
         const newId = sessions.createSession(config);

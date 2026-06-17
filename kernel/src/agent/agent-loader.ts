@@ -3,9 +3,9 @@
  * Agent configs are stored encrypted on disk and decrypted into memory only
  */
 import { createDecipheriv, randomBytes } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import type { AgentConfig, AgentManifest, AgentManifestEntry, AgentPackage } from '../types.js';
+import type { AgentConfig, AgentIdentity, AgentManifest, AgentManifestEntry, AgentPackage } from '../types.js';
 
 const ALGORITHM = 'aes-256-gcm';
 
@@ -101,7 +101,7 @@ export const agentCache = new AgentCache();
  * Returns cached config if already loaded.
  * Throws if agentId not found in manifest or decryption fails.
  */
-export function loadAgentOnDemand(agentId: string, agentsDir: string): AgentConfig {
+export function loadAgentOnDemand(agentId: string, agentsDir: string, customAgentsDir?: string): AgentConfig {
   // 缓存命中直接返回
   const cached = agentCache.get(agentId);
   if (cached) {
@@ -109,7 +109,15 @@ export function loadAgentOnDemand(agentId: string, agentsDir: string): AgentConf
     return cached;
   }
 
-  // 验证 agentId 在 manifest 中存在
+  // 优先加载自定义明文 Agent
+  if (customAgentsDir && existsSync(join(customAgentsDir, agentId))) {
+    const config = loadPlaintextAgent(agentId, join(customAgentsDir, agentId));
+    agentCache.set(agentId, config);
+    console.log(`[Kernel] Custom plaintext agent '${agentId}' loaded and cached`);
+    return config;
+  }
+
+  // Fallback to builtin manifest validation + encrypted loading
   const manifest = loadAgentManifest(agentsDir);
   const entry = manifest.agents.find(a => a.id === agentId);
   if (!entry) {
@@ -126,4 +134,77 @@ export function loadAgentOnDemand(agentId: string, agentsDir: string): AgentConf
   console.log(`[Kernel] Agent '${agentId}' loaded and cached (${agentCache.size} agents in cache)`);
 
   return config;
+}
+
+/**
+ * Load a plaintext custom agent from an OpenClaw-style directory.
+ */
+export function loadPlaintextAgent(agentId: string, agentDir: string): AgentConfig {
+  const identityPath = join(agentDir, 'IDENTITY.md');
+  const soulPath = join(agentDir, 'SOUL.md');
+  const agentsPath = join(agentDir, 'AGENTS.md');
+  const toolsPath = join(agentDir, 'TOOLS.md');
+  const userPath = join(agentDir, 'USER.md');
+  const memoryPath = join(agentDir, 'MEMORY.md');
+  const heartbeatPath = join(agentDir, 'heartbeat.md');
+
+  if (!existsSync(identityPath) || !existsSync(soulPath)) {
+    throw new Error(`Plaintext agent '${agentId}' missing IDENTITY.md or SOUL.md`);
+  }
+
+  const identity = parseIdentityMarkdown(readFileSync(identityPath, 'utf8'));
+  let soul = readFileSync(soulPath, 'utf8');
+  const agents = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : '';
+  const tools = existsSync(toolsPath) ? readFileSync(toolsPath, 'utf8') : '';
+  const user = existsSync(userPath) ? readFileSync(userPath, 'utf8') : undefined;
+  const memory = existsSync(memoryPath) ? readFileSync(memoryPath, 'utf8') : undefined;
+  const heartbeat = existsSync(heartbeatPath) ? readFileSync(heartbeatPath, 'utf8') : undefined;
+
+  if (memory) {
+    soul = `${soul}\n\n<!-- LONG_TERM_MEMORY -->\n${memory}`;
+  }
+
+  return {
+    id: agentId,
+    version: '1.0.0',
+    identity,
+    soul,
+    agents,
+    tools,
+    user,
+    heartbeat,
+    maxTurns: 64,
+  };
+}
+
+function parseIdentityMarkdown(content: string): AgentIdentity {
+  const lines = content.split('\n');
+  const result: Partial<AgentIdentity> = {
+    name: '',
+    nickname: '',
+    emoji: '🤖',
+    creature: '',
+    vibe: '',
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^-\s*\*\*(.+?):\*\*\s*(.+)$/);
+    if (!match) continue;
+    const key = match[1].trim().toLowerCase();
+    const value = match[2].trim();
+
+    if (key === 'name') {
+      const parts = value.split('/').map(s => s.trim());
+      result.name = parts[0] || '';
+      result.nickname = parts[1] || result.name;
+    } else if (key === 'emoji') {
+      result.emoji = value;
+    } else if (key === 'creature') {
+      result.creature = value;
+    } else if (key === 'vibe') {
+      result.vibe = value;
+    }
+  }
+
+  return result as AgentIdentity;
 }

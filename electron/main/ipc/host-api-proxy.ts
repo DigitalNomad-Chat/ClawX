@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { proxyAwareFetch } from '../../utils/proxy-fetch';
 import { getPort } from '../../utils/config';
-import { getHostApiToken } from '../../api/server';
+import { getHostApiToken, getServerListeningPromise } from '../../api/server';
 import { logger } from '../../utils/logger';
 
 type HostApiFetchRequest = {
@@ -20,6 +20,13 @@ export function registerHostApiProxyHandlers(): void {
 
   ipcMain.handle('hostapi:fetch', async (_, request: HostApiFetchRequest) => {
     const startedAt = Date.now();
+    // Wait for the Host API server to be truly accepting connections.
+    // This prevents NETWORK errors during the race window between
+    // registerHostApiProxyHandlers() and server.listen()'s callback.
+    const readyPromise = getServerListeningPromise();
+    if (readyPromise) {
+      await readyPromise;
+    }
     try {
       const path = typeof request?.path === 'string' ? request.path : '';
       if (!path || !path.startsWith('/')) {

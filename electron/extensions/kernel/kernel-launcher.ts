@@ -14,7 +14,7 @@ import { app } from 'electron';
 import type { KernelEvent, KernelRequest } from '../../../kernel/src/types.js';
 import { getActiveLLMProvider } from '../marketplace/kernel-llm-store.js';
 import { prepareWinSpawn } from '../../utils/win-shell.js';
-import { getOpenClawConfigDir } from '../../utils/paths.js';
+import { getOpenClawConfigDir, getClawDockConfigDir } from '../../utils/paths.js';
 
 export interface KernelLauncherOptions {
   onEvent?: (event: KernelEvent) => void;
@@ -144,6 +144,7 @@ export class KernelLauncher {
           KERNEL_AGENTS_DIR: agentsDir,
           KERNEL_SKILLS_DIR: skillsDir,
           OPENCLAW_HOME: getOpenClawConfigDir(),
+          CUSTOM_AGENTS_DIR: resolve(getClawDockConfigDir(), 'custom-agents'),
           NODE_ENV: 'development',
         },
       });
@@ -206,6 +207,7 @@ export class KernelLauncher {
           KERNEL_AGENTS_DIR: agentsDir,
           KERNEL_SKILLS_DIR: skillsDir,
           OPENCLAW_HOME: getOpenClawConfigDir(),
+          CUSTOM_AGENTS_DIR: resolve(getClawDockConfigDir(), 'custom-agents'),
           NODE_ENV: 'production',
         } as Record<string, string>,
         serviceName: 'ClawDock Kernel',

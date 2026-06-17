@@ -149,6 +149,11 @@ const electronAPI = {
         'marketplace:getAgent',
         'marketplace:hireAgent',
         'marketplace:restoreSession',
+        'marketplace:createCustomAgent',
+        'marketplace:updateCustomAgent',
+        'marketplace:deleteCustomAgent',
+        'marketplace:listCustomAgents',
+        'marketplace:generateAgentProfile',
         // Kernel communication
         'kernel:chat',
         'kernel:subscribe',

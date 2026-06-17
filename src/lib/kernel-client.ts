@@ -147,6 +147,62 @@ class KernelClient {
     }>;
   }
 
+  // ─── Custom Agents ────────────────────────────────────────────────
+
+  /**
+   * Create a custom agent
+   */
+  async createCustomAgent(payload: Omit<AgentInfo, 'version'> & { soul: string; agents?: string; tools?: string; user?: string; memory?: string; heartbeat?: string; maxTurns?: number }): Promise<{ success: boolean; agent?: AgentInfo; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:createCustomAgent', payload) as Promise<{
+      success: boolean;
+      agent?: AgentInfo;
+      error?: string;
+    }>;
+  }
+
+  /**
+   * Update a custom agent
+   */
+  async updateCustomAgent(agentId: string, payload: Omit<AgentInfo, 'version'> & { soul: string; agents?: string; tools?: string; user?: string; memory?: string; heartbeat?: string; maxTurns?: number }): Promise<{ success: boolean; agent?: AgentInfo; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:updateCustomAgent', agentId, payload) as Promise<{
+      success: boolean;
+      agent?: AgentInfo;
+      error?: string;
+    }>;
+  }
+
+  /**
+   * Delete a custom agent
+   */
+  async deleteCustomAgent(agentId: string): Promise<{ success: boolean; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:deleteCustomAgent', agentId) as Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+  }
+
+  /**
+   * List all custom agents
+   */
+  async listCustomAgents(): Promise<{ success: boolean; agents?: AgentInfo[]; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:listCustomAgents') as Promise<{
+      success: boolean;
+      agents?: AgentInfo[];
+      error?: string;
+    }>;
+  }
+
+  /**
+   * Generate agent profile from natural language requirements
+   */
+  async generateAgentProfile(requirements: string): Promise<{ success: boolean; profile?: { id: string; name: string; nickname: string; emoji: string; creature: string; vibe: string; description: string; tags: string[]; scenarios: string[]; soul: string; agents?: string; tools?: string; user?: string; memory?: string }; error?: string }> {
+    return window.electron.ipcRenderer.invoke('marketplace:generateAgentProfile', requirements) as Promise<{
+      success: boolean;
+      profile?: { id: string; name: string; nickname: string; emoji: string; creature: string; vibe: string; description: string; tags: string[]; scenarios: string[]; soul: string; agents?: string; tools?: string; user?: string; memory?: string };
+      error?: string;
+    }>;
+  }
+
   // ─── File staging ─────────────────────────────────────────────────
 
   /**
