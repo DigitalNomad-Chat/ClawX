@@ -1,0 +1,74 @@
+{
+  "memberCenter": {
+    "hero": {
+      "title": "メンバーセンター",
+      "freeDescription": "すべてのプレミアム機能を解除し、AIでワークフローを強化",
+      "proDescription": "サブスクリプションありがとうございます。Proの機能を maximally に活用してください。",
+      "proBadge": "Proメンバー",
+      "enterpriseDescription": "Enterpriseのフルアクセスを利用中です。",
+      "startFrom": "〜/月"
+    },
+    "tiers": {
+      "title": "プランを選択",
+      "monthly": "月額",
+      "yearly": "年額",
+      "proName": "プロ",
+      "enterpriseName": "エンタープライズ"
+    },
+    "comparison": {
+      "title": "プラン比較",
+      "feature": "機能"
+    },
+    "benefits": {
+      "title": "メンバー限定特典",
+      "exclusiveAgent": {
+        "title": "限定エージェント",
+        "desc": "メンバー限定のプレミアムエージェントを解除し、より多くの専門シナリオに対応"
+      },
+      "priorityAccess": {
+        "title": "優先モデルアクセス",
+        "desc": "新しいモデルと機能を最も早く体験し、高い応答優先権を取得"
+      },
+      "earlyAccess": {
+        "title": "早期機能アクセス",
+        "desc": "新しく登場する機能を先に試せ、ベータプログラムにも参加可能"
+      },
+      "community": {
+        "title": "メンバーコミュニティ",
+        "desc": "限定メンバーコミュニティに参加し、他のユーザーと経験を共有"
+      }
+    },
+    "subscription": {
+      "title": "サブスクリプション管理",
+      "notSubscribed": "現在フリープランを利用中です",
+      "upgradeToManage": "有料プランにアップグレードすると、ここでサブスクリプションを管理できます",
+      "currentPlan": "現在のプラン",
+      "startDate": "開始日",
+      "renewDate": "更新日",
+      "plan": "請求サイクル",
+      "autoRenew": "自動更新",
+      "enabled": "有効",
+      "disabled": "無効",
+      "changePlan": "プラン変更",
+      "pause": "更新を一時停止",
+      "cancel": "サブスクリプションをキャンセル"
+    },
+    "activation": {
+      "title": "アクティベーションコード",
+      "loginRequired": "アクティベーションコードをredeemするにはログインしてください",
+      "codePlaceholder": "アクティベーションコードを入力してください（例：CLWX-XXXX-XXXX-XXXX）",
+      "activate": "redeem",
+      "emptyCode": "アクティベーションコードを入力してください",
+      "success": "アクティベーション成功！",
+      "failed": "無効または期限切れのコードです",
+      "error": "アクティベーションに失敗しました。後でもう一度お試しください",
+      "hint": "コードは一度redeemすると返金できません。大切に保管してください",
+      "confirmTitle": "redeem確認",
+      "confirmMessage": "この操作は取り消せません。コードが正しいことを確認してください。",
+      "cancel": "キャンセル"
+    },
+    "faq": {
+      "title": "よくある質問"
+    }
+  }
+}

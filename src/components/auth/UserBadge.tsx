@@ -248,6 +248,15 @@ export function UserBadge({ collapsed = false }: { collapsed?: boolean }) {
 
             {/* 操作 */}
             <div className="border-t pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 mb-1"
+                onClick={() => { setMenuOpen(false); navigate('/goclaw/member'); }}
+              >
+                <Crown className="h-3.5 w-3.5" />
+                {t('userBadge.memberCenter') || '会员中心'}
+              </Button>
               {tier === 'free' && (
                 <Button
                   variant="ghost"

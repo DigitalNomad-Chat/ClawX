@@ -1,0 +1,74 @@
+{
+  "memberCenter": {
+    "hero": {
+      "title": "会员中心",
+      "freeDescription": "解锁全部高级功能，让 AI 为您的工作赋能",
+      "proDescription": "感谢您的订阅！您已享受全部 Pro 权益。",
+      "proBadge": "Pro 会员",
+      "enterpriseDescription": "您已享受企业版全部权益。",
+      "startFrom": "起/月"
+    },
+    "tiers": {
+      "title": "选择您的方案",
+      "monthly": "月付",
+      "yearly": "年付",
+      "proName": "专业版",
+      "enterpriseName": "企业版"
+    },
+    "comparison": {
+      "title": "方案对比",
+      "feature": "功能"
+    },
+    "benefits": {
+      "title": "会员专属权益",
+      "exclusiveAgent": {
+        "title": "专属 Agent",
+        "desc": "解锁会员独享的高阶 Agent，覆盖更多专业场景"
+      },
+      "priorityAccess": {
+        "title": "优先模型接入",
+        "desc": "第一时间体验新模型和新能力，享有更高的响应优先级"
+      },
+      "earlyAccess": {
+        "title": "新功能抢先体验",
+        "desc": "优先试用即将发布的创新功能，参与产品内测"
+      },
+      "community": {
+        "title": "会员专属社区",
+        "desc": "加入会员专属社群，与同好交流使用经验"
+      }
+    },
+    "subscription": {
+      "title": "订阅管理",
+      "notSubscribed": "您当前使用的是免费方案",
+      "upgradeToManage": "升级到付费方案后可在此管理订阅",
+      "currentPlan": "当前方案",
+      "startDate": "开通日期",
+      "renewDate": "续费日期",
+      "plan": "付费周期",
+      "autoRenew": "自动续费",
+      "enabled": "已开启",
+      "disabled": "已关闭",
+      "changePlan": "更换方案",
+      "pause": "暂停续费",
+      "cancel": "取消订阅"
+    },
+    "activation": {
+      "title": "激活码兑换",
+      "loginRequired": "请先登录后兑换激活码",
+      "codePlaceholder": "输入您的激活码，如 CLWX-XXXX-XXXX-XXXX",
+      "activate": "兑换",
+      "emptyCode": "请输入激活码",
+      "success": "激活成功！",
+      "failed": "激活码无效或已过期",
+      "error": "激活失败，请稍后重试",
+      "hint": "激活码一经兑换不可退换，请妥善保管",
+      "confirmTitle": "确认兑换",
+      "confirmMessage": "兑换后不可撤回，请确认激活码无误",
+      "cancel": "取消"
+    },
+    "faq": {
+      "title": "常见问题"
+    }
+  }
+}

@@ -18,6 +18,7 @@ import enCron from './locales/en/cron.json';
 import enDreams from './locales/en/dreams.json';
 import enSetup from './locales/en/setup.json';
 import enAuth from './locales/en/auth.json';
+import enMember from './locales/en/member.json';
 
 // ZH
 import zhCommon from './locales/zh/common.json';
@@ -31,6 +32,7 @@ import zhCron from './locales/zh/cron.json';
 import zhDreams from './locales/zh/dreams.json';
 import zhSetup from './locales/zh/setup.json';
 import zhAuth from './locales/zh/auth.json';
+import zhMember from './locales/zh/member.json';
 
 // JA
 import jaCommon from './locales/ja/common.json';
@@ -44,6 +46,7 @@ import jaCron from './locales/ja/cron.json';
 import jaDreams from './locales/ja/dreams.json';
 import jaSetup from './locales/ja/setup.json';
 import jaAuth from './locales/ja/auth.json';
+import jaMember from './locales/ja/member.json';
 
 // RU
 import ruCommon from './locales/ru/common.json';
@@ -57,6 +60,7 @@ import ruCron from './locales/ru/cron.json';
 import ruDreams from './locales/ru/dreams.json';
 import ruSetup from './locales/ru/setup.json';
 import ruAuth from './locales/ru/auth.json';
+import ruMember from './locales/ru/member.json';
 
 export const SUPPORTED_LANGUAGES = [
     { code: 'en', label: 'English' },
@@ -78,6 +82,7 @@ const resources = {
         dreams: enDreams,
         setup: enSetup,
         auth: enAuth,
+        member: enMember,
     },
     zh: {
         common: zhCommon,
@@ -91,6 +96,7 @@ const resources = {
         dreams: zhDreams,
         setup: zhSetup,
         auth: zhAuth,
+        member: zhMember,
     },
     ja: {
         common: jaCommon,
@@ -104,6 +110,7 @@ const resources = {
         dreams: jaDreams,
         setup: jaSetup,
         auth: jaAuth,
+        member: jaMember,
     },
     ru: {
         common: ruCommon,
@@ -117,6 +124,7 @@ const resources = {
         dreams: ruDreams,
         setup: ruSetup,
         auth: ruAuth,
+        member: ruMember,
     },
 };
 
@@ -128,7 +136,7 @@ i18n
         fallbackLng: 'en',
         supportedLngs: [...SUPPORTED_LANGUAGE_CODES],
         defaultNS: 'common',
-        ns: ['common', 'settings', 'dashboard', 'chat', 'channels', 'agents', 'skills', 'cron', 'dreams', 'setup', 'auth'],
+        ns: ['common', 'settings', 'dashboard', 'chat', 'channels', 'agents', 'skills', 'cron', 'dreams', 'setup', 'auth', 'member'],
         interpolation: {
             escapeValue: false, // React already escapes
         },

@@ -1,0 +1,74 @@
+{
+  "memberCenter": {
+    "hero": {
+      "title": "Member Center",
+      "freeDescription": "Unlock all premium features and empower your workflow with AI",
+      "proDescription": "Thank you for your subscription! Enjoy all Pro benefits.",
+      "proBadge": "Pro Member",
+      "enterpriseDescription": "You have full Enterprise access.",
+      "startFrom": "from /month"
+    },
+    "tiers": {
+      "title": "Choose Your Plan",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "proName": "Pro",
+      "enterpriseName": "Enterprise"
+    },
+    "comparison": {
+      "title": "Plan Comparison",
+      "feature": "Feature"
+    },
+    "benefits": {
+      "title": "Member Exclusive Benefits",
+      "exclusiveAgent": {
+        "title": "Exclusive Agents",
+        "desc": "Unlock member-only premium Agents covering more professional scenarios"
+      },
+      "priorityAccess": {
+        "title": "Priority Model Access",
+        "desc": "Be the first to experience new models and capabilities with higher response priority"
+      },
+      "earlyAccess": {
+        "title": "Early Feature Access",
+        "desc": "Try upcoming innovations first and participate in beta programs"
+      },
+      "community": {
+        "title": "Member Community",
+        "desc": "Join the exclusive member community to share experiences with peers"
+      }
+    },
+    "subscription": {
+      "title": "Subscription Management",
+      "notSubscribed": "You are currently on the Free plan",
+      "upgradeToManage": "Upgrade to a paid plan to manage your subscription here",
+      "currentPlan": "Current Plan",
+      "startDate": "Start Date",
+      "renewDate": "Renewal Date",
+      "plan": "Billing Cycle",
+      "autoRenew": "Auto Renewal",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "changePlan": "Change Plan",
+      "pause": "Pause Renewal",
+      "cancel": "Cancel Subscription"
+    },
+    "activation": {
+      "title": "Redeem Activation Code",
+      "loginRequired": "Please log in to redeem an activation code",
+      "codePlaceholder": "Enter your activation code, e.g. CLWX-XXXX-XXXX-XXXX",
+      "activate": "Redeem",
+      "emptyCode": "Please enter an activation code",
+      "success": "Activation successful!",
+      "failed": "Invalid or expired activation code",
+      "error": "Activation failed, please try again later",
+      "hint": "Activation codes cannot be refunded once redeemed. Please keep them safe.",
+      "confirmTitle": "Confirm Redemption",
+      "confirmMessage": "This action cannot be undone. Please verify the code is correct.",
+      "cancel": "Cancel"
+    },
+    "faq": {
+      "title": "Frequently Asked Questions"
+    }
+  }
+}

@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   Sheet,
   SheetContent,
@@ -14,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth';
-import { AlertTriangle, LogIn, ArrowUpCircle } from 'lucide-react';
+import { AlertTriangle, LogIn, Crown } from 'lucide-react';
 import { LoginModal } from './LoginModal';
 
 export interface UsageLimitModalProps {
@@ -26,6 +27,7 @@ export interface UsageLimitModalProps {
 export function UsageLimitModal({ feature, open, onClose }: UsageLimitModalProps) {
   const { t } = useTranslation('auth');
   const auth = useAuthStore();
+  const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState(false);
 
   const isLoggedIn = auth.isLoggedIn;
@@ -77,8 +79,8 @@ export function UsageLimitModal({ feature, open, onClose }: UsageLimitModalProps
                 {t('usageLimitModal.loginToContinue') || '登录以继续使用'}
               </Button>
             ) : tier === 'free' ? (
-              <Button className="w-full gap-2" onClick={onClose}>
-                <ArrowUpCircle className="h-4 w-4" />
+              <Button className="w-full gap-2" onClick={() => { navigate('/goclaw/member'); onClose(); }}>
+                <Crown className="h-4 w-4" />
                 {t('usageLimitModal.upgrade') || '升级会员以无限使用'}
               </Button>
             ) : (

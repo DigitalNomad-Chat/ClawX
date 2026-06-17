@@ -22,6 +22,9 @@ import { GoClawMarketplace } from './modules/goclaw/marketplace';
 import { GoClawManager } from './modules/goclaw/manager';
 import { GoClawHistory } from './modules/goclaw/history';
 import { GoClawModels } from './modules/goclaw/models';
+import { CustomAgentEditor } from './modules/goclaw/custom-agent-editor';
+import { MyAgents } from './modules/goclaw/my-agents';
+import { GoClawMemberCenter } from './modules/goclaw/member-center';
 import { AgentChat } from './pages/AgentChat';
 import { Settings } from './pages/Settings';
 import { AdvancedConfig } from './pages/AdvancedConfig';
@@ -215,7 +218,11 @@ function App() {
               <Route path="manager" element={<GoClawManager />} />
               <Route path="history" element={<GoClawHistory />} />
               <Route path="models" element={<GoClawModels />} />
+              <Route path="member" element={<GoClawMemberCenter />} />
               <Route path="chat/:agentId" element={<AgentChat />} />
+              <Route path="custom-agent/new" element={<CustomAgentEditor />} />
+              <Route path="custom-agent/:agentId/edit" element={<CustomAgentEditor />} />
+              <Route path="my-agents" element={<MyAgents />} />
             </Route>
             <Route path="/settings/*" element={<Settings />} />
             <Route path="/advanced-config" element={<AdvancedConfig />} />
