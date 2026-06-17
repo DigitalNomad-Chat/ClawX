@@ -42,45 +42,119 @@ describe('model option helpers', () => {
     expect(formatModelRefLabel('custom-alpha1234/model-alpha')).toBe('model-alpha');
   });
 
-  it('builds one configured custom model option per account', () => {
+  describe('resolveRuntimeProviderKey', () => {
+    it('returns semantic custom provider ids without hashing', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'agnes-ai' }))).toBe('agnes-ai');
+      expect(resolveRuntimeProviderKey(account({ id: 'my-api' }))).toBe('my-api');
+      expect(resolveRuntimeProviderKey(account({ id: 'localhost', vendorId: 'ollama' }))).toBe('localhost');
+    });
+
+    it('hashes UUID custom/ollama provider ids', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'abc12345-1234-1234-1234-123456789012' }))).toBe('custom-abc12345');
+      expect(
+        resolveRuntimeProviderKey(account({ id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', vendorId: 'ollama' })),
+      ).toBe('ollama-a1b2c3d4');
+    });
+
+    it('returns already-hashed custom/ollama runtime keys as-is', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'custom-agnesai' }))).toBe('custom-agnesai');
+      expect(resolveRuntimeProviderKey(account({ id: 'ollama-local01', vendorId: 'ollama' }))).toBe('ollama-local01');
+    });
+
+    it('maps built-in provider aliases to OpenClaw keys', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'kimi-coding', vendorId: 'kimi-coding' }))).toBe('kimi');
+      expect(resolveRuntimeProviderKey(account({ id: 'qwen-coding-cn', vendorId: 'qwen-coding-cn' }))).toBe('qwen');
+      expect(resolveRuntimeProviderKey(account({ id: 'qwen-standard-global', vendorId: 'qwen-standard-global' }))).toBe('qwen');
+      expect(resolveRuntimeProviderKey(account({ id: 'qwen-standard-cn', vendorId: 'qwen-standard-cn' }))).toBe('qwen');
+      expect(resolveRuntimeProviderKey(account({ id: 'modelstudio', vendorId: 'modelstudio' }))).toBe('qwen');
+      expect(resolveRuntimeProviderKey(account({ id: 'minimax-portal-cn', vendorId: 'minimax-portal-cn' }))).toBe('minimax-portal');
+    });
+
+    it('maps OAuth browser providers to their runtime keys', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'google-account', vendorId: 'google', authMode: 'oauth_browser' }))).toBe('google-gemini-cli');
+      expect(resolveRuntimeProviderKey(account({ id: 'openai-account', vendorId: 'openai', authMode: 'oauth_browser' }))).toBe('openai-codex');
+    });
+
+    it('returns vendorId directly for standard providers', () => {
+      expect(resolveRuntimeProviderKey(account({ id: 'openai', vendorId: 'openai' }))).toBe('openai');
+      expect(resolveRuntimeProviderKey(account({ id: 'anthropic', vendorId: 'anthropic' }))).toBe('anthropic');
+      expect(resolveRuntimeProviderKey(account({ id: 'moonshot-global', vendorId: 'moonshot-global' }))).toBe('moonshot-global');
+    });
+  });
+
+  it('builds one configured custom model option per UUID-based account', () => {
     const options = buildConfiguredModelOptions(
       [
-        account({ id: 'alpha1234', model: 'model-alpha', updatedAt: '2026-04-03T00:00:00.000Z' }),
-        account({ id: 'beta5678', label: 'Beta', model: 'provider/model-beta', updatedAt: '2026-04-02T00:00:00.000Z' }),
+        account({ id: 'abc12345-1234-1234-1234-123456789012', model: 'model-alpha', updatedAt: '2026-04-03T00:00:00.000Z' }),
+        account({ id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', label: 'Beta', model: 'model-beta', updatedAt: '2026-04-02T00:00:00.000Z' }),
       ],
-      [status('alpha1234'), status('beta5678')],
-      'alpha1234',
+      [status('abc12345-1234-1234-1234-123456789012'), status('a1b2c3d4-e5f6-7890-abcd-ef1234567890')],
+      'abc12345-1234-1234-1234-123456789012',
     );
 
     expect(options).toEqual([
       {
-        modelRef: 'custom-alpha123/model-alpha',
+        modelRef: 'custom-abc12345/model-alpha',
         label: 'model-alpha',
-        runtimeProviderKey: 'custom-alpha123',
-        accountId: 'alpha1234',
+        runtimeProviderKey: 'custom-abc12345',
+        accountId: 'abc12345-1234-1234-1234-123456789012',
       },
       {
-        modelRef: 'custom-beta5678/provider/model-beta',
-        label: 'provider/model-beta',
-        runtimeProviderKey: 'custom-beta5678',
-        accountId: 'beta5678',
+        modelRef: 'custom-a1b2c3d4/model-beta',
+        label: 'model-beta',
+        runtimeProviderKey: 'custom-a1b2c3d4',
+        accountId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      },
+    ]);
+  });
+
+  it('preserves semantic custom provider ids in configured model options', () => {
+    const options = buildConfiguredModelOptions(
+      [account({ id: 'agnes-ai', label: 'Agnes AI', model: 'agnes-2.0-flash' })],
+      [status('agnes-ai')],
+      'agnes-ai',
+    );
+
+    expect(options).toEqual([
+      {
+        modelRef: 'agnes-ai/agnes-2.0-flash',
+        label: 'agnes-2.0-flash',
+        runtimeProviderKey: 'agnes-ai',
+        accountId: 'agnes-ai',
+      },
+    ]);
+  });
+
+  it('strips foreign provider prefix from account model when building ref', () => {
+    const options = buildConfiguredModelOptions(
+      [account({ id: 'agnes-ai', label: 'Agnes AI', model: 'custom-agnesai/agnes-2.0-flash' })],
+      [status('agnes-ai')],
+      'agnes-ai',
+    );
+
+    expect(options).toEqual([
+      {
+        modelRef: 'agnes-ai/agnes-2.0-flash',
+        label: 'agnes-2.0-flash',
+        runtimeProviderKey: 'agnes-ai',
+        accountId: 'agnes-ai',
       },
     ]);
   });
 
   it('keeps prefixed account models intact and skips accounts without credentials', () => {
-    const runtimeKey = resolveRuntimeProviderKey(account({ id: 'gamma9012' }));
+    const runtimeKey = resolveRuntimeProviderKey(account({ id: 'abc12345-1234-1234-1234-123456789012' }));
     const options = buildConfiguredModelOptions(
       [
-        account({ id: 'gamma9012', model: `${runtimeKey}/model-gamma` }),
-        account({ id: 'delta3456', label: 'Delta', model: 'model-delta' }),
+        account({ id: 'abc12345-1234-1234-1234-123456789012', model: `${runtimeKey}/model-gamma` }),
+        account({ id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', label: 'Delta', model: 'model-delta' }),
       ],
-      [status('gamma9012'), status('delta3456', false)],
+      [status('abc12345-1234-1234-1234-123456789012'), status('a1b2c3d4-e5f6-7890-abcd-ef1234567890', false)],
       null,
     );
 
     expect(options).toHaveLength(1);
-    expect(options[0].modelRef).toBe('custom-gamma901/model-gamma');
+    expect(options[0].modelRef).toBe('custom-abc12345/model-gamma');
     expect(options[0].label).toBe('model-gamma');
   });
 
