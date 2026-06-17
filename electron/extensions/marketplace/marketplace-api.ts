@@ -6,7 +6,15 @@ import { ipcMain, type WebContents, app } from 'electron';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, join, extname } from 'path';
 import { getKernelLauncher } from '../index.js';
-import { registerKernelLLMRoutes } from './kernel-llm-store.js';
+import { registerKernelLLMRoutes, getActiveLLMProvider } from './kernel-llm-store.js';
+import {
+  addCustomAgent,
+  updateCustomAgent,
+  deleteCustomAgent,
+  listCustomAgents,
+  type CustomAgentInput,
+} from './custom-agent-store.js';
+import { generateAgentProfile } from './agent-generation-service.js';
 import {
   listSessions,
   getSession,
@@ -59,20 +67,27 @@ const wcDestroyedHandlers = new WeakMap<WebContents, () => void>();
 export function registerMarketplaceRoutes(): void {
   console.log('[Marketplace] Registering IPC routes...');
 
-  // List all available agents — 直接读取 manifest.json，不经过内核
+  // List all available agents — 合并预设 + 自定义
   ipcMain.handle('marketplace:listAgents', async () => {
     try {
       const manifest = readManifest();
-      return { success: true, agents: manifest.agents };
+      const custom = listCustomAgents();
+      return { success: true, agents: [...manifest.agents, ...custom] };
     } catch (err) {
       console.error('[Marketplace] listAgents error:', err);
       return { success: false, error: (err as Error).message };
     }
   });
 
-  // Get agent detail — 直接读取 manifest.json，不经过内核
+  // Get agent detail — 优先自定义，再预设
   ipcMain.handle('marketplace:getAgent', async (_event, agentId: string) => {
     try {
+      const custom = listCustomAgents();
+      const customAgent = custom.find((a) => a.id === agentId);
+      if (customAgent) {
+        return { success: true, agent: customAgent };
+      }
+
       const manifest = readManifest();
       const agent = manifest.agents.find((a) => a.id === agentId);
       if (agent) {
@@ -464,6 +479,58 @@ export function registerMarketplaceRoutes(): void {
       return { success: true, removed };
     } catch (err) {
       console.error('[Marketplace] history:clearAgent error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ─── Custom Agent CRUD ─────────────────────────────────────────────────
+
+  ipcMain.handle('marketplace:createCustomAgent', async (_event, payload: CustomAgentInput) => {
+    try {
+      const entry = await addCustomAgent(payload);
+      return { success: true, agent: entry };
+    } catch (err) {
+      console.error('[Marketplace] createCustomAgent error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('marketplace:updateCustomAgent', async (_event, agentId: string, payload: CustomAgentInput) => {
+    try {
+      const entry = await updateCustomAgent(agentId, payload);
+      return { success: true, agent: entry };
+    } catch (err) {
+      console.error('[Marketplace] updateCustomAgent error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('marketplace:deleteCustomAgent', async (_event, agentId: string) => {
+    try {
+      deleteCustomAgent(agentId);
+      return { success: true };
+    } catch (err) {
+      console.error('[Marketplace] deleteCustomAgent error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('marketplace:listCustomAgents', async () => {
+    try {
+      return { success: true, agents: listCustomAgents() };
+    } catch (err) {
+      console.error('[Marketplace] listCustomAgents error:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // Generate agent profile from natural language requirements
+  ipcMain.handle('marketplace:generateAgentProfile', async (_event, requirements: string) => {
+    try {
+      const profile = await generateAgentProfile(requirements);
+      return { success: true, profile };
+    } catch (err) {
+      console.error('[Marketplace] generateAgentProfile error:', err);
       return { success: false, error: (err as Error).message };
     }
   });

@@ -19,6 +19,7 @@ import {
   Bot,
   X,
   Shield,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,7 @@ export function GoClawSidebar() {
   const navItems = [
     { to: '/goclaw/marketplace', icon: <Store className="h-4 w-4" strokeWidth={2} />, label: '应用广场' },
     { to: '/goclaw/manager', icon: <Shield className="h-4 w-4" strokeWidth={2} />, label: '龙虾管家' },
+    { to: '/goclaw/member', icon: <Crown className="h-4 w-4" strokeWidth={2} />, label: '会员中心' },
     { to: '/goclaw/history', icon: <History className="h-4 w-4" strokeWidth={2} />, label: '历史记录' },
     { to: '/goclaw/models', icon: <Cpu className="h-4 w-4" strokeWidth={2} />, label: '模型配置' },
   ];

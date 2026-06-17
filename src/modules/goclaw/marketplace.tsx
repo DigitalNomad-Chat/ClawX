@@ -5,7 +5,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Store,
+  Search, Store, Plus, Bot,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -90,7 +90,25 @@ export function GoClawMarketplace() {
             </p>
           </div>
         </div>
-        <UsageBar feature="marketplace" />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/goclaw/custom-agent/new')}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            创建 Agent
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/goclaw/my-agents')}
+          >
+            <Bot className="h-4 w-4 mr-1" />
+            我的 Agent
+          </Button>
+          <UsageBar feature="marketplace" />
+        </div>
       </div>
 
       {/* Search & Filter */}

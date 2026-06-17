@@ -36,6 +36,8 @@ interface GoClawState {
   recentSessions: GoClawSession[];
   sessionsLoading: boolean;
   expandedAgentGroups: Record<string, boolean>;
+  customAgents: GoClawAgent[];
+  customAgentsLoading: boolean;
 
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
@@ -45,6 +47,11 @@ interface GoClawState {
   loadRecentSessions: () => Promise<void>;
   deleteSession: (sessionId: string) => Promise<boolean>;
   clearAgentSessions: (agentId: string) => Promise<boolean>;
+
+  loadCustomAgents: () => Promise<void>;
+  createCustomAgent: (payload: Parameters<typeof kernelClient.createCustomAgent>[0]) => Promise<{ success: boolean; agent?: GoClawAgent; error?: string }>;
+  updateCustomAgent: (agentId: string, payload: Parameters<typeof kernelClient.updateCustomAgent>[1]) => Promise<{ success: boolean; agent?: GoClawAgent; error?: string }>;
+  deleteCustomAgent: (agentId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useGoClawStore = create<GoClawState>((set, get) => ({
@@ -54,6 +61,8 @@ export const useGoClawStore = create<GoClawState>((set, get) => ({
   recentSessions: [],
   sessionsLoading: false,
   expandedAgentGroups: {},
+  customAgents: [],
+  customAgentsLoading: false,
 
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -138,6 +147,64 @@ export const useGoClawStore = create<GoClawState>((set, get) => ({
     } catch (err) {
       console.error('[GoClaw] Failed to clear agent sessions:', err);
       return false;
+    }
+  },
+
+  // ─── Custom Agents ────────────────────────────────────────────────
+
+  loadCustomAgents: async () => {
+    set({ customAgentsLoading: true });
+    try {
+      const result = await kernelClient.listCustomAgents();
+      if (result.success && result.agents) {
+        set({ customAgents: result.agents as GoClawAgent[] });
+      } else {
+        set({ customAgents: [] });
+      }
+    } catch (err) {
+      console.error('[GoClaw] Failed to load custom agents:', err);
+      set({ customAgents: [] });
+    } finally {
+      set({ customAgentsLoading: false });
+    }
+  },
+
+  createCustomAgent: async (payload) => {
+    try {
+      const result = await kernelClient.createCustomAgent(payload);
+      if (result.success) {
+        await get().loadCustomAgents();
+      }
+      return result;
+    } catch (err) {
+      console.error('[GoClaw] Failed to create custom agent:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+
+  updateCustomAgent: async (agentId, payload) => {
+    try {
+      const result = await kernelClient.updateCustomAgent(agentId, payload);
+      if (result.success) {
+        await get().loadCustomAgents();
+      }
+      return result;
+    } catch (err) {
+      console.error('[GoClaw] Failed to update custom agent:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+
+  deleteCustomAgent: async (agentId) => {
+    try {
+      const result = await kernelClient.deleteCustomAgent(agentId);
+      if (result.success) {
+        await get().loadCustomAgents();
+      }
+      return result;
+    } catch (err) {
+      console.error('[GoClaw] Failed to delete custom agent:', err);
+      return { success: false, error: String(err) };
     }
   },
 }));
