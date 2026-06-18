@@ -1,9 +1,9 @@
 {
     "name": "clawdock",
     "version": "0.4.2-beta.2",
-    "upstream": "ValueCell-ai/ClawDock@v0.4.2-beta.2",
-    "mergeDate": "2026-05-10",
-    "mergeBase": "96c9f6fe5bd3fc84e1511e9aff5c6ee403f2736b",
+    "upstream": "ValueCell-ai/ClawX@v0.4.2",
+    "mergeDate": "2026-06-18",
+    "mergeBase": "c1ba38c71b659a93c57262205ba7a1f4969c6145",
     "pnpm": {
         "onlyBuiltDependencies": [
             "@discordjs/opus",
