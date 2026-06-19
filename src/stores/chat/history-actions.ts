@@ -3,16 +3,18 @@ import { hostApiFetch } from '@/lib/host-api';
 import { useGatewayStore } from '@/stores/gateway';
 import {
   clearHistoryPoll,
+  dropRedundantOptimisticUserMessages,
   enrichWithCachedImages,
   enrichWithToolResultFiles,
   getLatestOptimisticUserMessage,
   getMessageErrorMessage,
   getMessageStopReason,
   getMessageText,
+  hasOptimisticServerEcho,
   isInternalMessage,
+  isRecoverableRuntimeError,
   isToolResultRole,
   loadMissingPreviews,
-  matchesOptimisticUserMessage,
   mergePendingOptimisticUserMessages,
   toMs,
 } from './helpers';
@@ -116,12 +118,13 @@ export function createHistoryActions(
           const userMsMs = toMs(userMsgAt);
           const optimistic = getLatestOptimisticUserMessage(get().messages, userMsMs);
           const hasMatchingUser = optimistic
-            ? finalMessages.some((message) => matchesOptimisticUserMessage(message, optimistic, userMsMs))
+            ? hasOptimisticServerEcho(finalMessages, optimistic, userMsMs)
             : false;
           if (optimistic && !hasMatchingUser) {
             finalMessages = [...finalMessages, optimistic];
           }
         }
+        finalMessages = dropRedundantOptimisticUserMessages(currentSessionKey, finalMessages);
 
         const { pendingFinal, lastUserMessageAt, sending: isSendingNow } = get();
         const userMsTs = lastUserMessageAt ? toMs(lastUserMessageAt) : 0;
@@ -150,12 +153,17 @@ export function createHistoryActions(
           && getMessageStopReason(lastAssistantAfterBoundary) === 'error'
           ? getMessageErrorMessage(lastAssistantAfterBoundary)
           : null;
+        const historyErrorIsTransient = Boolean(
+          latestTerminalAssistantErrorMessage
+          && isSendingNow
+          && isRecoverableRuntimeError(latestTerminalAssistantErrorMessage),
+        );
 
         set({
           messages: finalMessages,
           thinkingLevel,
           loading: false,
-          runError: latestTerminalAssistantErrorMessage,
+          runError: historyErrorIsTransient ? null : latestTerminalAssistantErrorMessage,
         });
 
         // Extract first user message text as a session label for display in the toolbar.
@@ -205,7 +213,7 @@ export function createHistoryActions(
         // Attempting to infer completion from message history is fragile
         // and leads to premature sending=false during server-side tool
         // execution.
-        if (latestTerminalAssistantErrorMessage) {
+        if (latestTerminalAssistantErrorMessage && !historyErrorIsTransient) {
           clearHistoryPoll();
           set({
             sending: false,

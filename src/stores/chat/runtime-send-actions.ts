@@ -58,6 +58,12 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
       const currentSendGeneration = ++sendGeneration;
 
       const targetSessionKey = resolveMainSessionKeyForAgent(targetAgentId) ?? get().currentSessionKey;
+
+      // Guard against double-submit before React re-renders with sending=true.
+      if (get().sending && targetSessionKey === get().currentSessionKey) {
+        return;
+      }
+
       if (targetSessionKey !== get().currentSessionKey) {
         const current = get();
         const leavingEmpty = !current.currentSessionKey.endsWith(':main') && current.messages.length === 0;
