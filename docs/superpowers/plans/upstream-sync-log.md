@@ -179,17 +179,6 @@
 
 ---
 
-## 版本对照表
-
-| 当前项目版本 | 同步上游版本 | 日期 |
-|--------------|--------------|------|
-| `0.4.2-beta.2` | `v0.4.2` | 2026-06-18 |
-| `0.4.2-beta.2` | `v0.4.4`（第一阶段） | 2026-06-18 |
-| `0.4.2-beta.2` | `v0.4.4`（第二阶段） | 2026-06-18 |
-| `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
-
----
-
 ### 2026-06-19：同步到 v0.4.5（B group）
 
 - **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
@@ -290,7 +279,10 @@
 
 #### 固化记录
 
-- C group 代码与测试已完成并通过 typecheck，**尚未提交**（待授权）。
+- C group 已提交：
+  - `3eb515be` — #1047/#1048 主体（`helpers.ts`/`runtime-send-actions.ts`/`gateway.ts`/`task-visualization.ts`/`Chat/index.tsx`/`ChatMessage.tsx`）+ 测试基础设施（`tests/setup.ts` localStorage polyfill + react-virtuoso mock）
+  - `d64c1c8c` — 补充 #1047 monolithic `chat.ts` 与拆分 `history-actions.ts` 的双轨实现（session run-state 缓存、`buildSessionSwitchPatch` 切换保持 run 状态、导出 `syncCachedSessionRunIdle`）
+- typecheck 通过，工作树干净。
 
 #### 下一步计划
 
@@ -307,4 +299,5 @@
 | `0.4.2-beta.2` | `v0.4.4`（第二阶段） | 2026-06-18 |
 | `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
 | `0.4.2-beta.2` | `v0.4.5`（B group `c14a0e9a`） | 2026-06-19 |
+| `0.4.2-beta.2` | `v0.4.5`（C group `3eb515be` + `d64c1c8c`） | 2026-06-19 |
 
