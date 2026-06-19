@@ -168,6 +168,11 @@
 - ✅ 指定单元测试通过：`tests/unit/agent-loader.test.ts`、`tests/unit/custom-agent-store.test.ts`、`tests/unit/model-options.test.ts`、`tests/unit/modules/goclaw/custom-agent-editor.test.tsx`、`tests/unit/modules/goclaw/my-agents.test.tsx`、`tests/unit/agent-generation-service.test.ts`
 - ⚠️ 全量单元测试仍有失败，主要与 feature-guard / membership 相关，这些失败在本次合并前已存在
 
+#### 固化记录
+
+- **2026-06-19**：将两阶段移植固化为 merge commit `a80a4560`（parents: 固化前 HEAD `00c53dc0` + v0.4.4 commit `3de1fed4`），工作树干净，`pnpm run typecheck` 通过，`MERGE_HEAD` 已清除。v0.4.4 现为 HEAD 祖先，作为 v0.4.5 选择性移植的安全锚点。
+- 执行计划见 `docs/superpowers/plans/2026-06-19-v0.4.4-freeze-and-v0.4.5-selective-merge.md`。
+
 #### 下一步计划
 
 继续同步上游 **v0.4.4 → v0.4.5**。
@@ -181,4 +186,5 @@
 | `0.4.2-beta.2` | `v0.4.2` | 2026-06-18 |
 | `0.4.2-beta.2` | `v0.4.4`（第一阶段） | 2026-06-18 |
 | `0.4.2-beta.2` | `v0.4.4`（第二阶段） | 2026-06-18 |
+| `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
 
