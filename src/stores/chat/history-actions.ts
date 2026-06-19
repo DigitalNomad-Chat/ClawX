@@ -10,12 +10,14 @@ import {
   getMessageErrorMessage,
   getMessageStopReason,
   getMessageText,
+  hasAssistantAfterLastRealUser,
   hasOptimisticServerEcho,
   isInternalMessage,
   isRecoverableRuntimeError,
   isToolResultRole,
   loadMissingPreviews,
   mergePendingOptimisticUserMessages,
+  setLastChatEventAt,
   toMs,
 } from './helpers';
 import { buildCronSessionHistoryPath, isCronSessionKey } from './cron-session-utils';
@@ -224,14 +226,12 @@ export function createHistoryActions(
           return true;
         }
 
-        if (isSendingNow && !pendingFinal) {
-          const hasRecentAssistantActivity = [...filteredMessages].reverse().some((msg) => {
-            if (msg.role !== 'assistant') return false;
-            return isAfterUserMsg(msg);
-          });
-          if (hasRecentAssistantActivity) {
-            set({ pendingFinal: true });
+        if (isSendingNow && !pendingFinal && hasAssistantAfterLastRealUser(filteredMessages)) {
+          setLastChatEventAt(Date.now());
+          if (get().error) {
+            set({ error: null });
           }
+          set({ pendingFinal: true });
         }
         return true;
       };
