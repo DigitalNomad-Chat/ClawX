@@ -76,6 +76,7 @@ vi.mock('@electron/utils/paths', () => ({
   getOpenClawConfigDir: () => testOpenClawConfigDir,
   getOpenClawDir: () => testOpenClawConfigDir,
   getOpenClawResolvedDir: () => testOpenClawConfigDir,
+  getDataDir: () => testOpenClawConfigDir,
 }));
 
 vi.mock('@electron/utils/proxy-fetch', () => ({

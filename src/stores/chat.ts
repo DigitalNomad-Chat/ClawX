@@ -104,7 +104,7 @@ const HISTORY_LOAD_MIN_INTERVAL_MS = 800;
 const HISTORY_POLL_SILENCE_WINDOW_MS = 2_500;
 
 /** Number of messages to fetch on initial history load (fast startup) */
-const INITIAL_HISTORY_LIMIT = 30;
+const INITIAL_HISTORY_LIMIT = 200;
 /** Number of messages to fetch when loading more history */
 const MORE_HISTORY_LIMIT = 30;
 const CHAT_EVENT_DEDUPE_TTL_MS = 30_000;

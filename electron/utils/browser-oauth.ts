@@ -5,6 +5,11 @@ import { loginOpenAICodexOAuth, type OpenAICodexOAuthCredentials } from './opena
 import { getProviderService } from '../services/providers/provider-service';
 import { getSecretStore } from '../services/secrets/secret-store';
 import { saveOAuthTokenToOpenClaw } from './openclaw-auth';
+import {
+  ensureOpenClawProviderAgentRuntimePins,
+  saveOAuthTokenToOpenClaw,
+  setOpenClawDefaultModel,
+} from './openclaw-auth';
 
 // Google was removed: OpenClaw's `google-gemini-cli` OAuth integration is an
 // unofficial third-party flow that requires the `gemini` CLI binary to be on
@@ -187,6 +192,26 @@ class BrowserOAuthManager extends EventEmitter {
       email: oauthTokenEmail,
       projectId: oauthTokenSubject,
     });
+
+    const modelId = normalizedExistingModel || defaultModel;
+    const modelRef = `${runtimeProviderId}/${modelId}`;
+    const fallbackModelRefs = (nextAccount.fallbackModels ?? [])
+      .map((fallback) => fallback.trim())
+      .filter(Boolean)
+      .map((fallback) => (
+        fallback.startsWith(`${runtimeProviderId}/`)
+          ? fallback
+          : `${runtimeProviderId}/${fallback}`
+      ));
+
+    try {
+      await setOpenClawDefaultModel(runtimeProviderId, modelRef, fallbackModelRefs);
+      await ensureOpenClawProviderAgentRuntimePins();
+      logger.info(`[BrowserOAuth] Registered ${runtimeProviderId} in openclaw.json (default model: ${modelRef})`);
+    } catch (err) {
+      logger.warn('[BrowserOAuth] Failed to register OpenAI OAuth provider in openclaw.json:', err);
+      throw err;
+    }
 
     this.emit('oauth:success', { provider: providerType, accountId: nextAccount.id });
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {

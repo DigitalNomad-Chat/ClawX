@@ -290,6 +290,71 @@
 
 ---
 
+### 2026-06-19：同步到 v0.4.5（D group）
+
+- **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
+- **上游版本**：`v0.4.5`
+- **上游提交**：`1aa4776e fix: OpenAI OAuth login and provider list cleanup (#1043)`
+- **当前分支**：`feat/membership-system`
+- **合并范围**：D group（PR #1043 OpenAI OAuth 登录修复 + Provider 列表清理），保留 ClawDock 品牌与自定义功能。
+
+#### 合并说明
+
+本阶段完成 v0.4.5 选择性移植的最后一组。核心问题是 bundled OpenClaw 2026.5.12 不注册 `codex` harness，导致 OpenAI OAuth 登录后聊天报 `Requested agent harness "codex" is not registered.`；同时修复 Provider 列表中 OAuth 账号产生的冗余 `OpenAI • API key (missing)` 行。
+
+1. **OpenAI OAuth 登录健壮性**
+   - `electron/utils/openai-codex-oauth.ts`：多 claim 回退解析 account id；local server 监听双栈（移除 `'localhost'` 绑定）；token 解析失败时使用 `?? 'default'` 而非 throw。
+
+2. **Provider 路由与 UI 去重**
+   - `electron/utils/provider-keys.ts`：新增 `OPENAI_CODEX_RUNTIME_PROVIDER_KEY = 'openai-codex'`；`OPENCLAW_OAUTH_PLUGIN_PROVIDER_KEYS` 追加 openai-codex；新增 `resolveOpenClawProviderKey(account)`（oauth_browser + openai → openai-codex）；新增 `filterActiveProviderKeysForUi`（在仅配置 Codex OAuth 时从 UI 隐藏裸 `openai` 行）。
+   - `electron/utils/openclaw-auth.ts`：`OPENCLAW_PROVIDER_PINNED_AGENT_RUNTIME` 增加 `'openai-codex': 'pi'`，将 OpenAI OAuth 路由固定到内置 `pi` harness；新增 `OPENAI_CODEX_OAUTH_PROVIDER_CONFIG`；`setOpenClawDefaultModel` 增加 openai-codex 分支，写入 `models.providers.openai-codex` 并启用 OAuth 插件。
+   - `electron/services/providers/provider-service.ts`：3 处调用改用 `resolveOpenClawProviderKey(account)`；新增 `hasConfiguredOpenAiApiKey` 检测与裸 openai 账号清理逻辑；使用 `filterActiveProviderKeysForUi` 生成 UI 列表。
+   - `electron/utils/browser-oauth.ts`：OAuth 成功后调用 `setOpenClawDefaultModel` 与 `ensureOpenClawProviderAgentRuntimePins`，持久化默认模型与 runtime pin。
+
+3. **恢复 OpenAI OAuth UI**
+   - `src/lib/providers.ts`：删除 openai provider 的 `hideOAuthUi: true`，使 add-provider 对话框重新展示 OAuth Login / API Key 切换。
+
+4. **测试移植**
+   - 新增 `tests/unit/provider-keys.test.ts`。
+   - 更新 `tests/unit/openclaw-auth.test.ts`（openai-codex pin 断言 + setOpenClawDefaultModel 分支）。
+   - 更新 `tests/unit/provider-service-stale-cleanup.test.ts`（UI 去重 + 无 key openai 账号清理）。
+   - 更新 `tests/unit/providers.test.ts`（移除 `hideOAuthUi` 断言）。
+   - 更新 `tests/e2e/provider-lifecycle.spec.ts`（OpenAI OAuth UI 生命周期）。
+
+#### 冲突处理
+
+| 文件 | 处理方式 |
+|------|----------|
+| `electron/utils/provider-keys.ts` | 保留 ClawDock 自定义的 `getOpenClawProviderKeyForType` authMode 分支作为防御性冗余；新增 `resolveOpenClawProviderKey` 与 `filterActiveProviderKeysForUi` 保持与上游结构一致 |
+| `electron/utils/openclaw-auth.ts` | 按 #1043 更新 pin 注释与 `'openai-codex': 'pi'` 条目；新增 `OPENAI_CODEX_OAUTH_PROVIDER_CONFIG` 与 openai-codex 默认模型分支 |
+| `electron/services/providers/provider-service.ts` | 将 3 处 `getOpenClawProviderKeyForType(..., authMode)` 改为 `resolveOpenClawProviderKey(account)`；新增 API key 检测与清理块 |
+| `src/lib/providers.ts` | 删除 openai 的 `hideOAuthUi: true`，恢复 OAuth UI |
+
+#### 验证结果
+
+- ✅ `pnpm run typecheck` 通过
+- ✅ D-group 新增/更新单元测试通过：
+  - `tests/unit/provider-keys.test.ts` 6/6 通过（将 upstream 的 `my-local → custom-mylocal` 断言适配为 ClawDock 行为：非 UUID custom id 保持原样，UUID id 按 8 位哈希处理）
+  - `tests/unit/openclaw-auth.test.ts` 48/48 通过
+  - `tests/unit/provider-service-stale-cleanup.test.ts` 15/15 通过
+- ⚠️ `tests/unit/providers.test.ts` 存在 4 个 pre-existing 失败，已用临时回退 `src/lib/providers.ts` 验证：失败在回退前后完全一致，与 D-group 无关
+  - `includes ark in the frontend provider registry`：ClawDock `PROVIDER_TYPE_INFO` 未包含 `ark`
+  - `exposes provider documentation links`：ark 的 `docsUrl` 未定义
+  - `shows OAuth-capable provider model overrides regardless of dev mode and preserves defaults`：minimax-portal / minimax-portal-cn 设置了 `showModelIdInDevModeOnly: true`
+  - `saves user-entered or default model overrides for built-in providers without dev mode`：ark 的 `resolveProviderModelForSave` 返回 `undefined`
+- ℹ️ 合计 76/80 通过，4 个失败均为 ClawDock 现有 provider 元数据与测试预期的偏差，不影响 #1043 功能
+
+#### 固化记录
+
+- D group 代码与测试已移植完成，工作树待提交（遵循 CLAUDE.md：未获得用户明确授权前不执行 `git commit`）。
+- 提交内容涉及文件：`electron/utils/openai-codex-oauth.ts`、`electron/utils/provider-keys.ts`、`electron/utils/openclaw-auth.ts`、`electron/services/providers/provider-service.ts`、`electron/utils/browser-oauth.ts`、`src/lib/providers.ts`、`tests/unit/provider-keys.test.ts`、`tests/unit/openclaw-auth.test.ts`、`tests/unit/provider-service-stale-cleanup.test.ts`、`tests/unit/providers.test.ts`、`tests/e2e/provider-lifecycle.spec.ts`。
+
+#### 下一步计划
+
+v0.4.2 → v0.4.5 同步验证已完成。后续处理剩余测试债务：#13 store mock 测试失败、#14 MessageBubble 样式断言失败；D group 代码待用户明确授权后提交。
+
+---
+
 ## 版本对照表
 
 | 当前项目版本 | 同步上游版本 | 日期 |
@@ -300,4 +365,5 @@
 | `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
 | `0.4.2-beta.2` | `v0.4.5`（B group `c14a0e9a`） | 2026-06-19 |
 | `0.4.2-beta.2` | `v0.4.5`（C group `3eb515be` + `d64c1c8c`） | 2026-06-19 |
+| `0.4.2-beta.2` | `v0.4.5`（D group #1043，工作树待提交） | 2026-06-19 |
 

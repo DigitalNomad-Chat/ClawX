@@ -114,59 +114,57 @@ export function MessageBubble({
     ? repairMarkdown(normalizeLatexDelimiters(debouncedText))
     : normalizeLatexDelimiters(text);
 
+  if (isUser) {
+    return (
+      <div className="relative rounded-2xl bg-brand px-4 py-3 msg-bubble-user">
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{text}</p>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        'relative rounded-2xl px-4 py-3',
-        !isUser && 'w-full',
-        isUser ? 'msg-bubble-user' : 'msg-bubble-ai',
-      )}
-    >
-      {isUser ? (
-        <p className="whitespace-pre-wrap break-words break-all text-sm leading-relaxed">{text}</p>
-      ) : (
-        <div className="prose prose-sm dark:prose-invert max-w-none break-words break-all">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false, output: 'html' }]]}
-            components={{
-              code({ className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '');
-                const language = match?.[1];
-                const isInline = !match && !className;
-                if (isInline) {
-                  return (
-                    <code {...props}>
+    <div className="relative w-full msg-bubble-ai">
+      <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false, output: 'html' }]]}
+          components={{
+            code({ className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || '');
+              const language = match?.[1];
+              const isInline = !match && !className;
+              if (isInline) {
+                return (
+                  <code className="break-all" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+              const codeText = String(children).replace(/\n$/, '');
+              return (
+                <div className="my-2 rounded-lg border border-border/30 overflow-hidden">
+                  <CodeBlockToolbar code={codeText} language={language} />
+                  <pre className="m-0 rounded-none bg-muted/30 dark:bg-white/5 px-4 py-3 overflow-x-auto">
+                    <code className={cn(className, 'text-sm font-mono leading-relaxed')} {...props}>
                       {children}
                     </code>
-                  );
-                }
-                const codeText = String(children).replace(/\n$/, '');
-                return (
-                  <div className="my-2 rounded-lg border border-border/30 overflow-hidden">
-                    <CodeBlockToolbar code={codeText} language={language} />
-                    <pre className="m-0 rounded-none bg-muted/30 dark:bg-white/5 px-4 py-3 overflow-x-auto">
-                      <code className={cn(className, 'text-sm font-mono leading-relaxed')} {...props}>
-                        {children}
-                      </code>
-                    </pre>
-                  </div>
-                );
-              },
-              a({ href, children }) {
-                return (
-                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-words break-all">
-                    {children}
-                  </a>
-                );
-              },
-            }}
-          >
-            {displayText}
-          </ReactMarkdown>
-          {isStreaming && <span className="streaming-cursor" />}
-        </div>
-      )}
+                  </pre>
+                </div>
+              );
+            },
+            a({ href, children }) {
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-words">
+                  {children}
+                </a>
+              );
+            },
+          }}
+        >
+          {displayText}
+        </ReactMarkdown>
+        {isStreaming && <span className="streaming-cursor" />}
+      </div>
     </div>
   );
 }
