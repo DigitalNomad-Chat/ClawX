@@ -170,13 +170,15 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
         });
       }
 
-      const partialError = clawhubResult.status === 'rejected'
-        ? clawhubResult.reason
-        : configResult.status === 'rejected'
-          ? configResult.reason
-          : clawhubData?.success === false
-            ? new Error(clawhubData.error || 'Failed to fetch marketplace skills')
-            : null;
+      const partialError = runtimeSkillsResult.status === 'rejected'
+        ? runtimeSkillsResult.reason
+        : clawhubResult.status === 'rejected'
+          ? clawhubResult.reason
+          : configResult.status === 'rejected'
+            ? configResult.reason
+            : clawhubData?.success === false
+              ? new Error(clawhubData.error || 'Failed to fetch marketplace skills')
+              : null;
 
       if (partialError) {
         const appError = normalizeAppError(partialError, { module: 'skills', operation: 'fetch' });

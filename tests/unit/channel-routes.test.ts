@@ -100,6 +100,7 @@ vi.mock('@electron/utils/openclaw-sdk', () => ({
 
 describe('handleChannelRoutes', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.resetAllMocks();
     rmSync(testOpenClawConfigDir, { recursive: true, force: true });
     proxyAwareFetchMock.mockReset();
@@ -276,6 +277,7 @@ describe('handleChannelRoutes', () => {
       'telegram',
       { botToken: 'token', allowedUsers: '123456' },
       'Legacy_Account',
+      expect.any(Object),
     );
     expect(sendJsonMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -763,6 +765,7 @@ describe('handleChannelRoutes', () => {
       'telegram',
       { botToken: 'token', allowedUsers: '123456' },
       'telegram-a1b2c3d4',
+      expect.any(Object),
     );
     expect(assignChannelAccountToAgentMock).toHaveBeenCalledWith('main', 'telegram', 'default');
     expect(clearChannelBindingMock).toHaveBeenCalledWith('telegram');

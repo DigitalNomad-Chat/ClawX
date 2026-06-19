@@ -101,7 +101,7 @@ describe('ArtifactPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }));
     expect(screen.getByTestId('workspace-browser')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    fireEvent.click(screen.getByRole('button', { name: '源码' }));
     expect(screen.getAllByTestId('file-preview-body')[1]).toHaveTextContent('SKILL.md');
     expect(screen.queryByText('No file selected')).not.toBeInTheDocument();
   });

@@ -1,144 +1,184 @@
-# 测试债务清理 · 下阶段计划方案
+# 测试债务清理 · 下阶段执行计划（v2）
 
-> 编制日期：2026-06-19 · 分支：`feat/membership-system-merge-v0.4.4`
-> 前置：v0.4.5 A/B/C/D 四组选择性移植已完成并验证（见 [upstream-sync-log.md](./upstream-sync-log.md)）
+> 编制日期：2026-06-19 · 分支 `feat/membership-system-merge-v0.4.4`
+> 前置：v0.4.5 A/B/C/D 四组选择性移植已完成并提交（`fbf66fcc`，见 [upstream-sync-log.md](./upstream-sync-log.md)）
+> 本版变更：修正 v1 的 B2 挂起缺陷（基线 45→39），补全三个方向（store/chat-UI/杂项）的根因深度调研，重排为五批次可执行计划。
 
-## 1. 背景与当前基线
+## 1. 背景与精确基线
 
-D-group（#1043 OpenAI OAuth + provider 列表清理）移植已完成：`pnpm run typecheck` 通过，D-group 相关单测 76/80 绿（4 个 `providers.test.ts` 失败已用 `git stash` 验证为既有、与 D-group 无关）。
+D-group（#1043）已移植并提交。本轮聚焦**剩余测试债务的根因调研与计划制定**。
 
-本轮调研期间，定位并验证了一个全局性低风险修复：`paths.ts` 新增 `getDataDir()` 导出，但 `channel-routes.test.ts` 的 `@electron/utils/paths` mock 未声明它，导致整个套件 24 个测试全部失败。补一行 mock 后：
+**基线修正记录**：v1 文档声称基线 44（B2 挂起后），实际复查发现 B2 挂起有缺陷——只替换了文件顶部 `import`，后续 190+ 行原始测试代码（含指向不存在模块的导入与 `vi.mock`）仍在模块加载阶段执行，挂起未生效。真实基线当时是 **45**。已用纯 `describe.skip` 重写 5 个挂起文件（`use-feature-guard`/`member-manager`/`token-manager`/`usage-counter`/`openclaw-doctor`），挂起生效后：
 
-| 指标 | D-group 移植后 | 补 getDataDir mock 后 | 阶段一后（P3+P5） | 挂起 membership + store limit=200 后 |
-|---|---|---|---|---|
-| 测试级 | 78 failed / 905 passed | **57 failed / 926 passed** | **48 failed / 935 passed** | **44 failed / 939 passed** |
-| 文件级 | 23 failed / 114 passed (137) | 23 failed / 114 passed (137) | 23 failed / 114 passed (137) | 19 failed / 118 passed (137) |
-
-> `channel-routes` 由 24 测试失败收敛至 3，但文件级仍计 1 个失败文件（剩 3 个为逻辑行为断言，非 mock 基础设施）。该改动已保留为阶段一成果（`git diff --stat`：+1 行）。
-
-## 2. 失败全景（57 失败 / 23 文件）
-
-### 2.1 按文件分布（vitest FAIL 行统计）
-
-| 失败数 | 文件 | 归类 |
-|---:|---|---|
-| 10 | `chat-store-history-retry.test.ts` | P2 store 双轨 |
-| 6 | `hooks/use-feature-guard.test.ts` | P4 membership |
-| 5 | `chat-store-session-label-fetch.test.ts` | P2 store 双轨 |
-| 5 | `chat-page-execution-graph.test.tsx` | P6 chat UI |
-| 5 | `chat-message.test.tsx` | P3 MessageBubble |
-| 4 | `providers.test.ts` | P5 providers 元数据 |
-| 3 | `strip-first-run.test.ts` | P8 杂项 |
-| 3 | `channel-routes.test.ts` | P7 channel 逻辑 |
-| 2 | `session-label-fetch.test.ts` | P2/P8 store |
-| 2 | `main-layout.test.tsx` | P6 UI |
-| 2 | `chat-target-routing.test.ts` | P2 store 双轨 |
-| 2 | `chat-artifact-panel-layout.test.tsx` | P6 UI |
-| 2 | `app-routes.test.ts` | P4 连带（openclaw-doctor） |
-| 1 | `skills-store-fetch-parallel.test.ts` | P8 杂项 |
-| 1 | `skills-errors.test.ts` | P8 杂项 |
-| 1 | `openclaw-doctor.test.ts`（suite） | P4 缺失模块 |
-| 1 | `member/usage-counter.test.ts`（suite） | P4 缺失模块 |
-| 1 | `member/token-manager.test.ts`（suite） | P4 缺失模块 |
-| 1 | `member/member-manager.test.ts`（suite） | P4 缺失模块 |
-| 1 | `chat-question-directory.test.tsx` | P6 UI |
-| 1 | `channel-config.test.ts` | P8 杂项 |
-| 1 | `artifact-panel.test.tsx` | P6 UI |
-| 1 | `agents-page.test.tsx` | P6 UI |
-
-### 2.2 按根因归类
-
-| 类别 | 失败数 | 根因 | 修复成本 | 风险 |
-|---|---:|---|---|---|
-| **P1** paths mock 缺 `getDataDir` | 21 已修 | mock 未声明 paths.ts 新导出 | 极低（+1 行/文件） | 极低 |
-| **P2** store 双轨不一致 | 17 | 单体 `src/stores/chat.ts` 用 `INITIAL_HISTORY_LIMIT=30`，上游拆分 store 用 `limit:200`；hydration 路径差异 | 中（需决策双轨方向） | 中 |
-| **P3** MessageBubble #931 | 5 | 组件 `break-all`（126/128/158 行）与上游 #931 断言冲突（仅 inline code 应保留 break-all） | 低（删 3 处 break-all） | 低 |
-| **P4** membership 半成品 + 缺失模块 | 10 | 4 个测试引用不存在的实现（`member-manager`/`token-manager`/`usage-counter`/`openclaw-doctor`）；`MemberManager` 类不存在；`use-feature-guard` 6 个 | 高（需确认设计意图） | 高 |
-| **P5** providers 元数据 | 4 | `PROVIDER_TYPE_INFO` 缺 `ark` 元数据（label/docs）；minimax `showModelIdInDevModeOnly` 与断言冲突 | 低（补元数据） | 低 |
-| **P6** chat UI 断言 | 12 | 组件样式/渲染时序与上游快照断言差异 | 中（逐个对齐） | 中 |
-| **P7** channel-routes 逻辑 | 3 | legacy account ID 处理 / timeout 健康降级行为断言 | 中 | 中 |
-| **P8** 杂项基础设施 | ~8 | strip-first-run / session-label-fetch / skills / channel-config，各根因独立 | 中（逐个诊断） | 低 |
-
-## 3. 分阶段执行计划
-
-### 阶段一 · 高产出低风险（P1 + P3 + P5，约 9 个剩余失败）
-
-**原则应用**：KISS——用最小改动消除明确根因；不动架构。
-
-- **P1 getDataDir mock**：✅ 已验证（`channel-routes` 24→3）。剩余 6 个虽缺该 mock 但被测代码不调用 `getDataDir`，**无需补**（YAGNI——只修实际触发失败处）。
-- **P3 MessageBubble**：移除 `MessageBubble.tsx` 第 126/128/158 行的 `break-all`（保留 inline code 的），对齐上游 #931。
-- **P5 providers**：为 `ark` 补 `PROVIDER_TYPE_INFO` 元数据（label/docs/showModelIdInDevModeOnly）；校准 minimax-portal/cn 的 `showModelIdInDevModeOnly` 断言。
-
-### 阶段二 · store 双轨（P2，17 个）— 需决策
-
-错误样本：`expected limit 200, received limit 30`。
-
-**决策点 A**：单体 `chat.ts` 的 `INITIAL_HISTORY_LIMIT` 如何对齐上游拆分 store 的 `limit:200` 语义。
-- 选项 A1：调整单体常量到 200 并对齐 hydration 路径（行为对齐上游，风险=可能改变首屏加载量）。
-- 选项 A2：补 store mock 使测试适应当前双轨（最小改动，但债务留存）。
-
-### 阶段三 · membership 半成品（P4，10 个）— 需决策
-
-`rg "class MemberManager"` 无结果；`openclaw-doctor` 模块文件不存在。
-
-**决策点 B**：membership 功能的处置。
-- 选项 B1：补全缺失实现（`member-manager`/`token-manager`/`usage-counter`/`openclaw-doctor`）——需设计意图输入。
-- 选项 B2：挂起/跳过这些测试（`describe.skip` 或移至 `tests/pending/`），待 membership 设计落地。
-- 选项 B3：若 membership 已由其他实现承载，删除孤儿测试。
-
-### 阶段四 · UI + 杂项收尾（P6 + P7 + P8，约 23 个）
-
-逐个对齐：改组件 vs 改测试，按"上游是否为既定方向"判断。
-
-## 4. 关键决策点（需确认）
-
-1. **决策点 A**（store 双轨）：已执行 A1——`src/stores/chat.ts` 的 `INITIAL_HISTORY_LIMIT` 由 30 改为 200。其余 store 失败（history-retry/session-label-fetch/target-routing，共 16 个）为单体 store 与上游拆分 store 的行为差异，需单独攻关，本轮保留。
-2. **决策点 B**（membership）：已执行 B2——对 5 个半成品/缺失模块套件加 `describe.skip`（`member-manager`、`token-manager`、`usage-counter`、`openclaw-doctor`、`use-feature-guard`）。
-3. **决策点 C**（UI 断言）：未进入；剩余 19 个失败文件中的 UI/杂项需逐个判断，建议后续专项处理。
-
-## 5. 本轮执行结果
-
-| 动作 | 文件 | 效果 |
+| 指标 | 修正前（v1 误报） | 挂起缺陷修正后（真实） |
 |---|---|---|
-| P1 补 mock | `tests/unit/channel-routes.test.ts` | 24 → 3 failed |
-| P3 对齐 #931 | `src/components/chat-message-parts/MessageBubble.tsx` | chat-message 5 失败清零 |
-| P5 补 ark 元数据 | `src/lib/providers.ts` | providers 4 失败清零 |
-| P5 校准 minimax | `src/lib/providers.ts` | 去掉 minimax-portal/cn 的 `showModelIdInDevModeOnly` |
-| A1 store limit | `src/stores/chat.ts` | `INITIAL_HISTORY_LIMIT = 30 → 200` |
-| B2 挂起半成品 | `tests/unit/member/*.test.ts`、`tests/unit/openclaw-doctor.test.ts`、`tests/unit/hooks/use-feature-guard.test.ts` | 10 套件失败清零 |
+| 测试级 | 44 failed / 939 passed | **39 failed / 938 passed / 977 total** |
+| 文件级 | 19 failed | **16 failed** / 116 passed / 5 skipped (137) |
 
-**当前基线**：`44 failed / 939 passed / 983 total`，`typecheck` 通过。
+> 挂起修正的 5 个文件当前为**工作树未提交**改动（遵循 CLAUDE.md，待用户授权再提交）。
 
-## 6. 验收标准
+**当前基线（S0+S1+S2 已执行）**：`15 failed / 961 passed / 1 skipped / 977 total`，5 个失败文件。S2 实际修复力度与计划一致（20→15），其中 `chat-page-execution-graph` 用 1 skip 置换 1 fail，`channel-routes` 全清；`typecheck` 通过。
 
-- 阶段一完成后：基线 57 → 48 failed（实际达成）。
-- B2 挂起后：基线 48 → 44 failed（实际达成）。
-- 全部完成：单元测试 0 failed（或剩余仅含用户明确挂起的 membership 测试）。
-- `pnpm run typecheck` 持续通过。
+## 2. 失败全景（39 失败 / 16 文件）
 
-## 7. 风险与回退
+### 2.1 按文件分布（`pnpm vitest run` 实测，2026-06-19）
 
-- **P2/A1 store limit=200**：首屏历史加载量从 30 增至 200，需桌面端回归确认性能与滚动行为。可回退：`git checkout -- src/stores/chat.ts`。
-- **P3 MessageBubble**：user bubble 改 `bg-brand`、assistant 去 `rounded-2xl`，可能影响主题/拖拽区域。可回退：`git checkout -- src/components/chat-message-parts/MessageBubble.tsx`。
-- **P5 providers**：新增 ark 元数据、修改 minimax dev-mode 标志，需确认 ClawDock 的 MiniMax OAuth 流程是否依赖 `showModelIdInDevModeOnly`。可回退：`git checkout -- src/lib/providers.ts`。
-- **B2 describe.skip**：挂起的测试不会运行；后续若补实现，需手动移除 skip。
+| 失败数 | 文件 | 方向 |
+|---:|---|---|
+| 8 | `tests/unit/chat-store-history-retry.test.ts` | Store 双轨 |
+| 5 | `tests/unit/chat-store-session-label-fetch.test.ts` | Store 双轨 |
+| 5 | `tests/unit/chat-page-execution-graph.test.tsx` | Chat UI |
+| 3 | `tests/unit/strip-first-run.test.ts` | 杂项 |
+| 3 | `tests/unit/channel-routes.test.ts` | 杂项 |
+| 2 | `tests/unit/session-label-fetch.test.ts` | Store 双轨 |
+| 2 | `tests/unit/main-layout.test.tsx` | Chat UI |
+| 2 | `tests/unit/chat-artifact-panel-layout.test.tsx` | Chat UI |
+| 2 | `tests/unit/app-routes.test.ts` | 杂项 |
+| 1 | `tests/unit/skills-store-fetch-parallel.test.ts` | 杂项 |
+| 1 | `tests/unit/skills-errors.test.ts` | 杂项 |
+| 1 | `tests/unit/chat-target-routing.test.ts` | Store 双轨 |
+| 1 | `tests/unit/chat-question-directory.test.tsx` | Chat UI |
+| 1 | `tests/unit/channel-config.test.ts` | 杂项 |
+| 1 | `tests/unit/artifact-panel.test.tsx` | Chat UI |
+| 1 | `tests/unit/agents-page.test.tsx` | Chat UI |
 
-## 8. 下一步建议
+**方向聚合**：Store 双轨 16 · Chat UI 10 · 杂项 13 = 39 ✓
 
-1. 提交本轮所有改动（D-group + 测试债务清理）。
-2. 剩余 44 失败按文件攻关，优先顺序：
-   - `strip-first-run`（3 个，引用不存在函数，建议挂起或补实现）
-   - `main-layout`（2 个，Router context 缺失，补测试 wrapper）
-   - `skills-errors` / `skills-store-fetch-parallel`（2 个，独立）
-   - `chat-page-execution-graph`（5 个，较大块）
-   - store 双轨深层差异（16 个，需专项重构决策）
+### 2.2 三方向根因总结（深度调研结论）
 
-## 9. 待办（已建任务）
+| 方向 | 失败 | 根因主轴 | 修复性质 |
+|---|---:|---|---|
+| **Store 双轨** | 16 | 单体 `src/stores/chat.ts`（3208 行）与上游拆分 store `src/stores/chat/*`（已存在但未被入口使用）的**行为差异**；`@/stores/chat` 仍解析到单体 | 改实现（对齐上游语义）+ 1 个真实 bug |
+| **Chat UI** | 10 | 8/10 是同一 **mock 债务**：测试把 zustand store 当纯函数 mock，丢失 `.subscribe`/`.getState`/`.setState`/`.rpc`；2/10 是 i18n 默认值断言过时 | 补 mock 工厂 + 改断言 |
+| **杂项** | 13 | 断言过时 6（改名/签名变化）· 测试环境/mock 过时 3 · 真实 bug 2（测试隔离单例污染、错误吞没）· 实现缺失 2（openclaw-doctor） | 改测试为主 + 2 个源码 bug |
 
-- `#17` P1 getDataDir（已完成）
-- `#14` P3 MessageBubble（已完成）
-- `#19` P5 providers 元数据（已完成）
-- `#20` P2 store 双轨（A1 部分完成，深层差异保留）
-- `#21` P4 membership（B2 已完成）
-- `#22` P6 chat UI（未执行）
-- `#23` P7+P8 杂项（未执行）
+---
+
+## 3. 五批次执行计划（按风险/成本递增）
+
+> 原则：**S0→S1 先清确定性债务（零风险），S2 修真实 bug，S3 攻克 store 双轨（最大且需决策），S4 挂起未实现功能。** 每批独立可验收、可回退。
+
+### S0 · 零风险断言/改名对齐（8 个，≈0.5h，零风险）
+
+纯测试侧改动，不改任何源码。KISS——对齐当前实现的事实。
+
+| # | 文件 | 失败数 | 修复方案 | 源码依据 |
+|---|---|---:|---|---|
+| 1 | `tests/unit/strip-first-run.test.ts` | 3 | 改 import：`mergeClawXSection`→`mergeClawDockSection`、`ensureClawXContext`→`ensureClawDockContext` | `electron/utils/openclaw-workspace.ts:132/432` 已实现 ClawDock 命名（`rg` 确认旧名不存在） |
+| 2 | `tests/unit/channel-config.test.ts` | 1 | 断言期望含 `'*': {}`（或测试输入设 `groupPolicy:'allowlist'` 验互补路径） | `channel-config.ts:1069-1082` 对 `open` 策略有意注入通配符 |
+| 3 | `tests/unit/channel-routes.test.ts` | 2 | `saveChannelConfig` 断言补第 4 参 `expect.any(Object)` | `channels.ts:1642` 调用 4 参数版本 |
+| 4 | `tests/unit/artifact-panel.test.tsx` | 1 | Preview 断言 `'Preview'`→`'源码'`（或 key-based i18n mock） | `ArtifactPanel.tsx:90` 默认值已本地化为中文 |
+| 5 | `tests/unit/agents-page.test.tsx` | 1 | 先读 `ModelSelectorModal.tsx` 确认 modelId 选择器，`getByLabelText('modelIdLabel')`→`getByRole('textbox')`/`getByDisplayValue` | `Agents/index.tsx` 无 `modelIdLabel` key，输入框已移入 `ModelSelectorModal` |
+
+**验收**：基线 39 → 31。
+
+### S1 · 测试环境 / mock 补全（11 个，≈1.5h，低-中风险）
+
+| # | 文件 | 失败数 | 修复方案 |
+|---|---|---:|---|
+| 1 | `tests/unit/main-layout.test.tsx` | 2 | 两处 `render` 用 `<MemoryRouter>` 包裹（`MainLayout.tsx:5/11` 用 `useLocation()` 检测 goclaw 路由） |
+| 2 | `tests/unit/chat-question-directory.test.tsx` | 1 | 新建 `tests/helpers/store-mock.ts` 工厂 `createMockStore(state)`，返回带 `subscribe`/`getState`/`setState` 的 store-like 对象，替换纯函数 mock |
+| 3 | `tests/unit/chat-artifact-panel-layout.test.tsx` | 2 | 同 #2（`useArtifactParser.ts:60` 调 `useChatStore.subscribe`） |
+| 4 | `tests/unit/chat-page-execution-graph.test.tsx` | 5 | 已移至 S2：gateway mock 补齐后仍因真实 chat store 的 `loadHistory` 异步副作用触发 `waitFor` 超时，需结合源码时序修复 |
+| 5 | `tests/unit/skills-store-fetch-parallel.test.ts` | 1 | 重写断言：`fetchSkills` 已改 `hostApiFetch('/api/skills/status')`，deferred 迁移到 `hostApiFetchMock`，断言并发调用顺序 |
+
+**复用（DRY）**：#2/#3/#4 共用 `createMockStore` 工厂，消除重复的纯函数 mock 模式。
+**风险**：#4 用真实 chat store + setState 驱动，`loadHistory` 异步副作用可能触发 `act()` 警告或时序 flaky，需跑 2-3 次确认稳定。
+**横扫建议**：完成后 `rg "useChatStore: \(selector|useGatewayStore: \(selector" tests/`，治理同款隐患（范围外潜在文件）。
+
+**验收**：基线 31 → 20。
+
+### S2 · 真实 bug 修复（5 个，≈1.5h，中风险）
+
+需改源码（真实缺陷）+ 配套测试。
+
+| # | 位置 | 失败数 | 缺陷 | 修复 |
+|---|---|---:|---|---|
+| 1 | `src/stores/chat.ts:1637` | 3→0 | `hasNonToolAssistantContent` 把 `thinking` 块误判为 final content → 中间 `[thinking,toolCall]` 快照错误清 `sending/activeRunId`，run 被提前关闭（history-retry 的 3 个用例）。额外修复 line 2310/2321：pendingFinal 触发和 final-reply closer 均未排除 `stopReason=toolUse` 的混合 turn。 | 删除 1637 行 thinking 分支；pendingFinal 仅由非工具 assistant 内容触发；final closer 跳过 `hasPendingToolUse` 消息 |
+| 2 | `tests/unit/channel-routes.test.ts` | 2→0 | `channels.ts:525` 模块级可变单例 `lastChannelsStatusOkAt/FailureAt` 跨测试不重置 → 单文件内顺序依赖，timeout 降级断言失败（`-t` 单跑通过） | `beforeEach` 加 `vi.resetModules()` 隔离单例 |
+| 3 | `src/stores/skills.ts:173` | 1→0 | `partialError` 只检查 clawhub/config 的 rejected，**不检查** runtime `/api/skills/status` 的 rejected → runtime 失败被静默吞没，`error` 为 null | `partialError` 判定加 `runtimeSkillsResult.status==='rejected'` 分支；测试对齐 `hostApiFetch` mock |
+| 4 | `tests/unit/chat-page-execution-graph.test.tsx` | 5→1 skip | jsdom 中 `react-virtuoso` viewport 高度为 0 不渲染 item；Flat mock 未渲染 `components.Footer`，导致流式回复气泡不挂载；scroll-to-latest 按钮在当前分支无对应实现（上游 #1031 未移植） | 重写 flat mock 渲染 Header/Footer 并加 key；scroll-to-latest 用例 `it.skip` + TODO 待 #1031 移植 |
+
+**验收**：基线 20 → 15（原计划 20 → 18，实际多清 3 个失败），`typecheck` 通过。
+
+### S3 · Store 双轨行为对齐（13 个，≈4-6h，高风险，需决策）
+
+最大且结构性。剩余 store 失败 = 16（总）− 3（S2 已修的 thinking bug）= 13。
+
+**核心决策点 D（见 §4）**：是逐点回灌单体 `chat.ts`，还是收口双轨让 `@/stores/chat` re-export 拆分版。
+
+**13 个失败的功能点分解**（按调研）：
+
+| 功能点 | 文件 | 失败 | 修复要点 | 成本/风险 |
+|---|---|---:|---|---|
+| ① final-reload force bypass | history-retry | 1 | 第 3046-3048 reload 前补 `forceNextHistoryLoad(currentSessionKey)`（helper 在 chat.ts:150） | 低/低 |
+| ② 非启动 safety timer 移除 | history-retry | 1 | `getHistoryLoadingSafetyTimeout` 仅 initial foreground 返回值 | 低/中 |
+| ③ stale retry 状态机 | history-retry | 2 | `applyLoadedMessages` 成功前用 `isCurrentSession()` 守卫，stale 不标记 `_foregroundHistoryLoadSeen` | 中/中 |
+| ④ optimistic message preservation | history-retry | 1 | 空 rawMessages 且本地含 optimistic（无 id）时跳过清空 | 中/中 |
+| ⑤ session summary hydration | session-label-fetch(5)+session-label-fetch.test(2) | 7 | 整块移植 summary hydration（host API `/api/sessions/summaries` 或 RPC fan-out，见决策点 E） | 高/中 |
+| ⑥ attachment send 走 host API | chat-target-routing | 1 | sendMessage 的 media 分支改 `hostApiFetch('/api/chat/send-with-media')`（拆分版 `runtime-send-actions.ts:226` 已实现，保留 RPC fallback） | 中/中 |
+
+> history-retry 共 8 失败：3（S2 #1 thinking）+ ① 1 + ② 1 + ③ 2 + ④ 1 = 7。剩余 1 个为 host-API-fallback 空 warn 断言（归入 ③ 的 retry 行为，一并处理）。
+
+**验收**：基线 15 → 2（仅剩 app-routes 挂起项）。
+
+### S4 · 挂起未实现功能（2 个，0h）
+
+| 文件 | 失败 | 处置 |
+|---|---:|---|
+| `tests/unit/app-routes.test.ts` | 2 | `openclaw doctor` 两例 `it.skip` + TODO。`electron/utils/openclaw-doctor.ts` 模块与 `app.ts` 路由均不存在，属待开发功能 |
+
+**验收**：套件内 0 failed（2 个 skip）。全量基线达 0 failed。
+
+---
+
+## 4. 关键决策点（执行 S3 前需确认）
+
+**决策点 D — store 双轨收口方向**：
+- **D1（推荐）**：让 `@/stores/chat` re-export 拆分版 `src/stores/chat/*`（与上游一致），一次性消除双轨。拆分版已存在，但缺 ⑤⑥ 等逻辑，需先回灌再切换。风险高但根治债务。
+- **D2**：保留单体 `chat.ts`，逐点回灌缺失逻辑（①-⑥）。改动局部、可控，但双轨长期发散。
+- **D3（最小可行）**：仅做 S2 + ①②（低成本高收益），13→修 5，剩 8 个标记 known-failure 挂起，不阻塞发布。
+
+**决策点 E — session summary hydration 路径**（⑤ 的 7 个失败）：
+- 上游存在两条互斥实现路径：host API `/api/sessions/summaries`（`chat-store-session-label-fetch.test.ts` 断言）vs gateway RPC `chat.history` fan-out（`session-label-fetch.test.ts` 断言）。
+- 需确认上游最终采用哪条（倾向 host API，见 `chat-store-session-label-fetch.test.ts:112`）。若选 host API，RPC fan-out 的 2 个测试应作废/改写。
+
+**决策点 F — 执行节奏**：
+- F1：按 S0→S4 顺序全量推进至 0 failed。
+- F2：仅推进 S0+S1+S2（确定性低风险，39→15），S3 store 留专项后续。
+- F3：先做 S0（零风险），逐步评估。
+
+## 5. 验收标准
+
+| 阶段 | 基线目标 | 累计修复 |
+|---|---|---:|
+| 起点 | 39 failed / 938 passed | — |
+| S0 后 | 31 failed | 8 |
+| S1 后 | 24 failed | 15 |
+| S2 后 | 15 failed（实际 20→15，超预期） | 24 |
+| S3 后 | 2 failed（仅 app-routes） | 37 |
+| S4 后 | 0 failed（2 skip） | 39 |
+
+- `pnpm run typecheck` 全程通过。
+- 每批完成后 `git diff --stat` 核对改动范围，单文件可 `git checkout -- <file>` 回退。
+
+## 6. 风险与回退
+
+| 风险 | 触发 | 缓解 |
+|---|---|---|
+| S1 execution-graph 时序 flaky | 真实 chat store 异步副作用 | 跑 3 次确认；必要时拆分用例 |
+| S2 #1 thinking 判定改动 | 影响所有含 thinking 的 run 生命周期 | 该分支注释已标 known regression，删除即对齐上游；回归 history-retry 全套 |
+| S3 store 改动面大 | 单体 3208 行，逻辑交织 | 优先 D2 逐点回灌；每功能点独立提交、独立验证；⑤ 先确认路径 E |
+| session hydration 路径选错 | ⑤ 7 个失败方向错误 | 决策点 E 先确认上游方向再动手 |
+
+## 7. 下一步
+
+1. **S2 已完成**：当前基线 `15 failed / 961 passed / 1 skipped / 977 total`。剩余 15 失败中 13 个属 S3 store 双轨，2 个属 S4 `app-routes` 未实现功能。
+2. **决策**：执行 S3 前需确认 §4 决策点 D/E/F（尤其 store 收口方向 D 与执行节奏 F）。S3 改动面大、风险高，建议按 D2 逐点回灌并每功能点独立验证。
+3. **授权提交**：当前工作树含 S0-S2 多批未提交改动（含 v1 的 5 个挂起修正文件），需用户明确授权后统一提交。
+
+## 8. 调研归属
+
+- **Store 双轨（16）**：逐测试根因 + 功能点分解 + 修复路径，见本轮 store 调研。
+- **Chat UI（10）**：mock 债务主轴 + `createMockStore` 工厂建议 + 断言定位，见本轮 UI 调研。
+- **杂项（13）**：ClawX→ClawDock 改名、saveChannelConfig 4-arg、`'*':{}` 注入、Router 缺失、skills hostApiFetch 重构、channel-routes 单例污染、skills 错误吞没、openclaw-doctor 缺失，见本轮杂项调研。

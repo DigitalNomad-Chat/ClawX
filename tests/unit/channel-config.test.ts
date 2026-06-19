@@ -452,6 +452,7 @@ describe('groups object serialization and deserialization', () => {
     expect(typeof formValues!.groups).toBe('string');
     const parsed = JSON.parse(formValues!.groups);
     expect(parsed).toEqual({
+      '*': {},
       'oc_test_group': {
         enabled: true,
         requireMention: false,

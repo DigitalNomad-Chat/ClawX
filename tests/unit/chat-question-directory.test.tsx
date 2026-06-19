@@ -15,45 +15,54 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/stores/gateway', () => ({
-  useGatewayStore: (selector: (state: { status: { state: string; gatewayReady: boolean } }) => unknown) => selector({
-    status: { state: 'running', gatewayReady: true },
-  }),
-}));
+const { useChatStore, useGatewayStore } = vi.hoisted(() => {
+  const gatewayState = { status: { state: 'running', gatewayReady: true } };
+  const useGatewayStore = (selector: (state: typeof gatewayState) => unknown) => selector(gatewayState);
+  useGatewayStore.getState = () => gatewayState;
+  useGatewayStore.setState = vi.fn();
+  useGatewayStore.subscribe = () => () => {};
+  useGatewayStore.getInitialState = () => gatewayState;
 
-const chatState = {
-  messages: [
-    { role: 'user', content: 'hello' },
-    { role: 'assistant', content: 'reply 1' },
-    { role: 'user', content: 'hello' },
-    { role: 'assistant', content: 'reply 2' },
-  ],
-  currentSessionKey: 'agent:main:main',
-  currentAgentId: 'main',
-  sessionLabels: {},
-  loading: false,
-  loadingMoreHistory: false,
-  hasMoreHistory: false,
-  sending: false,
-  error: null,
-  runError: null,
-  streamingMessage: null,
-  streamingTools: [],
-  pendingFinal: false,
-  activeRunId: null,
-  sendMessage: vi.fn(),
-  abortRun: vi.fn(),
-  clearError: vi.fn(),
-  loadMoreHistory: vi.fn(),
-  loadHistory: vi.fn(),
-  refresh: vi.fn(),
-  cleanupEmptySession: vi.fn(),
-  lastUserMessageAt: null,
-};
+  const chatState = {
+    messages: [
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'reply 1' },
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: 'reply 2' },
+    ] as Array<{ role: string; content: string }>,
+    currentSessionKey: 'agent:main:main',
+    currentAgentId: 'main',
+    sessionLabels: {},
+    loading: false,
+    loadingMoreHistory: false,
+    hasMoreHistory: false,
+    sending: false,
+    error: null,
+    runError: null,
+    streamingMessage: null,
+    streamingTools: [] as Array<Record<string, unknown>>,
+    pendingFinal: false,
+    activeRunId: null,
+    sendMessage: vi.fn(),
+    abortRun: vi.fn(),
+    clearError: vi.fn(),
+    loadMoreHistory: vi.fn(),
+    loadHistory: vi.fn(),
+    refresh: vi.fn(),
+    cleanupEmptySession: vi.fn(),
+    lastUserMessageAt: null,
+  };
+  const useChatStore = (selector: (state: typeof chatState) => unknown) => selector(chatState);
+  useChatStore.getState = () => chatState;
+  useChatStore.setState = vi.fn();
+  useChatStore.subscribe = () => () => {};
+  useChatStore.getInitialState = () => chatState;
 
-vi.mock('@/stores/chat', () => ({
-  useChatStore: (selector: (state: typeof chatState) => unknown) => selector(chatState),
-}));
+  return { useChatStore, useGatewayStore };
+});
+
+vi.mock('@/stores/gateway', () => ({ useGatewayStore }));
+vi.mock('@/stores/chat', () => ({ useChatStore }));
 
 vi.mock('@/stores/agents', () => ({
   useAgentsStore: (selector: (state: { agents: Array<{ id: string; name: string; workspace: string }>; fetchAgents: () => void }) => unknown) => selector({

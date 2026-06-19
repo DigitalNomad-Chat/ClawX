@@ -1634,7 +1634,6 @@ function hasNonToolAssistantContent(message: RawMessage | undefined): boolean {
   if (Array.isArray(content)) {
     for (const block of content as ContentBlock[]) {
       if (block.type === 'text' && block.text && block.text.trim()) return true;
-      if (block.type === 'thinking' && block.thinking && block.thinking.trim()) return true;
       if (block.type === 'image') return true;
     }
   }
@@ -2309,13 +2308,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       if (isSendingNow && !pendingFinal && hasAssistantAfterLastRealUser(filteredMessages)) {
-        set({ pendingFinal: true });
+        // Only arm pendingFinal when the assistant produced user-visible
+        // content (text/image). A bare [thinking, toolCall] turn is still
+        // mid-tool-chain and should not flip pendingFinal yet.
+        const segment = postUserSegmentMessages(filteredMessages);
+        if (segment.some((m) => m.role === 'assistant' && hasNonToolAssistantContent(m))) {
+          set({ pendingFinal: true });
+        }
       }
 
       // If pendingFinal, check whether the AI produced a final text response.
       if (pendingFinal || get().pendingFinal) {
         const recentAssistant = [...filteredMessages].reverse().find((msg) => {
           if (msg.role !== 'assistant') return false;
+          // A mixed text+toolCall turn with stopReason=tool_use is still
+          // waiting for tool results; don't treat it as the final reply.
+          if (hasPendingToolUse(msg)) return false;
           if (!hasNonToolAssistantContent(msg)) return false;
           return isAfterUserMsg(msg);
         });

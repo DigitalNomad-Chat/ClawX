@@ -199,7 +199,7 @@ describe('Agents page status refresh', () => {
     fireEvent.click(screen.getByText('settingsDialog.modelLabel').closest('button') as HTMLButtonElement);
 
     const useDefaultButton = await screen.findByRole('button', { name: 'settingsDialog.useDefaultModel' });
-    const modelIdInput = screen.getByLabelText('settingsDialog.modelIdLabel');
+    const modelIdInput = screen.getByDisplayValue('anthropic/claude-opus-4.6');
     const saveButton = screen.getByRole('button', { name: 'common:actions.save' });
 
     expect(useDefaultButton).toBeDisabled();
