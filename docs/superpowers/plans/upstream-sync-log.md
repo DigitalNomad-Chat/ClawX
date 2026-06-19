@@ -188,3 +188,123 @@
 | `0.4.2-beta.2` | `v0.4.4`（第二阶段） | 2026-06-18 |
 | `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
 
+---
+
+### 2026-06-19：同步到 v0.4.5（B group）
+
+- **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
+- **上游版本**：`v0.4.5`
+- **当前分支**：`feat/membership-system`
+- **合并范围**：B group（上游 PR #1044 optimistic user-message dedupe + 延迟可恢复 runtime error，PR #1046 会话重命名 label-hydration 保留），保留 ClawDock 品牌与自定义功能。
+
+#### 合并说明
+
+本阶段延续 v0.4.4 固化后的 selective merge 策略：
+
+1. **#1044 optimistic user-message 去重与 recoverable error 延迟**
+   - 将 `OPTIMISTIC_USER_TIMESTAMP_MATCH_MS` 从 5000ms 延长到 120_000ms。
+   - 新增 `matchesOptimisticUserMessage`、`hasOptimisticServerEcho`、`dropRedundantOptimisticUserMessages`。
+   - 新增 `isRecoverableRuntimeError`、`scheduleRecoverableRuntimeError`，对 `terminated` / `aborted` / `econnreset` / `connection reset` 等运行时错误延迟 12s 提交，避免 Gateway 瞬时重连误报。
+   - 在 monolithic `src/stores/chat.ts` 与拆分文件 `runtime-event-handlers.ts`、`history-actions.ts`、`runtime-send-actions.ts`、`helpers.ts` 中同步逻辑。
+   - 在 `sendMessage` 中增加 double-submit guard。
+
+2. **#1046 用户重命名会话 label 的 hydration 保留**
+   - 从 `src/stores/chat/session-label-hydration.ts` 引入 `finishSessionLabelHydration` / `getSessionLabelHydrationVersion`。
+   - 在 `renameSession` 成功后调用 `finishSessionLabelHydration`，使用户自定义会话名在后续 summary hydration 中不被覆盖。
+   - 未引入上游 `/api/sessions/summaries` 完整 hydration 链路，因当前 v0.4.4 分支未采用该路径。
+
+3. **单元测试更新**
+   - 更新 `tests/unit/chat-history-actions.test.ts` 与 `tests/unit/chat-runtime-event-handlers.test.ts` 的 mock，覆盖 `hasOptimisticServerEcho`、`dropRedundantOptimisticUserMessages`、`isRecoverableRuntimeError`、`scheduleRecoverableRuntimeError`。
+   - 新增 `defers recoverable terminated errors while the run is still active` 测试。
+
+#### 冲突处理
+
+| 文件 | 处理方式 |
+|------|----------|
+| `src/stores/chat.ts` | monolithic store 中镜像拆分文件的新增 helper 与 error recovery 逻辑；`dropRedundantOptimisticUserMessages` 在 monolithic 路径下保持 no-op 签名 |
+| `src/stores/chat/helpers.ts` | 新增常量与 helper 导出 |
+| `src/stores/chat/history-actions.ts` | 引入并使用 `dropRedundantOptimisticUserMessages`、`hasOptimisticServerEcho`、`isRecoverableRuntimeError` |
+| `src/stores/chat/runtime-event-handlers.ts` | error case 改为按 recoverable 判断延迟提交 |
+| `src/stores/chat/runtime-send-actions.ts` | 增加 double-submit guard |
+| `tests/unit/chat-history-actions.test.ts` | mock 扩展 |
+| `tests/unit/chat-runtime-event-handlers.test.ts` | mock 扩展并新增 recoverable error 测试 |
+
+#### 验证结果
+
+- ✅ `pnpm run typecheck` 通过
+- ✅ `chat-optimistic-match.test.ts` 6/6 通过
+- ✅ `chat-history-actions.test.ts` + `chat-runtime-event-handlers.test.ts` 合计 40/40 通过
+- ⚠️ `chat-store-session-label-fetch.test.ts`、`chat-store-history-retry.test.ts`、`chat-event-dedupe.test.ts`、`chat-target-routing.test.ts` 因既有的 jsdom `window.localStorage.clear is not a function` 环境问题失败，与 B-group 逻辑无关
+
+#### 固化记录
+
+- **2026-06-19**：提交 `c14a0e9a` "feat(chat): upstream v0.4.5 B-group selective merge (#1044/#1046)"。
+
+#### 下一步计划
+
+继续同步上游 **v0.4.5** C group（#1047 no-response + #1048 fold tool steps）与 D group（#1043 OpenAI OAuth + provider cleanup）。
+
+---
+
+### 2026-06-19：同步到 v0.4.5（C group）
+
+- **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
+- **上游版本**：`v0.4.5`
+- **当前分支**：`feat/membership-system`
+- **合并范围**：C group（PR #1047 no-response 误判修复 + PR #1048 工具步骤折叠到执行图），保留 ClawDock 品牌与自定义功能。
+
+#### 合并说明
+
+1. **#1047 no-response 误判修复（store 层）**
+   - `helpers.ts` 新增 `isRealUserBoundaryMessage`、`hasAssistantAfterLastRealUser`、`hasAssistantProgressSinceSend`：区分真实 user 边界与 `tool_result` 包装的伪 user，并判断自发送以来是否已有 assistant 进展。
+   - `runtime-send-actions.ts` 的 `checkStuck` 卡住检测：若 `hasAssistantProgressSinceSend` 为真，刷新 `lastChatEventAt`、清除 error 并继续等待，避免 Gateway 已返回 assistant 响应进展时误判为 no-response 超时。
+   - `gateway.ts` 的 run-completion 通知：对非当前会话调用 `syncCachedSessionRunIdle`，同步缓存会话的 run idle 状态。
+
+2. **#1048 工具步骤折叠到执行图（Chat 组件层）**
+   - `message-utils.ts` 新增 `normalizeMessageRole`：规范化 Gateway/OpenClaw role 比较。
+   - `task-visualization.ts` 新增 `buildRunSegmentMessageIndices` / `getRunSegmentMessages`：识别 user 触发的 run 段落（含分页前缀的 leading assistant 孤儿），供折叠工具卡片与 process attachment 使用。
+   - `Chat/index.tsx`：`isRealUserMessage` 提升到模块作用域（避免 TDZ）；用 `runSegmentMessageIndices` 跳过 run 段内 tool-only assistant 行并 suppress 工具卡片。
+   - `ChatMessage.tsx`：移除独立 `ToolCard` 渲染与内联 `ToolCard` 组件；新增 `isHtmlOrMarkdownPreview` / `isUserFacingAttachmentWhenFolded`，折叠 process attachment 时保留 image / 目录 / skill / PDF·XLSX / message-ref HTML·Markdown 等用户可见产物，隐藏通用 tool-result markdown。
+
+3. **测试基础设施修复**
+   - `tests/setup.ts` 新增内存版 Storage polyfill：jsdom 28.x 在 localStorage-file backing store 不可用时暴露空壳 `localStorage`/`sessionStorage`（缺 Storage API 方法），导致 zustand `persist` 调 `setItem` 报错。polyfill 幂等（仅当缺 `setItem` 时替换）。
+   - `chat-tool-card-suppression.test.tsx`、`chat-leading-orphan-tools.test.tsx` 新增 `react-virtuoso` mock：jsdom 容器高度为 0 导致 Virtuoso 渲染零行，平铺渲染以挂载 ExecutionGraphCard。
+
+#### 新增/修改测试
+
+| 文件 | 内容 |
+|------|------|
+| `tests/unit/run-segment-indices.test.ts`（新增） | `buildRunSegmentMessageIndices` 边界与 leading 孤儿折叠 |
+| `tests/unit/chat-tool-card-suppression.test.tsx`（新增） | run 段内不渲染独立工具卡片 |
+| `tests/unit/chat-leading-orphan-tools.test.tsx`（新增） | 分页前缀 tool 行折叠进首个执行图 |
+| `tests/unit/chat-message.test.tsx`（扩展） | HTML artifact / 通用 tool-result markdown / SKILL.md 可见性 |
+
+#### 验证结果
+
+- ✅ `pnpm run typecheck` 通过
+- ✅ #1048 直接相关测试全部通过：`run-segment-indices`、`chat-tool-card-suppression`、`chat-leading-orphan-tools`，及 `chat-message` 新增 3 个 attachment 用例
+- ✅ localStorage polyfill 副作用收益：`chat-event-dedupe`(2/2)、`host-events`(3/3) 此前因 jsdom localStorage 环境问题失败，现恢复通过
+- ⚠️ Pre-existing 失败（非本次引入，已归档为测试债务，详见复盘）：
+  - `chat-message.test.tsx` 的 word wrapping ×3 + reply styling ×2：`MessageBubble.tsx:126,128` 的 `break-words break-all` 与 #931 断言（期望不含 `break-all`）冲突，组件样式变更未同步测试。
+  - `chat-store-history-retry`(10)、`chat-store-session-label-fetch`(5)、`chat-target-routing`(2)：polyfill 解锁后暴露 store 双轨（monolithic `INITIAL_HISTORY_LIMIT=30` vs 上游拆分文件 `limit:200`）与 attachment 发送路径演进的断言偏差，逻辑与 C-group 无关。
+
+#### 固化记录
+
+- C group 代码与测试已完成并通过 typecheck，**尚未提交**（待授权）。
+
+#### 下一步计划
+
+继续同步上游 **v0.4.5** D group（#1043 OpenAI OAuth + provider cleanup）。
+
+---
+
+## 版本对照表
+
+| 当前项目版本 | 同步上游版本 | 日期 |
+|--------------|--------------|------|
+| `0.4.2-beta.2` | `v0.4.2` | 2026-06-18 |
+| `0.4.2-beta.2` | `v0.4.4`（第一阶段） | 2026-06-18 |
+| `0.4.2-beta.2` | `v0.4.4`（第二阶段） | 2026-06-18 |
+| `0.4.2-beta.2` | `v0.4.4`（merge commit 固化 `a80a4560`） | 2026-06-19 |
+| `0.4.2-beta.2` | `v0.4.5`（B group `c14a0e9a`） | 2026-06-19 |
+

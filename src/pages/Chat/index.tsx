@@ -19,8 +19,8 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ExecutionGraphCard } from './ExecutionGraphCard';
 import { ChatToolbar } from './ChatToolbar';
-import { extractImages, extractText, extractThinking, extractToolUse, stripProcessMessagePrefix } from './message-utils';
-import { deriveTaskSteps, findReplyMessageIndex, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
+import { extractImages, extractText, extractThinking, extractToolUse, normalizeMessageRole, stripProcessMessagePrefix } from './message-utils';
+import { buildRunSegmentMessageIndices, deriveTaskSteps, findReplyMessageIndex, getRunSegmentMessages, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useMinLoading } from '@/hooks/use-min-loading';
@@ -111,6 +111,14 @@ function generatedFileToTarget(file: GeneratedFile): FilePreviewTarget {
 // steps without tripping React's set-state-in-effect lint rule.
 const graphStepCacheStore = new Map<string, Record<string, GraphStepCacheEntry>>();
 const streamingTimestampStore = new Map<string, number>();
+
+function isRealUserMessage(msg: RawMessage): boolean {
+  if (normalizeMessageRole(msg.role) !== 'user') return false;
+  const content = msg.content;
+  if (!Array.isArray(content)) return true;
+  const blocks = content as Array<{ type?: string }>;
+  return blocks.length === 0 || !blocks.every((b) => b.type === 'tool_result' || b.type === 'toolResult');
+}
 
 export function Chat() {
   const { t } = useTranslation('chat');
@@ -381,19 +389,6 @@ export function Chat() {
   const isEmpty = messages.length === 0 && !sending;
   const subagentCompletionInfos = messages.map((message) => parseSubagentCompletionInfo(message));
   // Build an index of the *next* real user message after each position.
-  // Gateway history may contain `role: 'user'` messages that are actually
-  // tool-result wrappers (Anthropic API format).  These must NOT split
-  // the run into multiple segments — only genuine user-authored messages
-  // should act as run boundaries.
-  const isRealUserMessage = (msg: RawMessage): boolean => {
-    if (msg.role !== 'user') return false;
-    const content = msg.content;
-    if (!Array.isArray(content)) return true;
-    // If every block in the content is a tool_result, this is a Gateway
-    // tool-result wrapper, not a real user message.
-    const blocks = content as Array<{ type?: string }>;
-    return blocks.length === 0 || !blocks.every((b) => b.type === 'tool_result');
-  };
   const nextUserMessageIndexes = new Array<number>(messages.length).fill(-1);
   let nextUserMessageIndex = -1;
   for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
@@ -402,6 +397,16 @@ export function Chat() {
       nextUserMessageIndex = idx;
     }
   }
+
+  const isRunTrigger = useCallback(
+    (message: RawMessage, index: number) => isRealUserMessage(message) && !subagentCompletionInfos[index],
+    [subagentCompletionInfos],
+  );
+
+  const runSegmentMessageIndices = useMemo(
+    () => buildRunSegmentMessageIndices(messages, nextUserMessageIndexes, isRunTrigger),
+    [messages, nextUserMessageIndexes, isRunTrigger],
+  );
 
   // Indices of intermediate assistant process messages that are represented
   // in the ExecutionGraphCard (narration text and/or thinking). We suppress
@@ -417,7 +422,7 @@ export function Chat() {
       : `${currentSessionKey}:trigger-${idx}`;
     const nextUserIndex = nextUserMessageIndexes[idx];
     const segmentEnd = nextUserIndex === -1 ? messages.length : nextUserIndex;
-    const segmentMessages = messages.slice(idx + 1, segmentEnd);
+    const segmentMessages = getRunSegmentMessages(messages, idx, nextUserIndex, isRunTrigger);
     const completionInfos = subagentCompletionInfos
       .slice(idx + 1, segmentEnd)
       .filter((value): value is NonNullable<typeof value> => value != null);
@@ -660,7 +665,7 @@ export function Chat() {
     }];
   });
     return { userRunCards, foldedNarrationIndices };
-  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError]);
+  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError, isRunTrigger]);
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
   const replyTextOverrides = useMemo(() => {
     const map = new Map<number, string>();
@@ -703,12 +708,7 @@ export function Chat() {
 
       // Tool-use-only messages hidden by suppressToolCards collapse to zero height
       const isToolUseOnly = hasTools && !hasText && !hasImages && !hasAttachments;
-      if (isToolUseOnly) {
-        const insideRunSegment = userRunCards.some(
-          (card) => idx > card.triggerIndex && idx <= card.segmentEnd,
-        );
-        if (insideRunSegment) continue;
-      }
+      if (isToolUseOnly && runSegmentMessageIndices.has(idx)) continue;
 
       rows.push({ msg, originalIdx: idx });
     }
@@ -910,9 +910,14 @@ export function Chat() {
               atTopStateChange={handleAtTop}
               itemContent={(_index, row) => {
                 const { msg, originalIdx } = row;
-                const suppressToolCards = userRunCards.some((card) =>
-                  originalIdx > card.triggerIndex && originalIdx <= card.segmentEnd,
-                );
+                const suppressToolCards = runSegmentMessageIndices.has(originalIdx);
+                const isToolOnlyAssistant = normalizeMessageRole(msg.role) === 'assistant'
+                  && extractToolUse(msg).length > 0
+                  && extractText(msg).trim().length === 0
+                  && !extractThinking(msg);
+                if (suppressToolCards && isToolOnlyAssistant && !(msg._attachedFiles?.length)) {
+                  return null;
+                }
                 return (
                   <div className="mx-auto max-w-4xl">
                     <div
@@ -1033,6 +1038,7 @@ export function Chat() {
                           isStreaming
                           streamingTools={streamingReplyText != null ? [] : streamingTools}
                           onOpenFile={handleOpenAttachedFile}
+                          suppressToolCards={hasActiveExecutionGraph || runSegmentMessageIndices.size > 0}
                         />
                       )}
 

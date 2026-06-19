@@ -66,6 +66,49 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// jsdom 28.x exposes a hollow `localStorage`/`sessionStorage` when its
+// localStorage-file backing store is unavailable — the objects exist but
+// lack the Storage API methods (getItem/setItem/removeItem/clear/key/length).
+// Zustand's `persist` middleware calls `storage.setItem` at hydrate time, so
+// render tests mounting a persist-backed store (e.g. `useArtifactPanel`)
+// crash with "storage.setItem is not a function". Fall back to an in-memory
+// implementation whenever the built-in store is missing the methods.
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+    setItem: (key: string, value: string) => {
+      store.set(key, String(value));
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => {
+      store.clear();
+    },
+    key: (index: number) => {
+      const keys = Array.from(store.keys());
+      return index >= 0 && index < keys.length ? keys[index] : null;
+    },
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
+if (typeof window !== 'undefined') {
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    const current = (window as unknown as Record<string, unknown>)[name];
+    if (!current || typeof (current as { setItem?: unknown }).setItem !== 'function') {
+      Object.defineProperty(window, name, {
+        value: createMemoryStorage(),
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+}
+
 // Reset mocks after each test
 afterEach(() => {
   vi.clearAllMocks();

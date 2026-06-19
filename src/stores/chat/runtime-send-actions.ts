@@ -5,6 +5,7 @@ import {
   clearHistoryPoll,
   getLastAbortedRunId,
   getLastChatEventAt,
+  hasAssistantProgressSinceSend,
   setHistoryPollTimer,
   setLastChatEventAt,
   setLastAbortedRunId,
@@ -162,6 +163,14 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
         if (!state.sending) return;
         if (state.streamingMessage || state.streamingText) return;
         if (state.pendingFinal) {
+          setTimeout(checkStuck, 10_000);
+          return;
+        }
+        if (hasAssistantProgressSinceSend(state.messages, state.lastUserMessageAt)) {
+          setLastChatEventAt(Date.now());
+          if (state.error) {
+            set({ error: null });
+          }
           setTimeout(checkStuck, 10_000);
           return;
         }

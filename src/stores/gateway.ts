@@ -219,7 +219,7 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
   const isRunCompletion = phase === 'completed' || phase === 'done' || phase === 'finished';
   if (isPerMessageEnd || isRunCompletion) {
     import('./chat')
-      .then(({ useChatStore }) => {
+      .then(({ useChatStore, syncCachedSessionRunIdle }) => {
         const state = useChatStore.getState();
         const resolvedSessionKey = sessionKey != null ? String(sessionKey) : null;
         const shouldRefreshSessions = resolvedSessionKey != null && (
@@ -236,6 +236,9 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
         if (matchesCurrentSession || matchesActiveRun) {
           maybeLoadHistory(state, isRunCompletion);
         }
+        if (isRunCompletion && resolvedSessionKey && !matchesCurrentSession) {
+          syncCachedSessionRunIdle(resolvedSessionKey);
+        }
         if (isRunCompletion && (matchesCurrentSession || matchesActiveRun) && state.sending) {
           useChatStore.setState({
             sending: false,
@@ -244,6 +247,9 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
             lastUserMessageAt: null,
             error: null,
           });
+          if (resolvedSessionKey) {
+            syncCachedSessionRunIdle(resolvedSessionKey);
+          }
         }
       })
       .catch(() => {});

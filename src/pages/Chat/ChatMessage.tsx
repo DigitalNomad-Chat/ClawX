@@ -1,11 +1,13 @@
 /**
  * Chat Message Component
  * Renders user / assistant / system / toolresult messages
- * with markdown, images, and tool cards. Thinking output is
+ * with markdown and images. Tool steps render in ExecutionGraphCard;
+ * streaming runs may show a compact ToolStatusBar. Thinking output is
  * surfaced via ExecutionGraphCard, not inside message bubbles.
  */
 import { useState, useCallback, useEffect, memo } from 'react';
 import { Sparkles, Copy, Check, File, Eye, EyeOff } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { statFile } from '@/lib/api-client';
@@ -15,7 +17,6 @@ import { restoreText } from '@/lib/desensitize';
 import { useDesensitizeViewStore } from '@/stores/desensitize-view';
 import {
   ToolStatusBar,
-  ToolCard,
   FileCard,
   ImageThumbnail,
   ImagePreviewCard,
@@ -76,7 +77,36 @@ function isDirectoryAttachment(file: AttachedFileMeta): boolean {
 
 function isSkillFileAttachment(file: AttachedFileMeta): boolean {
   const path = file.filePath ?? '';
-  return /(?:^|[\\/])\.(?:openclaw|clawdock)[\\/]skills[\\/][^\\/]+[\\/].+\.[A-Za-z0-9]+$/i.test(path);
+  return (
+    /(?:^|[\\/])\.(?:openclaw|clawdock)[\\/]skills[\\/][^\\/]+[\\/].+\.[A-Za-z0-9]+$/i.test(path)
+    || /(?:^|[\\/])skills[\\/][^\\/]+[\\/]SKILL\.md$/i.test(path)
+  );
+}
+
+function isHtmlOrMarkdownPreview(file: AttachedFileMeta): boolean {
+  const name = file.fileName.toLowerCase();
+  const mime = file.mimeType.toLowerCase();
+  return (
+    mime === 'text/html'
+    || mime === 'text/markdown'
+    || name.endsWith('.html')
+    || name.endsWith('.htm')
+    || name.endsWith('.md')
+    || name.endsWith('.markdown')
+  );
+}
+
+/** User-facing artifacts that must stay visible when process output is folded into the graph. */
+function isUserFacingAttachmentWhenFolded(file: AttachedFileMeta): boolean {
+  if (file.mimeType.startsWith('image/')) return true;
+  if (isDirectoryAttachment(file)) return true;
+  if (isSkillFileAttachment(file)) return true;
+  if (isChatPreviewDocument(file)) return true;
+  // Paths parsed from the assistant reply (e.g. "/workspace/demo.html") are
+  // intentional user-facing links. Generic tool-result markdown attachments
+  // (e.g. CHECKLIST.md emitted mid-run) stay folded into the execution graph.
+  if (file.source === 'message-ref' && isHtmlOrMarkdownPreview(file)) return true;
+  return false;
 }
 
 function validationKindForAttachment(file: AttachedFileMeta): 'file' | 'dir' | null {
@@ -244,13 +274,12 @@ export const ChatMessage = memo(function ChatMessage({
   });
   const filteredProcessAttachments = derivedAttachedFiles.filter((file) => {
     if (file.source !== 'tool-result' && file.source !== 'message-ref') return true;
-    // Runtime-produced user-facing artifacts (images, PDFs, spreadsheets,
+    // Runtime-produced user-facing artifacts (images, HTML/Markdown/PDF/XLSX,
     // skill directories, ...) must remain visible in the reply bubble even
     // when generic process attachments are folded into the execution graph.
     // The graph card itself does not render `_attachedFiles`, so dropping
-    // images here would leave the user with no way to see them at all.
-    if (file.mimeType.startsWith('image/')) return true;
-    return isChatPreviewDocument(file) || isDirectoryAttachment(file) || isSkillFileAttachment(file);
+    // them here would leave the user with no way to open previews from chat.
+    return isUserFacingAttachmentWhenFolded(file);
   });
   // When a message is attachment-only, keep those attachments visible even if
   // process attachments are generally suppressed for this run segment —
@@ -294,15 +323,6 @@ export const ChatMessage = memo(function ChatMessage({
       >
         {isStreaming && !isUser && streamingTools.length > 0 && (
           <ToolStatusBar tools={streamingTools} />
-        )}
-
-        {/* Tool use cards */}
-        {visibleTools.length > 0 && (
-          <div className="space-y-1">
-            {visibleTools.map((tool, i) => (
-              <ToolCard key={tool.id || i} name={tool.name} input={tool.input} />
-            ))}
-          </div>
         )}
 
         {/* Images — rendered ABOVE text bubble for user messages */}
