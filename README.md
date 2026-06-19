@@ -43,6 +43,8 @@ Whether you're automating workflows, managing AI-powered channels, or scheduling
 
 ClawDock comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
 
+<p align="center"><strong style="font-size:1.1em; text-decoration: underline;">For a full enterprise edition, dedicated service support, or tailored deployment guidance for your business scenario, contact us at <a href="mailto:public@valuecell.ai">public@valuecell.ai</a>.</strong></p>
+
 ---
 ## Screenshot
 
@@ -81,6 +83,7 @@ Building AI agents shouldn't require mastering the command line. ClawDock was de
 | Complex CLI setup | One-click installation with guided setup wizard |
 | Configuration files | Visual settings with real-time validation |
 | Process management | Automatic gateway lifecycle management |
+| App updates | Startup update checks with a prompt before downloading or installing |
 | Multiple AI providers | Unified provider configuration panel |
 | Skill/plugin installation | Built-in skill marketplace and management |
 
@@ -135,6 +138,9 @@ Light mode, dark mode, or system-synchronized themes. ClawDock adapts to your pr
 
 ### 🚀 Startup Launch Control
 In **Settings → General**, you can enable **Launch at system startup** so ClawDock starts automatically after login.
+
+### 🔔 Update Prompts
+ClawX can automatically check for new versions on startup. When an update is available, it shows an in-app prompt; downloading and installing only happen after you choose the action.
 
 ---
 

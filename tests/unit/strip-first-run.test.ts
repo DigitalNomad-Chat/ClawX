@@ -3,7 +3,7 @@ import { join } from 'path';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 const { testHome } = vi.hoisted(() => ({
-  testHome: `/tmp/clawdock-openclaw-workspace-${Math.random().toString(36).slice(2)}`,
+  testHome: `/tmp/clawx-openclaw-workspace-${Math.random().toString(36).slice(2)}`,
 }));
 
 vi.mock('os', async () => {
@@ -19,9 +19,10 @@ vi.mock('os', async () => {
 });
 
 import {
-  ensureClawDockContext,
-  mergeClawDockSection,
-  removeChatFirstBootstrapFiles,
+  ensureClawXContext,
+  ensureClawXDefaultIdentity,
+  ensureClawXIdentityFile,
+  mergeClawXSection,
   stripFirstRunSection,
 } from '../../electron/utils/openclaw-workspace';
 
@@ -132,9 +133,9 @@ describe('stripFirstRunSection', () => {
 
   it('still changes AGENTS content when only First Run is removed', () => {
     const section = [
-      '## ClawDock Environment',
+      '## ClawX Environment',
       '',
-      'You are ClawDock.',
+      'You are ClawX.',
     ].join('\n');
     const original = [
       '# AGENTS.md',
@@ -147,65 +148,88 @@ describe('stripFirstRunSection', () => {
       '',
       'Read SOUL.md first.',
       '',
-      '<!-- clawdock:begin -->',
-      '## ClawDock Environment',
+      '<!-- clawx:begin -->',
+      '## ClawX Environment',
       '',
-      'You are ClawDock.',
-      '<!-- clawdock:end -->',
+      'You are ClawX.',
+      '<!-- clawx:end -->',
       '',
     ].join('\n');
 
     const stripped = stripFirstRunSection(original);
-    const merged = mergeClawDockSection(stripped, section);
+    const merged = mergeClawXSection(stripped, section);
 
     expect(merged).not.toBe(original);
     expect(merged).not.toContain('## First Run');
     expect(merged).toContain('## Session Startup');
-    expect(merged).toContain('<!-- clawdock:begin -->');
-    expect(merged).toContain('<!-- clawdock:end -->');
+    expect(merged).toContain('<!-- clawx:begin -->');
+    expect(merged).toContain('<!-- clawx:end -->');
   });
 });
 
-describe('removeChatFirstBootstrapFiles', () => {
-  it('removes only BOOTSTRAP.md from the default workspace', async () => {
+describe('ensureClawXIdentityFile', () => {
+  it('writes a default ClawX identity when the workspace has none', async () => {
     const workspaceDir = join(testHome, '.openclaw', 'workspace');
     await mkdir(workspaceDir, { recursive: true });
-    await writeFile(join(workspaceDir, 'BOOTSTRAP.md'), 'chat-first bootstrap', 'utf-8');
-    await writeFile(join(workspaceDir, 'SOUL.md'), 'existing soul', 'utf-8');
 
-    await removeChatFirstBootstrapFiles();
+    await ensureClawXIdentityFile(workspaceDir);
 
-    await expect(access(join(workspaceDir, 'BOOTSTRAP.md'))).rejects.toThrow();
-    await expect(readFile(join(workspaceDir, 'SOUL.md'), 'utf-8')).resolves.toBe('existing soul');
+    await expect(readFile(join(workspaceDir, 'IDENTITY.md'), 'utf-8')).resolves.toContain('ClawX');
   });
 
-  it('removes BOOTSTRAP.md from configured agent workspaces', async () => {
-    const openclawDir = join(testHome, '.openclaw');
-    const mainWorkspace = join(openclawDir, 'workspace-main');
-    const agentWorkspace = join(openclawDir, 'workspace-agent');
-    await mkdir(mainWorkspace, { recursive: true });
-    await mkdir(agentWorkspace, { recursive: true });
-    await writeFile(join(mainWorkspace, 'BOOTSTRAP.md'), 'main bootstrap', 'utf-8');
-    await writeFile(join(agentWorkspace, 'BOOTSTRAP.md'), 'agent bootstrap', 'utf-8');
+  it('replaces the untouched OpenClaw identity template but preserves custom identities', async () => {
+    const workspaceDir = join(testHome, '.openclaw', 'workspace');
+    await mkdir(workspaceDir, { recursive: true });
+
     await writeFile(
-      join(openclawDir, 'openclaw.json'),
-      JSON.stringify({
-        agents: {
-          defaults: { workspace: mainWorkspace },
-          list: [{ workspace: agentWorkspace }],
-        },
-      }),
+      join(workspaceDir, 'IDENTITY.md'),
+      [
+        '# IDENTITY.md - Who Am I?',
+        '',
+        '_Fill this in during your first conversation. Make it yours._',
+        '',
+        '- **Name:**',
+        '  _(pick something you like)_',
+        '- **Creature:**',
+        '  _(AI? robot? familiar? ghost in the machine? something weirder?)_',
+        '- **Vibe:**',
+        '  _(how do you come across? sharp? warm? chaotic? calm?)_',
+        '- **Emoji:**',
+        '  _(your signature — pick one that feels right)_',
+      ].join('\n'),
       'utf-8',
     );
 
-    await removeChatFirstBootstrapFiles();
+    await ensureClawXIdentityFile(workspaceDir);
+    await expect(readFile(join(workspaceDir, 'IDENTITY.md'), 'utf-8')).resolves.toContain('ClawX');
+    await expect(readFile(join(workspaceDir, 'IDENTITY.md'), 'utf-8')).resolves.not.toContain('pick something you like');
 
-    await expect(access(join(mainWorkspace, 'BOOTSTRAP.md'))).rejects.toThrow();
-    await expect(access(join(agentWorkspace, 'BOOTSTRAP.md'))).rejects.toThrow();
+    await writeFile(join(workspaceDir, 'IDENTITY.md'), '# IDENTITY.md\n\n- **Name:** Paisley\n', 'utf-8');
+    await ensureClawXIdentityFile(workspaceDir);
+    await expect(readFile(join(workspaceDir, 'IDENTITY.md'), 'utf-8')).resolves.toBe('# IDENTITY.md\n\n- **Name:** Paisley\n');
+  });
+
+  it('removes a lingering BOOTSTRAP.md after identity seeding', async () => {
+    const workspaceDir = join(testHome, '.openclaw', 'workspace');
+    await mkdir(workspaceDir, { recursive: true });
+    await writeFile(join(workspaceDir, 'BOOTSTRAP.md'), 'chat-first bootstrap', 'utf-8');
+
+    await ensureClawXIdentityFile(workspaceDir);
+
+    await expect(access(join(workspaceDir, 'BOOTSTRAP.md'))).rejects.toThrow();
+    await expect(readFile(join(workspaceDir, 'IDENTITY.md'), 'utf-8')).resolves.toContain('ClawX');
   });
 });
 
-describe('ensureClawDockContext', () => {
+describe('ensureClawXDefaultIdentity', () => {
+  it('creates the default workspace and seeds IDENTITY.md for startup-owned workspaces', async () => {
+    await ensureClawXDefaultIdentity();
+
+    await expect(readFile(join(testHome, '.openclaw', 'workspace', 'IDENTITY.md'), 'utf-8')).resolves.toContain('ClawX');
+  });
+});
+
+describe('ensureClawXContext', () => {
   it('does not wait for missing files in non-default agent workspaces', async () => {
     const openclawDir = join(testHome, '.openclaw');
     const defaultWorkspace = join(openclawDir, 'workspace-main');
@@ -226,13 +250,13 @@ describe('ensureClawDockContext', () => {
     );
 
     const result = await Promise.race([
-      ensureClawDockContext().then(() => 'done'),
+      ensureClawXContext().then(() => 'done'),
       new Promise((resolve) => setTimeout(() => resolve('timeout'), 200)),
     ]);
 
     expect(result).toBe('done');
-    await expect(readFile(join(defaultWorkspace, 'AGENTS.md'), 'utf-8')).resolves.toContain('## ClawDock Environment');
-    await expect(readFile(join(defaultWorkspace, 'TOOLS.md'), 'utf-8')).resolves.toContain('## ClawDock Tool Notes');
+    await expect(readFile(join(defaultWorkspace, 'AGENTS.md'), 'utf-8')).resolves.toContain('## ClawX Environment');
+    await expect(readFile(join(defaultWorkspace, 'TOOLS.md'), 'utf-8')).resolves.toContain('## ClawX Tool Notes');
     await expect(access(join(agentWorkspace, 'AGENTS.md'))).rejects.toThrow();
     await expect(access(join(agentWorkspace, 'TOOLS.md'))).rejects.toThrow();
   });
@@ -252,7 +276,7 @@ describe('ensureClawDockContext', () => {
     );
 
     const result = await Promise.race([
-      ensureClawDockContext().then(() => 'done'),
+      ensureClawXContext().then(() => 'done'),
       new Promise((resolve) => setTimeout(() => resolve('timeout'), 200)),
     ]);
 

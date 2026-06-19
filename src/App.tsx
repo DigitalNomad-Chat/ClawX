@@ -31,12 +31,14 @@ import { AdvancedConfig } from './pages/AdvancedConfig';
 import { Setup } from './pages/Setup';
 import ActivationPage from './pages/ActivationPage';
 import { useSettingsStore } from './stores/settings';
+import { useUpdateStore } from './stores/update';
 import { useGatewayStore } from './stores/gateway';
 import { useProviderStore } from './stores/providers';
 import { useAuthStore } from './stores/auth';
 import { applyGatewayTransportPreference } from './lib/api-client';
 import { rendererExtensionRegistry } from './extensions/registry';
 import { loadExternalRendererExtensions } from './extensions/_ext-bridge.generated';
+import { UpdateNotifier } from './components/update/UpdateNotifier';
 
 
 /**
@@ -114,13 +116,24 @@ function App() {
   const setupComplete = useSettingsStore((state) => state.setupComplete);
   const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
   const initGateway = useGatewayStore((state) => state.init);
+  const initUpdate = useUpdateStore((state) => state.init);
   const initProviders = useProviderStore((state) => state.init);
   const refreshUser = useAuthStore((state) => state.refreshUser);
 
   useEffect(() => {
-    initSettings();
-    refreshUser();
-  }, [initSettings, refreshUser]);
+    let cancelled = false;
+
+    void initSettings().finally(() => {
+      if (!cancelled) {
+        refreshUser();
+        void initUpdate();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initSettings, initUpdate, refreshUser]);
 
   // Sync i18n language with persisted settings on mount
   useEffect(() => {
@@ -232,6 +245,8 @@ function App() {
             {moduleRoutes}
           </Route>
         </Routes>
+
+        <UpdateNotifier />
 
         {/* Global toast notifications */}
         <Toaster

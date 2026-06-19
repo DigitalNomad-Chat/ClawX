@@ -224,6 +224,83 @@ describe('ChatInput agent targeting', () => {
     expect(onSend).toHaveBeenCalledWith('Hello direct agent', undefined, 'research', undefined);
   });
 
+  it('disables the input while gateway is running but not yet ready', () => {
+    gatewayState.status = { state: 'running', port: 18789, gatewayReady: false };
+    agentsState.agents = [
+      {
+        id: 'main',
+        name: 'Main',
+        isDefault: true,
+        modelDisplay: 'MiniMax',
+        inheritedModel: true,
+        workspace: '~/.openclaw/workspace',
+        agentDir: '~/.openclaw/agents/main/agent',
+        mainSessionKey: 'agent:main:main',
+        channelTypes: [],
+      },
+    ];
+    agentsState.defaultModelRef = 'custom-aaaaaaaa/gpt-a';
+    const now = '2025-01-01T00:00:00.000Z';
+    providersState.accounts = [
+      {
+        id: 'aaaaaaaa',
+        vendorId: 'custom',
+        label: 'Alpha',
+        authMode: 'api_key',
+        baseUrl: 'http://127.0.0.1:1/v1',
+        model: 'custom-aaaaaaaa/gpt-a',
+        enabled: true,
+        isDefault: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'bbbbbbbb',
+        vendorId: 'custom',
+        label: 'Beta',
+        authMode: 'api_key',
+        baseUrl: 'http://127.0.0.1:2/v1',
+        model: 'custom-bbbbbbbb/gpt-b',
+        enabled: true,
+        isDefault: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    providersState.statuses = [
+      { id: 'aaaaaaaa', name: 'Alpha', type: 'custom', hasKey: true, keyMasked: 'sk-***', enabled: true, createdAt: now, updatedAt: now },
+      { id: 'bbbbbbbb', name: 'Beta', type: 'custom', hasKey: true, keyMasked: 'sk-***', enabled: true, createdAt: now, updatedAt: now },
+    ];
+    providersState.defaultAccountId = 'aaaaaaaa';
+
+    renderChatInput();
+
+    expect(screen.getByTestId('chat-composer-input')).toBeDisabled();
+    expect(screen.getByTestId('chat-composer-skill')).toBeDisabled();
+    expect(screen.getByTestId('chat-model-picker-button')).toBeDisabled();
+  });
+
+  it('shows starting status while gateway is running but not yet ready', () => {
+    gatewayState.status = { state: 'running', port: 18789, gatewayReady: false };
+    agentsState.agents = [
+      {
+        id: 'main',
+        name: 'Main',
+        isDefault: true,
+        modelDisplay: 'MiniMax',
+        inheritedModel: true,
+        workspace: '~/.openclaw/workspace',
+        agentDir: '~/.openclaw/agents/main/agent',
+        mainSessionKey: 'agent:main:main',
+        channelTypes: [],
+      },
+    ];
+
+    renderChatInput();
+
+    expect(screen.getByText(/gateway starting \| port: 18789/i)).toBeInTheDocument();
+  });
+
   it('renders the skill trigger after the @ agent picker', () => {
     agentsState.agents = [
       {

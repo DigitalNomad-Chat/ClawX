@@ -109,6 +109,8 @@ export interface ProviderTypeInfo {
   codePlanDocsUrl?: string;
   /** If true, this provider is not shown in the "Add Provider" dialog. */
   hidden?: boolean;
+  /** If true, hide OAuth sign-in controls in the add-provider UI (logic remains enabled). */
+  hideOAuthUi?: boolean;
 }
 
 export type ProviderAuthMode =
@@ -165,6 +167,9 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     placeholder: 'sk-ant-api03-...',
     model: 'Claude',
     requiresApiKey: true,
+    showModelId: true,
+    defaultModelId: 'claude-opus-4-6',
+    modelIdPlaceholder: 'claude-opus-4-6',
     docsUrl: 'https://platform.claude.com/docs/en/api/overview',
   },
   {
@@ -176,10 +181,10 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     requiresApiKey: true,
     isOAuth: true,
     supportsApiKey: true,
-    defaultModelId: 'gpt-5.4',
+    hideOAuthUi: true,
+    defaultModelId: 'gpt-5.5',
     showModelId: true,
-    showModelIdInDevModeOnly: true,
-    modelIdPlaceholder: 'gpt-5.4',
+    modelIdPlaceholder: 'gpt-5.5',
     apiKeyUrl: 'https://platform.openai.com/api-keys',
   },
   {
@@ -189,26 +194,23 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     placeholder: 'AIza...',
     model: 'Gemini',
     requiresApiKey: true,
-    isOAuth: true,
-    supportsApiKey: true,
-    defaultModelId: 'gemini-3-pro-preview',
+    defaultModelId: 'gemini-3.1-pro-preview',
     showModelId: true,
-    showModelIdInDevModeOnly: true,
-    modelIdPlaceholder: 'gemini-3-pro-preview',
+    modelIdPlaceholder: 'gemini-3.1-pro-preview',
     apiKeyUrl: 'https://aistudio.google.com/app/apikey',
   },
-  { id: 'openrouter', name: 'OpenRouter', icon: '🌐', placeholder: 'sk-or-v1-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'openai/gpt-5.4', defaultModelId: 'openai/gpt-5.4', docsUrl: 'https://openrouter.ai/models' },
+  { id: 'openrouter', name: 'OpenRouter', icon: '🌐', placeholder: 'sk-or-v1-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'openai/gpt-5.5', defaultModelId: 'openai/gpt-5.5', docsUrl: 'https://openrouter.ai/models' },
   { id: 'minimax-portal-cn', name: 'MiniMax (CN)', icon: '☁️', placeholder: 'sk-...', model: 'MiniMax', requiresApiKey: false, isOAuth: true, supportsApiKey: true, defaultModelId: 'MiniMax-M2.7', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'MiniMax-M2.7', apiKeyUrl: 'https://platform.minimaxi.com/' },
   { id: 'kimi-coding', name: 'Kimi Coding', icon: '🌙', placeholder: 'sk-...', model: 'Kimi Code', requiresApiKey: true, defaultBaseUrl: 'https://api.kimi.com/coding/', defaultModelId: 'kimi-code', docsUrl: 'https://platform.moonshot.cn/' },
-  { id: 'moonshot', name: 'Moonshot (CN)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.cn/v1', defaultModelId: 'kimi-k2.6', docsUrl: 'https://platform.moonshot.cn/' },
-  { id: 'moonshot-global', name: 'Moonshot (Global)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.ai/v1', defaultModelId: 'kimi-k2.6', docsUrl: 'https://platform.moonshot.ai/' },
-  { id: 'siliconflow', name: 'SiliconFlow (CN)', icon: '🌊', placeholder: 'sk-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.siliconflow.cn/v1', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'deepseek-ai/DeepSeek-V3', defaultModelId: 'deepseek-ai/DeepSeek-V3', docsUrl: 'https://docs.siliconflow.cn/cn/userguide/introduction' },
-  { id: 'deepseek', name: 'DeepSeek', icon: '🐋', placeholder: 'sk-...', model: 'DeepSeek', requiresApiKey: true, defaultBaseUrl: 'https://api.deepseek.com/v1', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'deepseek-v4-pro', defaultModelId: 'deepseek-v4-pro', apiKeyUrl: 'https://platform.deepseek.com/api_keys', docsUrl: 'https://api-docs.deepseek.com/', docsUrlZh: 'https://api-docs.deepseek.com/zh-cn/' },
+  { id: 'moonshot', name: 'Moonshot (CN)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.cn/v1', showModelId: true, defaultModelId: 'kimi-k2.6', modelIdPlaceholder: 'kimi-k2.6', docsUrl: 'https://platform.moonshot.cn/' },
+  { id: 'moonshot-global', name: 'Moonshot (Global)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.ai/v1', showModelId: true, defaultModelId: 'kimi-k2.6', modelIdPlaceholder: 'kimi-k2.6', docsUrl: 'https://platform.moonshot.ai/' },
+  { id: 'siliconflow', name: 'SiliconFlow (CN)', icon: '🌊', placeholder: 'sk-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.siliconflow.cn/v1', showModelId: true, modelIdPlaceholder: 'deepseek-ai/DeepSeek-V3', defaultModelId: 'deepseek-ai/DeepSeek-V3', docsUrl: 'https://docs.siliconflow.cn/cn/userguide/introduction' },
+  { id: 'deepseek', name: 'DeepSeek', icon: '🐋', placeholder: 'sk-...', model: 'DeepSeek', requiresApiKey: true, defaultBaseUrl: 'https://api.deepseek.com/v1', showModelId: true, modelIdPlaceholder: 'deepseek-v4-pro', defaultModelId: 'deepseek-v4-pro', apiKeyUrl: 'https://platform.deepseek.com/api_keys', docsUrl: 'https://api-docs.deepseek.com/', docsUrlZh: 'https://api-docs.deepseek.com/zh-cn/' },
   { id: 'minimax-portal', name: 'MiniMax (Global)', icon: '☁️', placeholder: 'sk-...', model: 'MiniMax', requiresApiKey: false, isOAuth: true, supportsApiKey: true, defaultModelId: 'MiniMax-M2.7', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'MiniMax-M2.7', apiKeyUrl: 'https://platform.minimax.io' },
-  { id: 'modelstudio', name: 'Model Studio', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1', showBaseUrl: true, defaultModelId: 'qwen3.5-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.5-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/', hidden: true },
-  { id: 'qwen-coding-cn', name: 'Qwen Coding (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1', showBaseUrl: true, defaultModelId: 'qwen3.5-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.5-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
-  { id: 'qwen-standard-global', name: 'Qwen Standard (Global)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, defaultModelId: 'qwen3.5-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.5-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
-  { id: 'qwen-standard-cn', name: 'Qwen Standard (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, defaultModelId: 'qwen3.5-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.5-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
+  { id: 'modelstudio', name: 'Model Studio', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1', showBaseUrl: true, defaultModelId: 'qwen3.6-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.6-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/', hidden: true },
+  { id: 'qwen-coding-cn', name: 'Qwen Coding (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1', showBaseUrl: true, defaultModelId: 'qwen3.6-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.6-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
+  { id: 'qwen-standard-global', name: 'Qwen Standard (Global)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, defaultModelId: 'qwen3.6-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.6-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
+  { id: 'qwen-standard-cn', name: 'Qwen Standard (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, defaultModelId: 'qwen3.6-plus', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'qwen3.6-plus', apiKeyUrl: 'https://bailian.console.aliyun.com/' },
   { id: 'zai', name: 'Z.AI (GLM)', icon: '🔷', placeholder: 'sk-...', model: 'GLM', requiresApiKey: true, defaultBaseUrl: 'https://api.z.ai/v1', showBaseUrl: true, defaultModelId: 'glm-5', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'glm-5', apiKeyUrl: 'https://open.bigmodel.cn/' },
   { id: 'stepfun', name: 'Stepfun', icon: '📶', placeholder: 'sk-...', model: 'Step', requiresApiKey: true, defaultBaseUrl: 'https://api.stepfun.com/v1', showBaseUrl: true, defaultModelId: 'step-3.5-flash', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'step-3.5-flash', apiKeyUrl: 'https://platform.stepfun.com/' },
   { id: 'stepfun-plan', name: 'Stepfun Plan', icon: '📶', placeholder: 'sk-...', model: 'Step', requiresApiKey: true, defaultBaseUrl: 'https://api.stepfun.com/step_plan/v1', showBaseUrl: true, defaultModelId: 'step-3.5-flash', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'step-3.5-flash', apiKeyUrl: 'https://platform.stepfun.com/' },
@@ -217,7 +219,6 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
   { id: 'groq', name: 'Groq', icon: '⚡', placeholder: 'gsk_...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.groq.com/openai/v1', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'llama-4-scout', defaultModelId: 'llama-4-scout', apiKeyUrl: 'https://console.groq.com/' },
   { id: 'together', name: 'Together AI', icon: '🤝', placeholder: 'together-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.together.xyz/v1', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'meta-llama/Llama-4-Scout', defaultModelId: 'meta-llama/Llama-4-Scout', apiKeyUrl: 'https://api.together.xyz/' },
   { id: 'fireworks', name: 'Fireworks AI', icon: '🎆', placeholder: 'fw-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.fireworks.ai/inference/v1', defaultModelId: 'accounts/fireworks/models/kimi-k2p6', showModelId: true, showModelIdInDevModeOnly: true, modelIdPlaceholder: 'accounts/fireworks/models/kimi-k2p6', apiKeyUrl: 'https://fireworks.ai/' },
-  { id: 'ark', name: 'ByteDance Ark', icon: 'A', placeholder: 'your-ark-api-key', model: 'Doubao', requiresApiKey: true, defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'ep-20260228000000-xxxxx', docsUrl: 'https://www.volcengine.com/', codePlanPresetBaseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3', codePlanPresetModelId: 'ark-code-latest', codePlanDocsUrl: 'https://www.volcengine.com/docs/82379/1928261?lang=zh' },
   { id: 'ollama', name: 'Ollama', icon: '🦙', placeholder: 'Not required', requiresApiKey: false, defaultBaseUrl: 'http://localhost:11434/v1', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'qwen3:latest' },
   {
     id: 'custom',

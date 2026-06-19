@@ -1066,7 +1066,7 @@ function clearSessionEntryFromMap<T extends Record<string, unknown>>(entries: T,
 function buildSessionSwitchPatch(
   state: Pick<
     ChatState,
-    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity' | 'agentRwWorkDirs' | 'hasMoreHistory' | 'historyOffset'
+    'currentSessionKey' | 'messages' | 'sessions' | 'sessionLabels' | 'sessionLastActivity' | 'agentRwWorkDirs' | 'hasMoreHistory' | 'historyOffset' | 'loadingMoreHistory'
   >,
   nextSessionKey: string,
 ): Partial<ChatState> {
@@ -1106,6 +1106,7 @@ function buildSessionSwitchPatch(
     pendingToolImages: [],
     hasMoreHistory: true,
     historyOffset: 0,
+    loadingMoreHistory: false,
     rwWorkDir: state.agentRwWorkDirs[nextAgentId] ?? null,
   };
 }
@@ -1529,6 +1530,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   hasMoreHistory: true,
   historyOffset: 0,
+  loadingMoreHistory: false,
 
   thinkingLevel: null,
 
@@ -1572,6 +1574,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             key: String(s.key || ''),
             label: s.label ? String(s.label) : undefined,
             displayName: s.displayName ? String(s.displayName) : undefined,
+            derivedTitle: s.derivedTitle ? String(s.derivedTitle) : undefined,
             thinkingLevel: s.thinkingLevel ? String(s.thinkingLevel) : undefined,
             model: s.model ? String(s.model) : undefined,
             updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
@@ -1813,6 +1816,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
       lastUserMessageAt: null,
       pendingToolImages: [],
       rwWorkDir: s.agentRwWorkDirs[getAgentIdFromSessionKey(newKey)] ?? null,
+    }));
+  },
+
+  // ── Rename session ──
+
+  // ── Rename session ──
+
+  renameSession: async (key: string, newLabel: string) => {
+    const normalized = newLabel.trim();
+    if (!normalized) return;
+
+    try {
+      const result = await hostApiFetch<{ success: boolean; error?: string }>('/api/sessions/rename', {
+        method: 'POST',
+        body: JSON.stringify({ sessionKey: key, label: normalized }),
+      });
+      if (!result.success) {
+        console.warn(`[renameSession] API reported failure for ${key}:`, result.error);
+      }
+    } catch (err) {
+      console.warn(`[renameSession] API call failed for ${key}:`, err);
+    }
+
+    set((s) => ({
+      sessionLabels: { ...s.sessionLabels, [key]: normalized },
+      sessions: s.sessions.map((session) =>
+        session.key === key
+          ? { ...session, displayName: normalized, label: normalized }
+          : session,
+      ),
     }));
   },
 

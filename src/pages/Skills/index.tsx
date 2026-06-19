@@ -181,6 +181,7 @@ function SkillDetailDialog({ skill, isOpen, onClose, onToggle, onUninstall, onOp
                   value={skill.baseDir || t('detail.pathUnavailable')}
                   readOnly
                   className="h-[38px] font-mono text-xs bg-muted border rounded-lg text-foreground/70"
+
                 />
                 <Button
                   variant="outline"

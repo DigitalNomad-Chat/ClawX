@@ -74,6 +74,7 @@ export interface ChatSession {
   key: string;
   label?: string;
   displayName?: string;
+  derivedTitle?: string;
   thinkingLevel?: string;
   model?: string;
   updatedAt?: number;
@@ -125,6 +126,8 @@ export interface ChatState {
   hasMoreHistory: boolean;
   /** Number of historical messages already loaded (for offset calculation) */
   historyOffset: number;
+  /** Whether older messages are currently being fetched */
+  loadingMoreHistory: boolean;
 
   // Thinking
   thinkingLevel: string | null;
@@ -139,6 +142,7 @@ export interface ChatState {
   switchSession: (key: string) => void;
   newSession: () => void;
   deleteSession: (key: string) => Promise<void>;
+  renameSession: (key: string, newLabel: string) => void;
   cleanupEmptySession: () => void;
   loadHistory: (quiet?: boolean) => Promise<void>;
   /** Load earlier messages; prepend them to the existing message list */

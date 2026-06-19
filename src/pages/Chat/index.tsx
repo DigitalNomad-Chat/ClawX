@@ -10,6 +10,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
 import { useAgentsStore } from '@/stores/agents';
+import { useGatewayStore } from '@/stores/gateway';
 import { useArtifactPanel } from '@/stores/artifact-panel';
 import { hostApiFetch } from '@/lib/host-api';
 import { invokeIpc } from '@/lib/api-client';
@@ -24,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useMinLoading } from '@/hooks/use-min-loading';
 import { useArtifactParser } from './useArtifactParser';
-import { extractGeneratedFiles, generatedFileHasDiffPayload, type GeneratedFile } from '@/lib/generated-files';
+import { extractGeneratedFiles, generatedFileHasDiffPayload, isHtmlPreviewExt, type GeneratedFile } from '@/lib/generated-files';
 import { GeneratedFilesPanel } from '@/components/file-preview/GeneratedFilesPanel';
 import type { FilePreviewTarget } from '@/components/file-preview/types';
 import { buildPreviewTarget } from '@/components/file-preview/build-preview-target';
@@ -70,6 +71,20 @@ type UserRunCard = {
    */
   suppressThinking: boolean;
 };
+
+type QuestionDirectoryItem = {
+  index: number;
+  ordinal: number;
+  title: string;
+};
+
+const QUESTION_DIRECTORY_RENDER_LIMIT = 300;
+
+function buildQuestionDirectoryTitle(message: RawMessage, fallback: string): string {
+  const normalized = extractText(message).replace(/\s+/g, ' ').trim();
+  if (!normalized) return fallback;
+  return normalized.length > 64 ? `${normalized.slice(0, 64)}…` : normalized;
+}
 
 function getPrimaryMessageStepTexts(steps: TaskStep[]): string[] {
   return steps
@@ -118,9 +133,13 @@ export function Chat() {
   const fetchAgents = useAgentsStore((s) => s.fetchAgents);
   const agents = useAgentsStore((s) => s.agents);
 
+  const gatewayStatus = useGatewayStore((s) => s.status);
+  const isGatewayRunning = gatewayStatus.state === 'running';
+
   const cleanupEmptySession = useChatStore((s) => s.cleanupEmptySession);
   const lastUserMessageAt = useChatStore((s) => s.lastUserMessageAt);
   const hasMoreHistory = useChatStore((s) => s.hasMoreHistory);
+  const loadingMoreHistory = useChatStore((s) => s.loadingMoreHistory);
   const loadMoreHistory = useChatStore((s) => s.loadMoreHistory);
   const agentsList = useAgentsStore((s) => s.agents);
   const currentAgent = useMemo(
@@ -140,6 +159,7 @@ export function Chat() {
     closeArtifactPanel();
   }, [currentSessionKey, closeArtifactPanel]);
   const [childTranscripts, setChildTranscripts] = useState<Record<string, RawMessage[]>>({});
+  const [questionDirectoryOpenSessionKey, setQuestionDirectoryOpenSessionKey] = useState<string | null>(null);
 
   // Track how long the current send has been waiting for a response so we can
   // show progressive status messages during long session initialization.
@@ -185,12 +205,37 @@ export function Chat() {
   const minLoading = useMinLoading(loading && messages.length > 0);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
+  const questionDirectoryItems = useMemo<QuestionDirectoryItem[]>(() => {
+    const subagentCompletionInfos = messages.map((message) => parseSubagentCompletionInfo(message));
+    const items: QuestionDirectoryItem[] = [];
+    let questionOrdinal = 0;
+    messages.forEach((message, index) => {
+      if (!isRealUserMessage(message) || subagentCompletionInfos[index]) return;
+      questionOrdinal += 1;
+      items.push({
+        index,
+        ordinal: questionOrdinal,
+        title: buildQuestionDirectoryTitle(message, t('questionDirectory.fallback', { number: questionOrdinal })),
+      });
+    });
+    return items;
+  }, [messages, t]);
+
+  const questionDirectoryVisible = questionDirectoryOpenSessionKey === currentSessionKey && questionDirectoryItems.length > 1;
+
+  const onToggleQuestionDirectory = useCallback(() => {
+    setQuestionDirectoryOpenSessionKey((openSessionKey) =>
+      openSessionKey === currentSessionKey ? null : currentSessionKey,
+    );
+  }, [currentSessionKey]);
+
   // Wrap sendMessage so that every user send forces a scroll-to-bottom,
   // even when the user had previously scrolled up to read older messages.
   const handleSend = useCallback((...args: Parameters<typeof sendMessage>) => {
     virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'auto' });
+    setQuestionDirectoryOpenSessionKey(currentSessionKey);
     return sendMessage(...args);
-  }, [sendMessage]);
+  }, [sendMessage, currentSessionKey]);
 
   // Force scroll to bottom after initial history load completes so the user
   // lands at the latest message instead of somewhere in the middle.
@@ -833,12 +878,19 @@ export function Chat() {
       <div className="flex min-w-0 flex-1 flex-col">
       {/* Toolbar */}
       <div className="flex shrink-0 items-center justify-between px-4 py-2">
-        <ChatToolbar />
+        <ChatToolbar
+          questionDirectoryOpen={questionDirectoryVisible}
+          questionDirectoryCount={questionDirectoryItems.length}
+          onToggleQuestionDirectory={onToggleQuestionDirectory}
+        />
       </div>
 
       {/* Messages Area */}
       <div className="min-h-0 flex-1 overflow-hidden px-4 py-4">
         <div className="mx-auto flex h-full min-h-0 max-w-6xl flex-col gap-4 lg:flex-row lg:items-stretch">
+          {questionDirectoryVisible && (
+            <QuestionDirectory items={questionDirectoryItems} />
+          )}
           {isEmpty ? (
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
               <div className="mx-auto w-full max-w-3xl space-y-4 transition-all duration-300">
@@ -904,7 +956,14 @@ export function Chat() {
                               {generatedFiles.length > 0 && (
                                 <GeneratedFilesPanel
                                   files={generatedFiles}
-                                  onOpen={(file) => openChanges(generatedFileToTarget(file))}
+                                  onOpen={(file) => {
+                                    const target = generatedFileToTarget(file);
+                                    if (isHtmlPreviewExt(file.ext)) {
+                                      openPreview(target);
+                                      return;
+                                    }
+                                    openChanges(target);
+                                  }}
                                 />
                               )}
                             </div>
@@ -915,15 +974,27 @@ export function Chat() {
                 );
               }}
               components={{
-                Header: () =>
-                  isLoadingMore ? (
+                Header: () => {
+                  if (!hasMoreHistory) return null;
+                  return (
                     <div className="mx-auto max-w-4xl py-4 text-center">
-                      <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        正在加载历史记录……
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void loadMoreHistory()}
+                        disabled={loadingMoreHistory || isLoadingMore}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                        data-testid="chat-load-more-history"
+                      >
+                        {(loadingMoreHistory || isLoadingMore) && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        )}
+                        {(loadingMoreHistory || isLoadingMore)
+                          ? t('loadingMoreHistory', '加载更多中...')
+                          : t('loadMoreHistory', '加载更早的消息')}
+                      </button>
                     </div>
-                  ) : null,
+                  );
+                },
                 Footer: () => {
                   const hasStreaming = shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph);
                   const hasActivity = sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph;
@@ -1017,7 +1088,7 @@ export function Chat() {
       <ChatInput
         onSend={handleSend}
         onStop={abortRun}
-        disabled={false}
+        disabled={!isGatewayRunning}
         sending={sending || hasActiveExecutionGraph}
         isEmpty={isEmpty}
       />
@@ -1109,8 +1180,73 @@ function WelcomeScreen() {
   );
 }
 
-// ── Typing Indicator ────────────────────────────────────────────
+// ── Question Directory ─────────────────────────────────────────
 
+function QuestionDirectory({ items }: { items: QuestionDirectoryItem[] }) {
+  const { t } = useTranslation('chat');
+  const scrollRef = useRef<HTMLElement | null>(null);
+  const visibleItems = items.slice(0, QUESTION_DIRECTORY_RENDER_LIMIT);
+  const hiddenCount = Math.max(0, items.length - visibleItems.length);
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    scrollEl.scrollTop = scrollEl.scrollHeight;
+  }, [visibleItems.length]);
+
+  const handleJumpToMessage = (index: number) => {
+    document.getElementById(`chat-message-${index}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  return (
+    <aside
+      data-testid="chat-question-directory"
+      className="w-full shrink-0 lg:w-56 xl:w-64"
+      aria-label={t('questionDirectory.title')}
+    >
+      <div className="sticky top-2 max-h-full overflow-hidden rounded-2xl border border-black/5 bg-black/[0.02] p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('questionDirectory.title')}
+          </h2>
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-2xs font-medium text-muted-foreground dark:bg-white/10">
+            {items.length}
+          </span>
+        </div>
+        <nav ref={scrollRef} className="max-h-[calc(100vh-13rem)] space-y-1 overflow-y-auto pr-1">
+          {visibleItems.map((item) => (
+            <button
+              key={item.index}
+              type="button"
+              data-testid={`chat-question-directory-item-${item.index}`}
+              onClick={() => handleJumpToMessage(item.index)}
+              className={cn(
+                'group flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left transition-colors',
+                'text-foreground/70 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
+              )}
+              title={item.title}
+            >
+              <span className="line-clamp-2 min-w-0 text-xs leading-5">
+                {item.title}
+              </span>
+            </button>
+          ))}
+          {hiddenCount > 0 && (
+            <div className="px-2 py-2 text-xs leading-5 text-muted-foreground">
+              {t('questionDirectory.moreHint', { count: hiddenCount })}
+            </div>
+          )}
+        </nav>
+      </div>
+    </aside>
+  );
+
+};
+
+// ── Typing Indicator ────────────────────────────────────────────
 function TypingIndicator({ label }: { label?: string }) {
   return (
     <div className="flex gap-3">
@@ -1149,5 +1285,6 @@ function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
     </div>
   );
 }
+
 
 export default Chat;

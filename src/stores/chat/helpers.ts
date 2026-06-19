@@ -28,6 +28,15 @@ let _errorRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
 // the sending state after abortRun clears it.
 let _lastAbortedRunId: string | null = null;
 const _blockedRunEvents = new Map<string, Record<string, unknown>[]>();
+const OPTIMISTIC_USER_MESSAGE_TTL_MS = 30 * 60 * 1000;
+
+type PendingOptimisticUserMessage = {
+  message: RawMessage;
+  timestampMs: number;
+  createdAtMs: number;
+};
+
+const _pendingOptimisticUserMessages = new Map<string, PendingOptimisticUserMessage[]>();
 
 function clearErrorRecoveryTimer(): void {
   if (_errorRecoveryTimer) {
@@ -137,6 +146,7 @@ function normalizeStreamingMessage(message: unknown): unknown {
 /**
  * Strip Gateway-injected metadata that does NOT exist on the renderer's
  * optimistic user message but is echoed back when the Gateway persists it:
+ *   - leading sender metadata `Sender (untrusted metadata): ...`
  *   - leading timestamp `[Wed 2026-04-22 10:30 GMT+8] `
  *   - `[message_id: uuid]` tags sprinkled throughout the text
  *   - `[media attached: path (mime) | path]` references appended when the
@@ -147,14 +157,27 @@ function normalizeStreamingMessage(message: unknown): unknown {
  * is important: the user bubble renders the cleaned text, so the comparison
  * used to dedupe optimistic vs server echoes must operate on the same
  * cleaned form — otherwise the same visible message renders twice.
+ *
+ * Order matters: the `[media attached: ...]` lines are commonly emitted
+ * BETWEEN the Sender block and the `[Mon ... GMT+8]` timestamp prefix.
+ * If we strip the timestamp before the media-attached lines, the timestamp
+ * regex (`^\s*\[(?:Mon|...)]`) can never match because the leading `[` is
+ * `[media attached:` instead — leaving the timestamp in the normalized
+ * comparison text and breaking optimistic-vs-echo dedupe.
  */
 function stripGatewayUserMetadata(text: string): string {
   return text
-    .replace(/^\s*\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[^\]]+\]\s*/i, '')
     .replace(/\s*\[media attached:[^\]]*\]/g, '')
     .replace(/\s*\[message_id:\s*[^\]]+\]/g, '')
+    .replace(/^Sender\s*\([^)]*\)\s*:\s*```[a-z]*\n[\s\S]*?```\s*/i, '')
+    .replace(/^Sender\s*\([^)]*\)\s*:\s*\{[\s\S]*?\}\s*/i, '')
+    .replace(/^Sender\s*\([^)]*\)\s*:\s*[^\n]*(?:\n\s*)*/i, '')
+    .replace(/^Sender\s*:\s*```[a-z]*\n[\s\S]*?```\s*/i, '')
+    .replace(/^Sender\s*:\s*\{[\s\S]*?\}\s*/i, '')
+    .replace(/^Sender\s*:\s*[^\n]*(?:\n\s*)*/i, '')
     .replace(/^Conversation info\s*\([^)]*\):\s*```[a-z]*\n[\s\S]*?```\s*/i, '')
-    .replace(/^Conversation info\s*\([^)]*\):\s*\{[\s\S]*?\}\s*/i, '');
+    .replace(/^Conversation info\s*\([^)]*\):\s*\{[\s\S]*?\}\s*/i, '')
+    .replace(/^\s*\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[^\]]+\]\s*/i, '');
 }
 
 function normalizeComparableUserText(content: unknown): string {
@@ -196,6 +219,62 @@ function matchesOptimisticUserMessage(
   if (sameText && (!optimisticAttachments || !candidateAttachments) && (timestampMatches || !hasCandidateTimestamp)) return true;
   if (sameAttachments && (!optimisticText || !candidateText) && (timestampMatches || !hasCandidateTimestamp)) return true;
   return false;
+}
+
+function rememberPendingOptimisticUserMessage(sessionKey: string, message: RawMessage, timestampMs: number): void {
+  const now = Date.now();
+  const existing = (_pendingOptimisticUserMessages.get(sessionKey) || [])
+    .filter((entry) => now - entry.createdAtMs <= OPTIMISTIC_USER_MESSAGE_TTL_MS);
+  existing.push({ message, timestampMs, createdAtMs: now });
+  _pendingOptimisticUserMessages.set(sessionKey, existing);
+}
+
+function clearPendingOptimisticUserMessages(sessionKey: string): void {
+  _pendingOptimisticUserMessages.delete(sessionKey);
+}
+
+function mergePendingOptimisticUserMessages(sessionKey: string, loadedMessages: RawMessage[]): RawMessage[] {
+  const pending = _pendingOptimisticUserMessages.get(sessionKey);
+  if (!pending || pending.length === 0) return loadedMessages;
+
+  const now = Date.now();
+  let merged = loadedMessages;
+  const stillPending: PendingOptimisticUserMessage[] = [];
+
+  for (const entry of pending) {
+    if (now - entry.createdAtMs > OPTIMISTIC_USER_MESSAGE_TTL_MS) {
+      continue;
+    }
+
+    const hasServerEcho = loadedMessages.some((message) =>
+      matchesOptimisticUserMessage(message, entry.message, entry.timestampMs),
+    );
+    if (hasServerEcho) {
+      continue;
+    }
+
+    const alreadyRendered = merged.some((message) =>
+      message.id === entry.message.id || matchesOptimisticUserMessage(message, entry.message, entry.timestampMs),
+    );
+    if (!alreadyRendered) {
+      const insertAt = merged.findIndex((message) =>
+        typeof message.timestamp === 'number' && toMs(message.timestamp) > entry.timestampMs,
+      );
+      merged = insertAt === -1
+        ? [...merged, entry.message]
+        : [...merged.slice(0, insertAt), entry.message, ...merged.slice(insertAt)];
+    }
+
+    stillPending.push(entry);
+  }
+
+  if (stillPending.length > 0) {
+    _pendingOptimisticUserMessages.set(sessionKey, stillPending);
+  } else {
+    _pendingOptimisticUserMessages.delete(sessionKey);
+  }
+
+  return merged;
 }
 
 function snapshotStreamingAssistantMessage(
@@ -307,6 +386,8 @@ function mimeFromExtension(filePath: string): string {
     'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'txt': 'text/plain',
     'csv': 'text/csv',
+    'html': 'text/html',
+    'htm': 'text/html',
     'md': 'text/markdown',
     'rtf': 'application/rtf',
     'epub': 'application/epub+zip',
@@ -353,7 +434,7 @@ function trimPathTerminators(filePath: string): string {
 function extractRawFilePaths(text: string): Array<{ filePath: string; mimeType: string }> {
   const refs: Array<{ filePath: string; mimeType: string }> = [];
   const seen = new Set<string>();
-  const exts = 'png|jpe?g|gif|webp|bmp|avif|svg|pdf|docx?|xlsx?|pptx?|txt|csv|md|rtf|epub|zip|tar|gz|rar|7z|mp3|wav|ogg|aac|flac|m4a|mp4|mov|avi|mkv|webm|m4v';
+  const exts = 'png|jpe?g|gif|webp|bmp|avif|svg|pdf|docx?|xlsx?|pptx?|html?|txt|csv|md|rtf|epub|zip|tar|gz|rar|7z|mp3|wav|ogg|aac|flac|m4a|mp4|mov|avi|mkv|webm|m4v';
   // Tagged media references (MEDIA:/path, media:~/path, ...).  The agent
   // runtime uses this prefix as an explicit "this is an artifact" marker,
   // so we want them recognised even though the leading colon would
@@ -1149,6 +1230,16 @@ function collectToolUpdates(message: unknown, eventState: string): ToolStatus[] 
   return updates;
 }
 
+/**
+ * True when an assistant message carries user-visible final output (text or
+ * image). NOTE: `thinking` blocks are intentionally excluded — they are the
+ * model's internal monologue and frequently precede tool calls in models like
+ * MiniMax-M2.7 and gpt-5.5. Treating thinking as "final content" causes the
+ * history-poll closer in applyLoadedMessages and the runtime final handler to
+ * misclassify intermediate `[thinking, toolCall]` turns as completed replies,
+ * which prematurely tears down the `sending` / `activeRunId` / `pendingFinal`
+ * lifecycle flags and makes the Thinking… indicator vanish mid-tool-chain.
+ */
 function hasNonToolAssistantContent(message: RawMessage | undefined): boolean {
   if (!message) return false;
   if (typeof message.content === 'string' && message.content.trim()) return true;
@@ -1157,13 +1248,41 @@ function hasNonToolAssistantContent(message: RawMessage | undefined): boolean {
   if (Array.isArray(content)) {
     for (const block of content as ContentBlock[]) {
       if (block.type === 'text' && block.text && block.text.trim()) return true;
-      if (block.type === 'thinking' && block.thinking && block.thinking.trim()) return true;
       if (block.type === 'image') return true;
     }
   }
 
   const msg = message as unknown as Record<string, unknown>;
   if (typeof msg.text === 'string' && msg.text.trim()) return true;
+
+  return false;
+}
+
+/**
+ * True when an assistant message is still waiting on a tool result, i.e. it
+ * represents an intermediate tool-use turn rather than a finished reply.
+ * Detected via:
+ *   - explicit stop_reason = "tool_use" / "toolUse"
+ *   - any tool_use / toolCall block in `content`
+ *   - OpenAI-format `tool_calls` array
+ * Used by applyLoadedMessages and the runtime `final` handler to keep the
+ * `sending` / `activeRunId` / `pendingFinal` flags armed across tool rounds.
+ */
+function hasPendingToolUse(message: RawMessage | undefined): boolean {
+  if (!message) return false;
+  const reason = getMessageStopReason(message);
+  if (reason === 'tool_use' || reason === 'tooluse') return true;
+
+  const content = message.content;
+  if (Array.isArray(content)) {
+    for (const block of content as ContentBlock[]) {
+      if (block.type === 'tool_use' || block.type === 'toolCall') return true;
+    }
+  }
+
+  const msg = message as unknown as Record<string, unknown>;
+  const toolCalls = msg.tool_calls ?? msg.toolCalls;
+  if (Array.isArray(toolCalls) && toolCalls.length > 0) return true;
 
   return false;
 }
@@ -1232,9 +1351,13 @@ export {
   collectToolUpdates,
   upsertToolStatuses,
   hasNonToolAssistantContent,
+  hasPendingToolUse,
   isToolOnlyMessage,
   normalizeStreamingMessage,
   matchesOptimisticUserMessage,
+  rememberPendingOptimisticUserMessage,
+  clearPendingOptimisticUserMessages,
+  mergePendingOptimisticUserMessages,
   snapshotStreamingAssistantMessage,
   getLatestOptimisticUserMessage,
   setHistoryPollTimer,

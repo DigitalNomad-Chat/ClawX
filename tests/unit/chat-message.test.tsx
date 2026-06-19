@@ -280,3 +280,74 @@ describe('ChatMessage LaTeX rendering', () => {
     expect(container.querySelector('.katex')).toBeNull();
   });
 });
+
+describe('ChatMessage word wrapping', () => {
+  // Regression for #931: word-break:break-all on the message bubble wrappers
+  // forced English words to split mid-character. Long unbreakable tokens
+  // (URLs, identifiers) still wrap via overflow-wrap:break-word; inline
+  // <code> and <a> children keep break-all because those carry non-prose
+  // tokens where mid-char breaks are still desirable.
+  it('does not apply break-all to the assistant prose wrapper', () => {
+    const message: RawMessage = {
+      role: 'assistant',
+      content: 'The neural network response should wrap at word boundaries.',
+    };
+    const { container } = render(<ChatMessage message={message} />);
+    const prose = container.querySelector('.prose');
+    expect(prose).not.toBeNull();
+    expect(prose?.classList.contains('break-all')).toBe(false);
+    expect(prose?.classList.contains('break-words')).toBe(true);
+  });
+
+  it('does not apply break-all to user message text', () => {
+    const message: RawMessage = {
+      role: 'user',
+      content: 'A user-typed sentence that should also wrap by words, not characters.',
+    };
+    const { container } = render(<ChatMessage message={message} />);
+    const paragraph = container.querySelector('p.whitespace-pre-wrap');
+    expect(paragraph).not.toBeNull();
+    expect(paragraph?.classList.contains('break-all')).toBe(false);
+    expect(paragraph?.classList.contains('break-words')).toBe(true);
+  });
+
+  it('keeps break-all on inline code so long identifiers can still break mid-token', () => {
+    const message: RawMessage = {
+      role: 'assistant',
+      content: 'Use `someVeryLongIdentifierNameThatShouldStillBreakAnywhere` here.',
+    };
+    const { container } = render(<ChatMessage message={message} />);
+    const inlineCode = container.querySelector('.prose code');
+    expect(inlineCode).not.toBeNull();
+    expect(inlineCode?.classList.contains('break-all')).toBe(true);
+  });
+});
+
+describe('ChatMessage reply styling', () => {
+  it('renders assistant replies as plain Markdown without a rounded bubble wrapper', () => {
+    const message: RawMessage = {
+      role: 'assistant',
+      content: 'Direct Markdown reply with **bold** text.',
+    };
+
+    const { container } = render(<ChatMessage message={message} />);
+    const prose = container.querySelector('.prose');
+    expect(prose).not.toBeNull();
+    expect(prose?.classList.contains('rounded-2xl')).toBe(false);
+    expect(prose?.classList.contains('bg-black/5')).toBe(false);
+    expect(prose?.classList.contains('dark:bg-white/5')).toBe(false);
+    expect(prose?.parentElement?.classList.contains('rounded-2xl')).toBe(false);
+  });
+
+  it('keeps user messages in the blue rounded bubble', () => {
+    const message: RawMessage = {
+      role: 'user',
+      content: 'Keep the prompt bubble.',
+    };
+
+    const { container } = render(<ChatMessage message={message} />);
+    const bubble = container.querySelector('.rounded-2xl.bg-brand');
+    expect(bubble).not.toBeNull();
+    expect(bubble).toHaveTextContent('Keep the prompt bubble.');
+  });
+});

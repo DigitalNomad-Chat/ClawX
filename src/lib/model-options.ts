@@ -23,7 +23,6 @@ function looksLikeUUID(str: string): boolean {
 
 export function resolveRuntimeProviderKey(account: ProviderAccount): string {
   if (account.authMode === 'oauth_browser') {
-    if (account.vendorId === 'google') return 'google-gemini-cli';
     if (account.vendorId === 'openai') return 'openai-codex';
   }
 

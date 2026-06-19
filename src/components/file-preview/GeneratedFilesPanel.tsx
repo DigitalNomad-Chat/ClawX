@@ -12,6 +12,7 @@ import { invokeIpc, readTextFile } from '@/lib/api-client';
 import {
   computeLineStats,
   supportsInlineDiff,
+  supportsInlineDocumentPreview,
   supportsRichDocumentPreview,
   type GeneratedFile,
 } from '@/lib/generated-files';
@@ -116,7 +117,7 @@ export function GeneratedFilesPanel({
       <div className="flex flex-wrap gap-2">
         {files.map((file) => {
           const lineStats = computeLineStats(file);
-          const clickable = supportsInlineDiff(file);
+          const clickable = supportsInlineDiff(file) || supportsInlineDocumentPreview(file.ext);
           const revealOnly = supportsRichDocumentPreview(file.ext);
           const renderable = isRenderable(file.ext);
           if (revealOnly) {

@@ -25,7 +25,7 @@ function parseSessionUpdatedAtMs(value: unknown): number | undefined {
 export function createSessionActions(
   set: ChatSet,
   get: ChatGet,
-): Pick<SessionHistoryActions, 'loadSessions' | 'switchSession' | 'newSession' | 'deleteSession' | 'cleanupEmptySession'> {
+): Pick<SessionHistoryActions, 'loadSessions' | 'switchSession' | 'newSession' | 'deleteSession' | 'renameSession' | 'cleanupEmptySession'> {
   return {
     loadSessions: async () => {
       try {
@@ -45,6 +45,7 @@ export function createSessionActions(
             thinkingLevel: s.thinkingLevel ? String(s.thinkingLevel) : undefined,
             model: s.model ? String(s.model) : undefined,
             updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
+            derivedTitle: s.derivedTitle ? String(s.derivedTitle) : undefined,
           })).filter((s: ChatSession) => s.key);
 
           const canonicalBySuffix = new Map<string, string>();
@@ -210,6 +211,19 @@ export function createSessionActions(
           sessionLastActivity: Object.fromEntries(Object.entries(s.sessionLastActivity).filter(([k]) => k !== key)),
         }));
       }
+    },
+
+    // ── Rename session ──
+
+    renameSession: (key: string, newLabel: string) => {
+      set((s) => ({
+        sessionLabels: { ...s.sessionLabels, [key]: newLabel },
+        sessions: s.sessions.map((session) =>
+          session.key === key
+            ? { ...session, displayName: newLabel, label: newLabel }
+            : session,
+        ),
+      }));
     },
 
     // ── New session ──

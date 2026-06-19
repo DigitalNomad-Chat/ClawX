@@ -1,6 +1,6 @@
 {
     "runError": {
-        "title": "Model API call error"
+        "title": "Model call failed"
     },
     "gatewayNotRunning": "Gateway Not Running",
     "gatewayRequired": "The Hermes Gateway needs to be running to use chat. It will start automatically, or you can start it from Settings.",
@@ -14,6 +14,7 @@
         "brainstorming": "Multi-Agent Parallel"
     },
     "noLogs": "(No logs available yet)",
+    "scrollToLatest": "Jump to latest",
     "toolbar": {
         "refresh": "Refresh chat",
         "currentAgent": "Talking to {{agent}}",
@@ -25,9 +26,6 @@
         "modified": "Modified",
         "openFolder": "Open folder",
         "viewAll": "View all changes"
-    },
-    "runError": {
-        "title": "Model call failed"
     },
     "artifactPanel": {
         "tabs": {
@@ -197,10 +195,15 @@
     },
     "historyBuckets": {
         "today": "Today",
-        "yesterday": "Yesterday",
-        "withinWeek": "Within 1 Week",
-        "withinTwoWeeks": "Within 2 Weeks",
-        "withinMonth": "Within 1 Month",
-        "older": "Older than 1 Month"
-    }
+        "withinWeek": "Last 7 days",
+        "withinMonth": "Last 30 days",
+        "older": "Older"
+    },
+    "questionDirectory": {
+        "title": "Question directory",
+        "fallback": "Question {{number}}",
+        "moreHint": "{{count}} more questions not shown"
+    },
+    "loadMoreHistory": "Load earlier messages",
+    "loadingMoreHistory": "Loading more..."
 }

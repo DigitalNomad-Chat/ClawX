@@ -13,6 +13,7 @@ import {
   isToolResultRole,
   loadMissingPreviews,
   matchesOptimisticUserMessage,
+  mergePendingOptimisticUserMessages,
   toMs,
 } from './helpers';
 import { buildCronSessionHistoryPath, isCronSessionKey } from './cron-session-utils';
@@ -44,11 +45,20 @@ async function loadCronFallbackMessages(sessionKey: string, limit = 200): Promis
 export function createHistoryActions(
   set: ChatSet,
   get: ChatGet,
-): Pick<SessionHistoryActions, 'loadHistory'> {
+): Pick<SessionHistoryActions, 'loadHistory' | 'loadMoreHistory'> {
   return {
+    loadMoreHistory: async () => {
+      // The legacy split-store path is not active in the Electron app. Keep a
+      // conservative implementation for type safety; the monolithic store in
+      // src/stores/chat.ts provides paginated transcript loading.
+      await get().loadHistory(true);
+    },
     loadHistory: async (quiet = false) => {
       const { currentSessionKey } = get();
-      const isInitialForegroundLoad = !quiet && !foregroundHistoryLoadSeen.has(currentSessionKey);
+      const gatewayState = useGatewayStore.getState?.() as { status?: { pid?: number; connectedAt?: number; port?: number } } | undefined;
+      const gatewayStatus = gatewayState?.status;
+      const foregroundLoadKey = `${gatewayStatus?.pid ?? 'none'}:${gatewayStatus?.connectedAt ?? 'none'}:${gatewayStatus?.port ?? 'none'}|${currentSessionKey}`;
+      const isInitialForegroundLoad = !quiet && !foregroundHistoryLoadSeen.has(foregroundLoadKey);
       const historyTimeoutOverride = getStartupHistoryTimeoutOverride(isInitialForegroundLoad);
       if (!quiet) set({ loading: true, error: null });
 
@@ -97,19 +107,19 @@ export function createHistoryActions(
         // Restore file attachments for user/assistant messages (from cache + text patterns)
         const enrichedMessages = enrichWithCachedImages(filteredMessages);
 
-        // Preserve the optimistic user message during an active send.
-        // The Gateway may not include the user's message in chat.history
-        // until the run completes, causing it to flash out of the UI.
-        let finalMessages = enrichedMessages;
+        // Preserve optimistic user messages independently from sending state.
+        // Gateway phase=end can clear sending before chat.history has persisted
+        // the user turn; without this, an early quiet reload briefly removes it.
+        let finalMessages = mergePendingOptimisticUserMessages(currentSessionKey, enrichedMessages);
         const userMsgAt = get().lastUserMessageAt;
         if (get().sending && userMsgAt) {
           const userMsMs = toMs(userMsgAt);
           const optimistic = getLatestOptimisticUserMessage(get().messages, userMsMs);
           const hasMatchingUser = optimistic
-            ? enrichedMessages.some((message) => matchesOptimisticUserMessage(message, optimistic, userMsMs))
+            ? finalMessages.some((message) => matchesOptimisticUserMessage(message, optimistic, userMsMs))
             : false;
           if (optimistic && !hasMatchingUser) {
-            finalMessages = [...enrichedMessages, optimistic];
+            finalMessages = [...finalMessages, optimistic];
           }
         }
 
@@ -278,7 +288,7 @@ export function createHistoryActions(
           }
           const applied = applyLoadedMessages(rawMessages, thinkingLevel);
           if (applied && isInitialForegroundLoad) {
-            foregroundHistoryLoadSeen.add(currentSessionKey);
+            foregroundHistoryLoadSeen.add(foregroundLoadKey);
           }
           return;
         }
@@ -297,7 +307,7 @@ export function createHistoryActions(
         if (fallbackMessages.length > 0) {
           const applied = applyLoadedMessages(fallbackMessages, null);
           if (applied && isInitialForegroundLoad) {
-            foregroundHistoryLoadSeen.add(currentSessionKey);
+            foregroundHistoryLoadSeen.add(foregroundLoadKey);
           }
         } else if (errorKind === 'gateway_startup') {
           // Suppress error UI for gateway startup -- the history will load
@@ -317,7 +327,7 @@ export function createHistoryActions(
         if (fallbackMessages.length > 0) {
           const applied = applyLoadedMessages(fallbackMessages, null);
           if (applied && isInitialForegroundLoad) {
-            foregroundHistoryLoadSeen.add(currentSessionKey);
+            foregroundHistoryLoadSeen.add(foregroundLoadKey);
           }
         } else {
           applyLoadFailure(String(err));

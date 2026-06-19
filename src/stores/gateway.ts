@@ -42,11 +42,54 @@ function pruneGatewayEventDedupe(now: number): void {
   }
 }
 
+function stableGatewayEventFingerprint(value: unknown): string {
+  let hash = 2166136261;
+  let length = 0;
+
+  const add = (part: string): void => {
+    length += part.length;
+    for (let i = 0; i < part.length; i += 1) {
+      hash ^= part.charCodeAt(i);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+  };
+
+  const visit = (entry: unknown): void => {
+    if (entry === undefined) {
+      add('u:');
+      return;
+    }
+    if (entry === null || typeof entry !== 'object') {
+      add(`${typeof entry}:${JSON.stringify(entry)};`);
+      return;
+    }
+    if (Array.isArray(entry)) {
+      add('[');
+      for (const item of entry) visit(item);
+      add(']');
+      return;
+    }
+
+    add('{');
+    for (const [key, child] of Object.entries(entry as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))) {
+      add(`${JSON.stringify(key)}:`);
+      visit(child);
+    }
+    add('}');
+  };
+
+  visit(value);
+  return `${hash.toString(36)}:${length.toString(36)}`;
+}
+
 function buildGatewayEventDedupeKey(event: Record<string, unknown>): string | null {
   const runId = event.runId != null ? String(event.runId) : '';
   const sessionKey = event.sessionKey != null ? String(event.sessionKey) : '';
   const seq = event.seq != null ? String(event.seq) : '';
   const state = event.state != null ? String(event.state) : '';
+  if (state === 'delta' && !seq) {
+    return ['delta-nosq', runId, sessionKey, stableGatewayEventFingerprint(event.message ?? event)].join('|');
+  }
   if (runId || sessionKey || seq || state) {
     return [runId, sessionKey, seq, state].join('|');
   }
@@ -166,7 +209,15 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
       .catch(() => {});
   }
 
-  if (phase === 'completed' || phase === 'done' || phase === 'finished' || phase === 'end') {
+  // `phase: 'end'` fires per streaming message (including intermediate tool
+  // rounds), NOT per-run, so it must not clear lifecycle state — otherwise the
+  // first `[thinking, toolCall]` round tears down `sending` / `activeRunId` /
+  // `pendingFinal` and the Thinking… indicator vanishes mid-chain. Only
+  // `completed` / `done` / `finished` are actual run terminators. We still
+  // honour `'end'` as a hint to refresh history opportunistically.
+  const isPerMessageEnd = phase === 'end';
+  const isRunCompletion = phase === 'completed' || phase === 'done' || phase === 'finished';
+  if (isPerMessageEnd || isRunCompletion) {
     import('./chat')
       .then(({ useChatStore }) => {
         const state = useChatStore.getState();
@@ -183,9 +234,9 @@ function handleGatewayNotification(notification: { method?: string; params?: Rec
         const matchesActiveRun = runId != null && state.activeRunId != null && String(runId) === state.activeRunId;
 
         if (matchesCurrentSession || matchesActiveRun) {
-          maybeLoadHistory(state);
+          maybeLoadHistory(state, isRunCompletion);
         }
-        if ((matchesCurrentSession || matchesActiveRun) && state.sending) {
+        if (isRunCompletion && (matchesCurrentSession || matchesActiveRun) && state.sending) {
           useChatStore.setState({
             sending: false,
             activeRunId: null,

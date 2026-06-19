@@ -392,6 +392,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-[44px] rounded-xl font-mono text-sm bg-surface-input border focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40"
+
             />
           </div>
 
@@ -405,6 +406,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
               className="rounded-xl font-mono text-sm bg-surface-input border focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40 resize-none"
+
             />
           </div>
 
@@ -418,6 +420,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
                 setSelectedAgentId(e.target.value);
               }}
               className="h-[44px] rounded-xl border bg-surface-input text-sm"
+
             >
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
@@ -447,6 +450,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
               className="h-[44px] rounded-xl font-mono text-sm bg-surface-input border focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary shadow-sm transition-all text-foreground placeholder:text-foreground/40"
             />
             <p className="text-xs text-muted-foreground">{t('dialog.timeoutDesc')}</p>
+
           </div>
 
           {/* Delivery */}
@@ -467,6 +471,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
                   deliveryMode === 'none'
                     ? 'bg-primary hover:bg-primary/90 text-primary-foreground border-transparent'
                     : 'bg-surface-input border hover:bg-muted text-foreground/80 hover:text-foreground',
+
                 )}
               >
                 <div>
@@ -484,6 +489,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
                   deliveryMode === 'announce'
                     ? 'bg-primary hover:bg-primary/90 text-primary-foreground border-transparent'
                     : 'bg-surface-input border hover:bg-muted text-foreground/80 hover:text-foreground',
+
                 )}
               >
                 <div>
@@ -494,7 +500,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
             </div>
 
             {deliveryMode === 'announce' && (
-              <div className="space-y-3 rounded-2xl border border-black/5 dark:border-white/5 bg-surface-input p-4 shadow-sm">
+              <div className="space-y-3 rounded-2xl border border-black/5 dark:border-white/5 bg-transparent p-4 shadow-sm">
                 <div className="space-y-2">
                   <Label htmlFor="delivery-channel" className="text-sm text-foreground/80 font-bold">
                     {t('dialog.deliveryChannel')}
@@ -586,6 +592,7 @@ function TaskDialog({ job, configuredChannels, onClose, onSave }: TaskDialogProp
 
           {/* Enabled */}
           <div className="flex items-center justify-between bg-muted p-4 rounded-xl">
+
             <div>
               <Label className="text-sm font-medium">{t('dialog.enableImmediately')}</Label>
               <p className="text-sm text-muted-foreground mt-0.5">
@@ -670,10 +677,11 @@ function CronJobCard({ job, deliveryAccountName, onToggle, onEdit, onDelete, onT
         <div className="flex items-center gap-4">
           <div className="h-12 w-12 shrink-0 flex items-center justify-center text-foreground bg-primary/10 rounded-lg shadow-sm group-hover:scale-105 transition-transform">
             <Clock className={cn("h-5 w-5", job.enabled ? "text-primary" : "text-muted-foreground")} />
+
           </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-base font-semibold text-foreground truncate">{job.name}</h3>
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 min-w-0">
+              <h3 data-testid={`cron-job-card-title-${job.id}`} className="text-base font-semibold text-foreground truncate min-w-0">{job.name}</h3>
               <div
                 className={cn(
                   "w-2 h-2 rounded-full shrink-0",
@@ -685,11 +693,12 @@ function CronJobCard({ job, deliveryAccountName, onToggle, onEdit, onDelete, onT
             <p className="text-sm text-muted-foreground flex items-center gap-1.5">
               <Timer className="h-3.5 w-3.5" />
               {parseCronSchedule(job.schedule, t)}
+
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+        <div data-testid={`cron-job-card-switch-${job.id}`} className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
           <Switch
             checked={job.enabled}
             onCheckedChange={onToggle}
@@ -697,10 +706,10 @@ function CronJobCard({ job, deliveryAccountName, onToggle, onEdit, onDelete, onT
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col justify-end mt-2 pl-[62px]">
-        <div className="flex items-start gap-2 mb-3">
+      <div className="flex-1 flex flex-col justify-end mt-2 pl-[62px] min-w-0">
+        <div className="flex items-start gap-2 mb-3 min-w-0">
           <MessageSquare className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
-          <p className="text-sm text-muted-foreground line-clamp-2 leading-[1.5]">
+          <p className="text-sm text-muted-foreground line-clamp-2 leading-[1.5] min-w-0 flex-1 break-all">
             {job.message}
           </p>
         </div>

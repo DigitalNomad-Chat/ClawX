@@ -1,6 +1,6 @@
 {
     "runError": {
-        "title": "模型API调用错误"
+        "title": "模型调用失败"
     },
     "gatewayNotRunning": "网关未运行",
     "gatewayRequired": "Hermes 网关需要运行才能使用聊天。它将自动启动，或者您可以从设置中启动。",
@@ -14,6 +14,7 @@
         "brainstorming": "多智能体并行"
     },
     "noLogs": "（暂无日志）",
+    "scrollToLatest": "跳转到最新对话",
     "toolbar": {
         "refresh": "刷新聊天",
         "currentAgent": "当前对话对象：{{agent}}",
@@ -25,9 +26,6 @@
         "modified": "修改",
         "openFolder": "打开文件夹",
         "viewAll": "查看文件变更"
-    },
-    "runError": {
-        "title": "模型调用失败"
     },
     "artifactPanel": {
         "tabs": {
@@ -197,10 +195,15 @@
     },
     "historyBuckets": {
         "today": "今天",
-        "yesterday": "昨天",
         "withinWeek": "一周内",
-        "withinTwoWeeks": "两周内",
-        "withinMonth": "一个月内",
-        "older": "一个月之前"
-    }
+        "withinMonth": "一月内",
+        "older": "更早"
+    },
+    "questionDirectory": {
+        "title": "问题目录",
+        "fallback": "问题 {{number}}",
+        "moreHint": "还有 {{count}} 个问题未显示"
+    },
+    "loadMoreHistory": "加载更早的消息",
+    "loadingMoreHistory": "加载更多中..."
 }

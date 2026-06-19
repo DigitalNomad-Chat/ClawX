@@ -38,7 +38,7 @@ function status(id: string, hasKey = true): ProviderWithKeyInfo {
 
 describe('model option helpers', () => {
   it('formats model refs using only the text after the provider prefix', () => {
-    expect(formatModelRefLabel('openrouter/openai/gpt-5.4')).toBe('openai/gpt-5.4');
+    expect(formatModelRefLabel('openrouter/openai/gpt-5.5')).toBe('openai/gpt-5.5');
     expect(formatModelRefLabel('custom-alpha1234/model-alpha')).toBe('model-alpha');
   });
 
@@ -71,7 +71,9 @@ describe('model option helpers', () => {
     });
 
     it('maps OAuth browser providers to their runtime keys', () => {
-      expect(resolveRuntimeProviderKey(account({ id: 'google-account', vendorId: 'google', authMode: 'oauth_browser' }))).toBe('google-gemini-cli');
+      // Google Gemini CLI provider has been removed; OAuth browser Google accounts
+      // now fall back to the standard 'google' vendor key.
+      expect(resolveRuntimeProviderKey(account({ id: 'google-account', vendorId: 'google', authMode: 'oauth_browser' }))).toBe('google');
       expect(resolveRuntimeProviderKey(account({ id: 'openai-account', vendorId: 'openai', authMode: 'oauth_browser' }))).toBe('openai-codex');
     });
 

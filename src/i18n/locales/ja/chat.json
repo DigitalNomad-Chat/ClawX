@@ -1,6 +1,6 @@
 {
     "runError": {
-        "title": "モデルAPI呼び出しエラー"
+        "title": "モデル呼び出しに失敗しました"
     },
     "gatewayNotRunning": "ゲートウェイが停止中",
     "gatewayRequired": "チャットを利用するには Hermes ゲートウェイが実行されている必要があります。自動的に起動するか、設定から起動できます。",
@@ -14,6 +14,7 @@
         "brainstorming": "マルチエージェント並列実行"
     },
     "noLogs": "（ログはまだありません）",
+    "scrollToLatest": "最新の会話へ移動",
     "toolbar": {
         "refresh": "チャットを更新",
         "currentAgent": "現在の会話相手: {{agent}}",
@@ -25,9 +26,6 @@
         "modified": "更新",
         "openFolder": "フォルダーを開く",
         "viewAll": "ファイル変更を見る"
-    },
-    "runError": {
-        "title": "モデル呼び出しに失敗しました"
     },
     "artifactPanel": {
         "tabs": {
@@ -94,7 +92,7 @@
             "noChanges": "表示する変更はありません",
             "newFile": "新規ファイルのため比較対象がありません",
             "tooLarge": "ファイルが大きすぎるため diff ビューは無効化されました。完全な内容は「ソース」タブで確認してください",
-            "unavailable": "この会話ではこのファイルの正確な変更ベースラインを取得できなかったため、差分を生成できません。", 
+            "unavailable": "この会話ではこのファイルの正確な変更ベースラインを取得できなかったため、差分を生成できません。",
             "unavailableHint": "「プレビュー」で現在の内容を確認するか、Git などで正確な差分を参照してください。"
         },
         "confirmOpen": {
@@ -197,10 +195,15 @@
     },
     "historyBuckets": {
         "today": "今日",
-        "yesterday": "昨日",
-        "withinWeek": "1週間以内",
-        "withinTwoWeeks": "2週間以内",
-        "withinMonth": "1か月以内",
-        "older": "1か月より前"
-    }
+        "withinWeek": "過去7日間",
+        "withinMonth": "過去30日間",
+        "older": "それ以前"
+    },
+    "questionDirectory": {
+        "title": "質問目次",
+        "fallback": "質問 {{number}}",
+        "moreHint": "さらに {{count}} 件の質問は表示されていません"
+    },
+    "loadMoreHistory": "さらに前のメッセージを読み込む",
+    "loadingMoreHistory": "読み込み中..."
 }

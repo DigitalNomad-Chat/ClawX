@@ -64,6 +64,16 @@
     --status-success: 145 65% 55%;
     --status-running: 210 100% 63%;
     --status-error: 0 85% 75%;
+
+    /* ── Usage accents (light) ────────────────────────────────────
+     *
+     * Three semantic accents reused for token usage / activity visualisation.
+     * Mirrors the Cron page convention so the Models bar chart, legend dots,
+     * and any future "input / output / cache" indicator share one palette.
+     * ─────────────────────────────────────────────────────────── */
+    --usage-input: 217 91% 60%;
+    --usage-output: 142 71% 45%;
+    --usage-cache: 48 96% 53%;
   }
 
   /* NiceAI deep dark palette */
@@ -96,6 +106,11 @@
     --status-success: 145 65% 50%;
     --status-running: 210 100% 63%;
     --status-error: 0 85% 75%;
+
+    /* Usage accents — lifted shades so bars stay vivid on dark surfaces. */
+    --usage-input: 217 91% 65%;
+    --usage-output: 142 71% 52%;
+    --usage-cache: 48 96% 60%;
   }
 }
 
@@ -110,8 +125,13 @@
   }
 }
 
-/* ── Custom scrollbar ─────────────────────────────────────────── */
+@layer components {
+  .sidebar-nav-text.sidebar-nav-text {
+    @apply text-sm font-normal leading-4;
+  }
+}
 
+/* ── Custom scrollbar ─────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -136,267 +156,4 @@
 
 *:hover::-webkit-scrollbar-thumb {
   @apply bg-border;
-}
-
-*:hover::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/30;
-}
-
-/* ── Monaco diff editor background alignment ──────────────────── */
-
-:root:not(.dark) .clawdock-diff-editor .monaco-diff-editor,
-:root:not(.dark) .clawdock-diff-editor .monaco-editor,
-:root:not(.dark) .clawdock-diff-editor .monaco-editor-background,
-:root:not(.dark) .clawdock-diff-editor .monaco-editor .margin,
-:root:not(.dark) .clawdock-diff-editor .monaco-editor .gutter,
-:root:not(.dark) .clawdock-diff-editor .diffOverview {
-  background-color: hsl(var(--background)) !important;
-}
-
-/* ── macOS traffic light spacing ──────────────────────────────── */
-
-.drag-region {
-  -webkit-app-region: drag;
-}
-
-.no-drag {
-  -webkit-app-region: no-drag;
-}
-
-/* ── Smooth transitions ───────────────────────────────────────── */
-
-.transition-theme {
-  @apply transition-colors duration-200;
-}
-
-/* ── Focus ring ───────────────────────────────────────────────── */
-
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
-}
-
-/* ── Prose styling for markdown ───────────────────────────────── */
-
-.prose {
-  line-height: 1.6;
-}
-
-.prose p {
-  margin-bottom: 0.75em;
-}
-
-.prose p:last-child {
-  margin-bottom: 0;
-}
-
-.prose ul,
-.prose ol {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
-  padding-left: 1.5em;
-}
-
-.prose li {
-  margin-bottom: 0.25em;
-}
-
-.prose pre {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
-}
-
-.prose blockquote {
-  border-left: 3px solid hsl(var(--border));
-  padding-left: 1em;
-  margin: 0.5em 0;
-  color: hsl(var(--muted-foreground));
-}
-
-.prose table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5em 0;
-}
-
-.prose th,
-.prose td {
-  border: 1px solid hsl(var(--border));
-  padding: 0.5em;
-  text-align: left;
-}
-
-.prose th {
-  background: transparent;
-  font-weight: 700;
-}
-
-.dark .prose th {
-  background: hsl(var(--muted));
-}
-
-/* ── Status utilities ─────────────────────────────────────────── */
-
-@layer base {
-  .text-status-success {
-    color: hsl(var(--status-success));
-  }
-  .text-status-running {
-    color: hsl(var(--status-running));
-  }
-  .text-status-error {
-    color: hsl(var(--status-error));
-  }
-  .bg-status-success {
-    background-color: hsl(var(--status-success));
-  }
-  .bg-status-running {
-    background-color: hsl(var(--status-running));
-  }
-  .bg-status-error {
-    background-color: hsl(var(--status-error));
-  }
-}
-
-/* ── Chat message bubbles ─────────────────────────────────────── */
-
-@layer components {
-  .msg-bubble-user {
-    background: linear-gradient(135deg, #409eff 0%, #275bff 100%);
-    box-shadow:
-      0 2px 8px rgba(64, 158, 255, 0.22),
-      0 0 0 1px rgba(255, 255, 255, 0.12) inset,
-      0 -1px 0 rgba(0, 0, 0, 0.08) inset;
-    color: #fff;
-  }
-
-  .msg-bubble-ai {
-    background: hsl(var(--surface-modal));
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-    color: hsl(var(--foreground));
-  }
-
-  .dark .msg-bubble-ai {
-    background: hsl(var(--card));
-    border-color: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  }
-
-  /* Code block inside AI bubble */
-  .msg-bubble-ai pre {
-    background: #1e1e2e;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    padding: 1rem;
-    overflow-x: auto;
-  }
-
-  .msg-bubble-ai pre code {
-    background: transparent;
-    color: #cdd6f4;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 13px;
-    line-height: 1.6;
-  }
-
-  .msg-bubble-ai code:not(pre code) {
-    background: rgba(64, 158, 255, 0.08);
-    color: #165dff;
-    padding: 0.15em 0.45em;
-    border-radius: 6px;
-    font-size: 0.9em;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-  }
-
-  .dark .msg-bubble-ai code:not(pre code) {
-    background: rgba(64, 158, 255, 0.12);
-    color: #8cc5ff;
-  }
-}
-
-/* ── Message entrance animation ───────────────────────────────── */
-
-@keyframes message-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-message-in {
-  animation: message-in 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-}
-
-/* ── Streaming cursor ─────────────────────────────────────────── */
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.streaming-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1.2em;
-  background: currentColor;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  animation: blink 1s step-end infinite;
-  border-radius: 1px;
-}
-
-/* ── Skeleton shimmer ─────────────────────────────────────────── */
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 25%,
-    hsl(var(--muted) / 0.6) 50%,
-    hsl(var(--muted)) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* ── Glass morphism utilities ─────────────────────────────────── */
-
-@layer utilities {
-  .glass-panel {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.75));
-    backdrop-filter: blur(20px) saturate(1.2);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow:
-      0 4px 24px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(255, 255, 255, 0.4) inset;
-  }
-
-  .dark .glass-panel {
-    background: linear-gradient(180deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 28, 0.8));
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow:
-      0 4px 24px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-  }
-}
-
-/* ── Typing indicator animation ───────────────────────────────── */
-
-@keyframes bounce {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-4px);
-  }
 }

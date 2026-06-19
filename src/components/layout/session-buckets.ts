@@ -1,5 +1,7 @@
 import type { ChatSession } from '@/stores/chat';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export interface AgentGroup {
   agentId: string;
   agentName: string;
@@ -9,9 +11,7 @@ export interface AgentGroup {
 
 export type SessionBucketKey =
   | 'today'
-  | 'yesterday'
   | 'withinWeek'
-  | 'withinTwoWeeks'
   | 'withinMonth'
   | 'older';
 
@@ -20,15 +20,10 @@ export function getSessionBucket(activityMs: number, nowMs: number): SessionBuck
 
   const now = new Date(nowMs);
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
 
   if (activityMs >= startOfToday) return 'today';
-  if (activityMs >= startOfYesterday) return 'yesterday';
-
-  const daysAgo = (startOfToday - activityMs) / (24 * 60 * 60 * 1000);
-  if (daysAgo <= 7) return 'withinWeek';
-  if (daysAgo <= 14) return 'withinTwoWeeks';
-  if (daysAgo <= 30) return 'withinMonth';
+  if (activityMs >= startOfToday - 7 * DAY_MS) return 'withinWeek';
+  if (activityMs >= startOfToday - 30 * DAY_MS) return 'withinMonth';
   return 'older';
 }
 
