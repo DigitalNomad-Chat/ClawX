@@ -1,9 +1,80 @@
 import type { IncomingMessage, ServerResponse } from 'http';
+import { basename } from 'node:path';
 import { getAllSkillConfigs, updateSkillConfig } from '../../utils/skill-config';
-import { collectQuickAccessSkills, filterEnabledQuickAccessSkills, type QuickAccessRuntimeSkillStatus } from '../../utils/skill-quick-access';
+import { collectQuickAccessSkills, filterEnabledQuickAccessSkills, type QuickAccessRuntimeSkillStatus, type QuickAccessSkillSource } from '../../utils/skill-quick-access';
 import type { ClawHubInstallParams, ClawHubSearchParams, ClawHubUninstallParams } from '../../gateway/clawhub';
 import type { HostApiContext } from '../context';
 import { parseJsonBody, sendJson } from '../route-utils';
+
+/**
+ * 本地扫描目录来源 → 前端 `resolveSkillSourceLabel` 识别的来源键。
+ * 让 Skills 页 source 徽标正确显示（Workspace / Managed / Extra 等），
+ * 而非原样暴露 collectQuickAccessSkills 的内部枚举。
+ */
+const QUICK_ACCESS_SOURCE_TO_GATEWAY: Record<QuickAccessSkillSource, string> = {
+  workspace: 'clawdock-workspace',
+  openclaw: 'openclaw-managed',
+  agents: 'agents-skills-personal',
+  legacy: 'clawdock-extra',
+};
+
+/**
+ * 将本地扫描到的 skill 目录映射为前端 Skills 管理页所需的状态结构。
+ *
+ * 数据来源（本地扫描为基准，不依赖 Gateway 是否就绪）：
+ *   1. `collectQuickAccessSkills` 扫描 ~/.clawdock/skills、.agents/skills、
+ *      workspace、legacy roots → skill 列表基准。
+ *   2. `getAllSkillConfigs` 读取用户配置 → 判定显式禁用的 skill。
+ *   3. Gateway `skills.status`（可选，try/catch 容错）→ 叠加运行时 disabled。
+ *
+ * 与 `/api/skills/quick-access` 的 `filterEnabledQuickAccessSkills`（剔除禁用项，
+ * 用于"快速访问"语境）刻意不同：管理页需展示全部已发现的 skill，并通过
+ * `disabled` 字段让用户重新启用被禁用的项。
+ */
+async function collectSkillStatuses(ctx: HostApiContext) {
+  const [scannedSkills, configs] = await Promise.all([
+    collectQuickAccessSkills({}),
+    getAllSkillConfigs(),
+  ]);
+
+  const configDisabledKeys = new Set<string>();
+  for (const [skillKey, config] of Object.entries(configs || {})) {
+    if (config?.enabled === false) {
+      const normalized = skillKey.trim().toLowerCase();
+      if (normalized) configDisabledKeys.add(normalized);
+    }
+  }
+
+  const runtimeDisabledKeys = new Set<string>();
+  if (ctx.gatewayManager.getStatus().state === 'running') {
+    try {
+      const runtimeStatus = await ctx.gatewayManager.rpc<{ skills?: QuickAccessRuntimeSkillStatus[] }>('skills.status');
+      for (const skill of runtimeStatus.skills || []) {
+        if (!skill.disabled) continue;
+        const aliases = [skill.skillKey, skill.slug, skill.name, skill.baseDir ? basename(skill.baseDir) : '']
+          .map((value) => (value || '').trim().toLowerCase())
+          .filter(Boolean);
+        for (const alias of aliases) runtimeDisabledKeys.add(alias);
+      }
+    } catch {
+      // Gateway 不可用时仅依赖 config + 本地扫描，不影响列表返回。
+    }
+  }
+
+  return scannedSkills.map((skill) => {
+    const key = skill.name.trim().toLowerCase();
+    return {
+      skillKey: skill.name,
+      slug: skill.name,
+      name: skill.name,
+      description: skill.description,
+      disabled: configDisabledKeys.has(key) || runtimeDisabledKeys.has(key),
+      source: QUICK_ACCESS_SOURCE_TO_GATEWAY[skill.source] ?? skill.source,
+      baseDir: skill.baseDir,
+      filePath: skill.manifestPath,
+    };
+  });
+}
 
 export async function handleSkillRoutes(
   req: IncomingMessage,
@@ -13,10 +84,8 @@ export async function handleSkillRoutes(
 ): Promise<boolean> {
   if (url.pathname === '/api/skills/status' && req.method === 'GET') {
     try {
-      // Runtime skills are now served by the embedded Hermes Server (:8648).
-      // Host API only returns the static skill configuration.
-      let runtimeSkills: QuickAccessRuntimeSkillStatus[] | undefined;
-      sendJson(res, 200, { success: true, skills: runtimeSkills || [] });
+      // 本地扫描为基准（不依赖 Gateway），叠加 config + runtime 的 disabled 状态。
+      sendJson(res, 200, { success: true, skills: await collectSkillStatuses(ctx) });
     } catch (error) {
       sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : String(error) });
     }
