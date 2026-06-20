@@ -173,8 +173,11 @@ describe('chat target routing', () => {
       }),
     );
 
+    const sendCall = hostApiFetchMock.mock.calls.find(
+      (call) => call[0] === '/api/chat/send-with-media',
+    );
     const payload = JSON.parse(
-      (hostApiFetchMock.mock.calls[0]?.[1] as { body: string }).body,
+      (sendCall?.[1] as { body: string }).body,
     ) as {
       sessionKey: string;
       message: string;

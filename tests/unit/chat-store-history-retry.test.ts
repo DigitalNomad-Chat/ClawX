@@ -35,7 +35,7 @@ describe('useChatStore startup history retry', () => {
     agentsState.agents = [];
     gatewayRpcMock.mockReset();
     hostApiFetchMock.mockReset();
-    hostApiFetchMock.mockResolvedValue({ messages: [] });
+    hostApiFetchMock.mockResolvedValue({ success: true, messages: [] });
   });
 
   afterEach(() => {
@@ -144,7 +144,18 @@ describe('useChatStore startup history retry', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    console.log('[test] before assertions messages=', useChatStore.getState().messages.map((m) => m.content));
+
     expect(gatewayRpcMock).toHaveBeenCalledTimes(2);
+
+    // The final event triggers a void immediate history reload. Yield until
+    // the authoritative transcript (second RPC response) has been applied.
+    for (let i = 0; i < 10; i += 1) {
+      const contents = useChatStore.getState().messages.map((message) => message.content);
+      if (contents.length === 2) break;
+      await Promise.resolve();
+    }
+
     expect(useChatStore.getState().messages.map((message) => message.content)).toEqual([
       'hello',
       'Real answer',
@@ -363,8 +374,12 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('does not burn the first-load retry path when the first attempt becomes stale', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Use the shared gatewayRpcMock for this test.  A previous attempt used
+    // vi.doMock to inject a local mock, but Vitest did not apply the dynamic
+    // override for an already vi.mock'ed module in this file, so chat.ts kept
+    // using the hoisted gatewayRpcMock.
     const { useChatStore } = await import('@/stores/chat');
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
@@ -387,16 +402,37 @@ describe('useChatStore startup history retry', () => {
     });
 
     let resolveFirstAttempt: ((value: { messages: Array<{ role: string; content: string; timestamp: number }> }) => void) | null = null;
-    gatewayRpcMock
-      .mockImplementationOnce(() => new Promise((resolve) => {
-        resolveFirstAttempt = resolve;
-      }))
-      .mockRejectedValueOnce(new Error('RPC timeout: chat.history'))
-      .mockResolvedValueOnce({
+    let historyCallIndex = 0;
+    gatewayRpcMock.mockImplementation((method: string) => {
+      if (method !== 'chat.history') {
+        return Promise.resolve({});
+      }
+      const idx = historyCallIndex;
+      historyCallIndex += 1;
+      if (idx === 0) {
+        return new Promise((resolve) => {
+          resolveFirstAttempt = resolve;
+        });
+      }
+      if (idx === 1) {
+        return Promise.reject(new Error('RPC timeout: chat.history'));
+      }
+      return Promise.resolve({
         messages: [{ role: 'assistant', content: 'restored after retry', timestamp: 1002 }],
       });
+    });
+
+    // Force the first load through the RPC path so its first attempt can
+    // become stale mid-flight when we switch sessions.
+    hostApiFetchMock.mockRejectedValue(new Error('host down'));
 
     const firstLoad = useChatStore.getState().loadHistory(false);
+    // Wait until the first RPC attempt has actually started and exposed its
+    // resolver before switching sessions; otherwise the fallback loop breaks
+    // on isCurrentSession() before the attempt ever fires.
+    for (let i = 0; i < 20 && !resolveFirstAttempt; i += 1) {
+      await Promise.resolve();
+    }
     useChatStore.setState({
       currentSessionKey: 'agent:main:other',
       messages: [{ role: 'assistant', content: 'other session', timestamp: 1001 }],
@@ -411,6 +447,8 @@ describe('useChatStore startup history retry', () => {
       messages: [],
     });
     const secondLoad = useChatStore.getState().loadHistory(false);
+    await Promise.resolve();
+    await Promise.resolve();
     await vi.runAllTimersAsync();
     await secondLoad;
 

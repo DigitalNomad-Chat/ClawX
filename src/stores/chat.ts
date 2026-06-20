@@ -11,7 +11,9 @@ import { useAgentsStore } from './agents';
 import { buildBaselineRunKey, captureBaseline, clearBaselines } from './baseline-cache';
 import { buildCronSessionHistoryPath, isCronSessionKey } from './chat/cron-session-utils';
 import {
+  beginSessionLabelHydration,
   finishSessionLabelHydration,
+  getSessionLabelHydrationCandidate,
   getSessionLabelHydrationVersion,
   clearSessionLabelHydrationTracking,
 } from './chat/session-label-hydration';
@@ -1762,24 +1764,70 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     _loadSessionsInFlight = (async () => {
-      const loadStartedAt = Date.now();
       try {
+        async function hydrateSessionLabels(sessionsToHydrate: ChatSession[]) {
+          const { sessionLabels, sessionLastActivity } = get();
+          const candidates = sessionsToHydrate
+            .map((session) => getSessionLabelHydrationCandidate(session, sessionLabels, sessionLastActivity))
+            .filter((candidate): candidate is { sessionKey: string; version: string } => candidate !== null);
+          const eligible = candidates.filter((candidate) =>
+            beginSessionLabelHydration(candidate.sessionKey, candidate.version),
+          );
+          if (eligible.length === 0) return;
+
+          try {
+            const result = await hostApiFetch<{
+              success?: boolean;
+              summaries: Array<{ sessionKey: string; firstUserText: string | null; lastTimestamp: number | null }>;
+            }>('/api/sessions/summaries', {
+              method: 'POST',
+              body: JSON.stringify({ sessionKeys: eligible.map((candidate) => candidate.sessionKey) }),
+            });
+            if (!result?.success || !Array.isArray(result.summaries)) {
+              eligible.forEach((candidate) =>
+                finishSessionLabelHydration(candidate.sessionKey, candidate.version, 'error'),
+              );
+              return;
+            }
+            const summariesByKey = new Map(result.summaries.map((summary) => [summary.sessionKey, summary]));
+            set((state) => {
+              const nextLabels = { ...state.sessionLabels };
+              const nextActivity = { ...state.sessionLastActivity };
+              for (const candidate of eligible) {
+                const summary = summariesByKey.get(candidate.sessionKey);
+                const text = summary?.firstUserText?.trim();
+                if (text) {
+                  nextLabels[candidate.sessionKey] = text;
+                  if (summary?.lastTimestamp != null) {
+                    nextActivity[candidate.sessionKey] = summary.lastTimestamp;
+                  }
+                  finishSessionLabelHydration(candidate.sessionKey, candidate.version, 'labeled');
+                } else {
+                  finishSessionLabelHydration(candidate.sessionKey, candidate.version, 'empty');
+                }
+              }
+              return { sessionLabels: nextLabels, sessionLastActivity: nextActivity };
+            });
+          } catch (err) {
+            console.warn('[hydrateSessionLabels] failed:', err);
+            eligible.forEach((candidate) =>
+              finishSessionLabelHydration(candidate.sessionKey, candidate.version, 'error'),
+            );
+          }
+        }
         let sessions: ChatSession[] = [];
         let usedHostApi = false;
 
         // Try fast host API first (parallel disk scan, no gateway RPC)
         try {
-          const hostApiStartedAt = Date.now();
           sessions = await fetchSessionsViaHostApi();
           usedHostApi = true;
-          console.log(`[loadSessions] Host API success: ${sessions.length} sessions in ${Date.now() - hostApiStartedAt}ms`);
         } catch (hostErr) {
           console.warn('[loadSessions] host API failed, falling back to RPC:', hostErr);
         }
 
         // Fallback to gateway RPC if host API failed or returned empty
         if (!usedHostApi || sessions.length === 0) {
-          const rpcStartedAt = Date.now();
           const data = await useGatewayStore.getState().rpc<Record<string, unknown>>('sessions.list', {});
           const rawSessions = data && Array.isArray(data.sessions) ? data.sessions : [];
           sessions = rawSessions.map((s: Record<string, unknown>) => ({
@@ -1791,10 +1839,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             model: s.model ? String(s.model) : undefined,
             updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
           })).filter((s: ChatSession) => s.key);
-          console.log(`[loadSessions] RPC fallback: ${sessions.length} sessions in ${Date.now() - rpcStartedAt}ms`);
         }
-
-        console.log(`[loadSessions] total=${Date.now() - loadStartedAt}ms usedHostApi=${usedHostApi} sessions=${sessions.length}`);
 
         const canonicalBySuffix = new Map<string, string>();
         for (const session of sessions) {
@@ -1855,6 +1900,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...discoveredActivity,
           },
         }));
+
+        await hydrateSessionLabels(sessionsWithCurrent);
 
         // Restore rwWorkDir from AGENTS.md marker for current agent
         const agentId = getAgentIdFromSessionKey(nextSessionKey);
@@ -2129,10 +2176,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Safety guard: if history loading takes too long, force loading to false
     // to prevent the UI from being stuck in a spinner forever.
     let loadingTimedOut = false;
-    const loadingSafetyTimer = quiet ? null : setTimeout(() => {
+    const loadingSafetyTimer = (!quiet && isInitialForegroundLoad) ? setTimeout(() => {
       loadingTimedOut = true;
       set({ loading: false });
-    }, getHistoryLoadingSafetyTimeout(isInitialForegroundLoad));
+    }, getHistoryLoadingSafetyTimeout(isInitialForegroundLoad)) : null;
 
     const loadPromise = (async () => {
       const isCurrentSession = () => get().currentSessionKey === currentSessionKey;
@@ -2199,6 +2246,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
           finalMessages = [...enrichedMessages, optimistic];
         }
       }
+
+      // Fallback: if the completion refresh already cleared send state but
+      // chat.history has not yet persisted the user turn, keep the trailing
+      // optimistic user message so it does not flash out. This only applies
+      // when the loaded batch contains no confirmable user echo.
+      if (finalMessages.length === 0) {
+        const trailingUser = [...get().messages].reverse().find(
+          (message) => message.role === 'user',
+        );
+        if (trailingUser) {
+          const echoed = enrichedMessages.some((message) =>
+            message.role === 'user'
+            && normalizeComparableUserText(message.content) === normalizeComparableUserText(trailingUser.content),
+          );
+          if (!echoed) {
+            finalMessages = [...enrichedMessages, trailingUser];
+          }
+        }
+      }
+
       finalMessages = dropRedundantOptimisticUserMessages(currentSessionKey, finalMessages);
 
       const { pendingFinal, lastUserMessageAt, sending: isSendingNow } = get();
@@ -2353,7 +2420,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return true;
       };
 
-      const historyLoadStartedAt = Date.now();
       try {
         let rawMessages: RawMessage[] = [];
         let thinkingLevel: string | null = null;
@@ -2362,12 +2428,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Try fast host API first (reads disk directly, no gateway RPC)
         try {
-          const hostApiStartedAt = Date.now();
           const hostResult = await fetchHistoryViaHostApi(currentSessionKey, INITIAL_HISTORY_LIMIT);
           rawMessages = hostResult.messages;
           hostApiTotalMessages = hostResult.totalMessages;
           usedHostApi = true;
-          console.log(`[loadHistory] Host API success: ${rawMessages.length}/${hostResult.totalMessages} msgs in ${Date.now() - hostApiStartedAt}ms`);
         } catch (hostErr) {
           console.warn('[loadHistory] host API failed, falling back to RPC:', hostErr);
         }
@@ -2383,13 +2447,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
 
             try {
-              const rpcStartedAt = Date.now();
               data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
                 'chat.history',
                 { sessionKey: currentSessionKey, limit: INITIAL_HISTORY_LIMIT },
                 historyTimeoutOverride,
               );
-              console.log(`[loadHistory] RPC success: attempt=${attempt} in ${Date.now() - rpcStartedAt}ms`);
               lastError = null;
               break;
             } catch (error) {
@@ -2446,8 +2508,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
           rawMessages = await loadCronFallbackMessages(currentSessionKey, INITIAL_HISTORY_LIMIT);
         }
 
-        console.log(`[loadHistory] total=${Date.now() - historyLoadStartedAt}ms usedHostApi=${usedHostApi} msgs=${rawMessages.length}`);
-
         if (rawMessages.length > 0 || !get().error) {
           const applied = applyLoadedMessages(rawMessages, thinkingLevel, hostApiTotalMessages);
           if (applied && isInitialForegroundLoad) {
@@ -2478,7 +2538,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Only update load time if we actually didn't time out
         _lastHistoryLoadAtBySession.set(currentSessionKey, Date.now());
       }
-      
+
       const active = _historyLoadInFlight.get(currentSessionKey);
       if (active === loadPromise) {
         _historyLoadInFlight.delete(currentSessionKey);
@@ -2698,10 +2758,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const idempotencyKey = crypto.randomUUID();
       const hasMedia = attachments && attachments.length > 0;
-      if (hasMedia) {
-        console.log('[sendMessage] Media paths:', attachments!.map(a => a.stagedPath));
-      }
-
       // Cache image attachments BEFORE the IPC call to avoid race condition:
       // history may reload (via Gateway event) before the RPC returns.
       // Keyed by staged file path which appears in [media attached: <path> ...].
@@ -2754,8 +2810,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         );
         result = { success: true, result: rpcResult };
       }
-
-      console.log(`[sendMessage] RPC result: success=${result.success}, runId=${result.result?.runId || 'none'}`);
 
       if (!result.success) {
         const errorMsg = result.error || 'Failed to send message';
@@ -3053,6 +3107,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // tool-use turns (thinking + tool blocks) from the Gateway's authoritative record.
           if (hasOutput && !toolOnly) {
             clearHistoryPoll();
+            forceNextHistoryLoad(get().currentSessionKey);
             void get().loadHistory(true);
 
             // OpenClaw's gateway processes `MEDIA:/path` markers in the
