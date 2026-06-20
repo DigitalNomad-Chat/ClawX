@@ -19,9 +19,8 @@ export function MainLayout() {
       data-testid="main-layout"
       data-platform={platform}
       className={cn(
-        'flex h-screen overflow-hidden theme-niceai',
+        'flex h-screen flex-col overflow-hidden theme-niceai',
         isWin ? 'bg-surface-sidebar' : 'bg-background',
-        isMac ? 'flex-row' : 'flex-col',
       )}
     >
       <TitleBar />
@@ -32,7 +31,7 @@ export function MainLayout() {
           data-testid="main-content"
           className={cn(
             'relative min-h-0 flex-1 overflow-auto rounded-tl-2xl border-l border-border/60 bg-background',
-            !isWin && 'border-t border-border/60',
+            !isWin && !isMac && 'border-t border-border/60',
             !isGoClawRoute && 'p-6',
           )}
         >

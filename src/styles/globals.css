@@ -129,6 +129,18 @@
   .sidebar-nav-text.sidebar-nav-text {
     @apply text-sm font-normal leading-4;
   }
+
+  /* Frameless Electron window drag region helpers.
+   * Must be defined in source CSS so they exist in dev HMR builds; the
+   * compiled dist bundle previously carried them, which is why packaged
+   * builds worked while `pnpm dev` did not. */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
 }
 
 /* ── Custom scrollbar ─────────────────────────────────────────── */

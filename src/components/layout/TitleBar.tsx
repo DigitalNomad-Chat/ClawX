@@ -2,7 +2,8 @@
  * TitleBar Component
  * macOS: empty drag region (native traffic lights handled by hiddenInset).
  * Windows: drag region with custom minimize/maximize/close controls; uses
- * `bg-surface-sidebar` so the frameless strip matches the sidebar rail.
+ * `bg-background` with a bottom border so the strip is visually separated
+ * from the sidebar rail (prevents the controls from merging into the logo).
  * Linux: use native window chrome (no custom title bar).
  */
 import { useState, useEffect } from 'react';
@@ -13,8 +14,9 @@ export function TitleBar() {
   const platform = window.electron?.platform;
 
   if (platform === 'darwin') {
-    // macOS traffic lights live inside the sidebar area; keep the shell left/right.
-    return null;
+    // macOS: a drag-region strip at the top. Native traffic lights (hiddenInset)
+    // sit inside this strip so they stay clear of the sidebar logo below.
+    return <div className="drag-region h-10 shrink-0 border-b border-border/60 bg-background" />;
   }
 
   // Linux keeps the native frame/title bar for better IME compatibility.
@@ -54,27 +56,28 @@ function WindowsTitleBar() {
   return (
     <div
       data-testid="windows-titlebar"
-      className="drag-region flex h-10 shrink-0 items-center justify-end bg-surface-sidebar"
+      className="drag-region flex h-10 shrink-0 items-center justify-end border-b border-border/60 bg-background"
+      onDoubleClick={handleMaximize}
     >
       {/* Right: Window Controls */}
       <div className="no-drag flex h-full">
         <button
           onClick={handleMinimize}
-          className="flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
+          className="no-drag flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
           title="Minimize"
         >
           <Minus className="h-4 w-4" />
         </button>
         <button
           onClick={handleMaximize}
-          className="flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
+          className="no-drag flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-accent transition-colors"
           title={maximized ? 'Restore' : 'Maximize'}
         >
           {maximized ? <Copy className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
         </button>
         <button
           onClick={handleClose}
-          className="flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-red-500 hover:text-white transition-colors"
+          className="no-drag flex h-full w-11 items-center justify-center text-muted-foreground hover:bg-red-500 hover:text-white transition-colors"
           title="Close"
         >
           <X className="h-4 w-4" />
