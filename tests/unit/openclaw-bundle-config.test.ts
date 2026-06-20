@@ -22,7 +22,6 @@ describe('openclaw bundle config', () => {
       'silk-wasm',
       'acpx',
       'playwright-core',
-      '@openclaw/codex',
       'qrcode-terminal',
     ]));
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as {

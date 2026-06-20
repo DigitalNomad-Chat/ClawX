@@ -781,7 +781,6 @@ describe('sanitizeOpenClawConfig', () => {
     expect(allow).toContain('custom-plugin');
     expect(allow).toContain('browser');
     expect(allow).toContain('memory-core');
-    expect(allow).toContain('codex');
     expect(allow).toContain('alibaba');
     expect(allow).not.toContain('groq');
     expect(allow).toContain('openrouter');

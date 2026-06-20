@@ -63,7 +63,7 @@ async function sanitizeConfig(
     'qqbot',
   ]);
   const BUNDLED_ALLOWLIST_PRESERVE_IDS = new Set(
-    bundledPlugins?.preserveIds ?? ['browser', 'acpx', 'memory-core', 'codex'],
+    bundledPlugins?.preserveIds ?? ['browser', 'acpx', 'memory-core'],
   );
 
   /** Non-throwing async existence check. */
@@ -866,7 +866,7 @@ describe('sanitizeOpenClawConfig (blocklist approach)', () => {
     const result = await readConfig();
     const plugins = result.plugins as Record<string, unknown>;
     const allow = plugins.allow as string[];
-    expect(allow).toEqual(expect.arrayContaining(['customPlugin', 'browser', 'acpx', 'memory-core', 'codex']));
+    expect(allow).toEqual(expect.arrayContaining(['customPlugin', 'browser', 'acpx', 'memory-core']));
     expect(allow).not.toContain('openai');
     expect(allow).not.toContain('anthropic');
     expect(allow).not.toContain('diffs');

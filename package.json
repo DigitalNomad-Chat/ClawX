@@ -1,8 +1,8 @@
 {
     "name": "clawdock",
-    "version": "0.4.2-beta.2",
-    "upstream": "ValueCell-ai/ClawX@v0.4.4",
-    "mergeDate": "2026-06-18",
+    "version": "0.4.6",
+    "upstream": "ValueCell-ai/ClawX@v0.4.6",
+    "mergeDate": "2026-06-20",
     "mergeBase": "c1ba38c71b659a93c57262205ba7a1f4969c6145",
     "pnpm": {
         "onlyBuiltDependencies": [
@@ -39,6 +39,7 @@
         "native:build:dev": "cd native && node-gyp rebuild --debug",
         "obfuscate": "node scripts/obfuscate-main.mjs && node scripts/obfuscate-renderer.mjs",
         "generate-integrity": "node scripts/generate-integrity.mjs",
+        "patch-nsis-extract": "node scripts/patch-nsis-extract.mjs",
         "init": "pnpm install && pnpm run uv:download",
         "predev": "node scripts/generate-ext-bridge.mjs && zx scripts/prepare-preinstalled-skills-dev.mjs",
         "dev": "vite",
@@ -72,7 +73,7 @@
         "package": "node scripts/generate-ext-bridge.mjs && pnpm run build:vite && zx scripts/bundle-openclaw.mjs && zx scripts/bundle-openclaw-plugins.mjs && zx scripts/bundle-preinstalled-skills.mjs",
         "package:mac": "pnpm run package && node scripts/run-electron-builder.mjs --mac --publish never",
         "package:mac:local": "SKIP_PREINSTALLED_SKILLS=1 pnpm run package && node scripts/run-electron-builder.mjs --mac --publish never",
-        "package:win": "pnpm run prep:win-binaries && pnpm run package && node scripts/run-electron-builder.mjs --win --publish never",
+        "package:win": "pnpm run prep:win-binaries && pnpm run patch-nsis-extract && pnpm run package && node scripts/run-electron-builder.mjs --win --publish never",
         "package:linux": "pnpm run package && node scripts/run-electron-builder.mjs --linux --publish never",
         "release": "pnpm run uv:download && pnpm run package && node scripts/run-electron-builder.mjs --publish always",
         "preversion": "node scripts/pre-version-fetch-tags.mjs",
@@ -127,7 +128,6 @@
         "@larksuite/openclaw-lark": "2026.5.12",
         "@larksuiteoapi/node-sdk": "^1.61.1",
         "@monaco-editor/react": "^4.7.0",
-        "@openclaw/codex": "2026.5.12",
         "@openclaw/discord": "2026.5.12",
         "@openclaw/qqbot": "2026.5.12",
         "@openclaw/whatsapp": "2026.5.12",

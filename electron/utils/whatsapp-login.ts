@@ -40,21 +40,38 @@ function resolveOpenClawPackageJson(packageName: string): string {
     }
 }
 
-const baileysPath = dirname(resolveOpenClawPackageJson('@whiskeysockets/baileys'));
+let _baileysPath: string | null = null;
 
-// Load Baileys dependencies dynamically
-const {
-    default: makeWASocket,
-    useMultiFileAuthState: initAuth, // Rename to avoid React hook linter error
-    DisconnectReason,
-    fetchLatestBaileysVersion
-} = require(baileysPath);
+/** Lazily resolve the @whiskeysockets/baileys package path on first use. */
+function getBaileysPath(): string {
+    if (!_baileysPath) {
+        _baileysPath = dirname(resolveOpenClawPackageJson('@whiskeysockets/baileys'));
+    }
+    return _baileysPath;
+}
+
+type BaileysSocket = ReturnType<typeof makeWASocket>;
+
+// Load Baileys dependencies dynamically on first use so a missing packaged
+// dependency does not crash app startup.
+let baileysModule: {
+    default: typeof makeWASocket;
+    useMultiFileAuthState: typeof initAuth;
+    DisconnectReason: { loggedOut: number };
+    fetchLatestBaileysVersion: () => Promise<{ version: unknown }>;
+} | null = null;
+
+function loadBaileys() {
+    if (baileysModule) return baileysModule;
+    const baileysPath = getBaileysPath();
+    baileysModule = require(baileysPath);
+    return baileysModule;
+}
 
 // Types from Baileys (approximate since we don't have types for dynamic require)
 interface BaileysError extends Error {
     output?: { statusCode?: number };
 }
-type BaileysSocket = ReturnType<typeof makeWASocket>;
 type ConnectionState = {
     connection: 'close' | 'open' | 'connecting';
     lastDisconnect?: {
@@ -273,6 +290,8 @@ export class WhatsAppLoginManager extends EventEmitter {
         if (!this.active) return;
 
         try {
+            const { default: makeWASocket, useMultiFileAuthState: initAuth, DisconnectReason, fetchLatestBaileysVersion } = loadBaileys();
+
             // Path where OpenClaw expects WhatsApp credentials
             const authDir = join(homedir(), '.openclaw', 'credentials', 'whatsapp', accountId);
 
@@ -287,7 +306,7 @@ export class WhatsAppLoginManager extends EventEmitter {
             let pino: (...args: unknown[]) => Record<string, unknown>;
             try {
                 // Try to resolve pino from baileys context since it's a dependency of baileys
-                const baileysRequire = createRequire(join(baileysPath, 'package.json'));
+                const baileysRequire = createRequire(join(getBaileysPath(), 'package.json'));
                 pino = baileysRequire('pino');
             } catch (e) {
                 console.warn('[WhatsAppLogin] Could not load pino from baileys, trying root', e);
