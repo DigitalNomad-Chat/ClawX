@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRunSegmentMessageIndices } from '@/pages/Chat/task-visualization';
+import { buildRunSegmentMessageIndices, segmentHasFinalReply } from '@/pages/Chat/task-visualization';
 import type { RawMessage } from '@/stores/chat';
 
 describe('buildRunSegmentMessageIndices', () => {
@@ -45,5 +45,24 @@ describe('buildRunSegmentMessageIndices', () => {
     expect(indices.has(1)).toBe(true);
     expect(indices.has(3)).toBe(true);
     expect(indices.has(2)).toBe(false);
+  });
+});
+
+describe('segmentHasFinalReply', () => {
+  it('returns true when a text reply follows all tool calls', () => {
+    const segment: RawMessage[] = [
+      { role: 'assistant', content: [{ type: 'text', text: 'Working on it.' }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'exec', input: {} }] },
+      { role: 'assistant', content: [{ type: 'text', text: '执行完成 ✅' }] },
+    ];
+    expect(segmentHasFinalReply(segment)).toBe(true);
+  });
+
+  it('returns false for narration before tools while the chain is still open', () => {
+    const segment: RawMessage[] = [
+      { role: 'assistant', content: [{ type: 'text', text: 'Let me fetch that.' }] },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'exec', input: {} }] },
+    ];
+    expect(segmentHasFinalReply(segment)).toBe(false);
   });
 });

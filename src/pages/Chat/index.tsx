@@ -20,7 +20,7 @@ import { ChatInput } from './ChatInput';
 import { ExecutionGraphCard } from './ExecutionGraphCard';
 import { ChatToolbar } from './ChatToolbar';
 import { extractImages, extractText, extractThinking, extractToolUse, normalizeMessageRole, stripProcessMessagePrefix } from './message-utils';
-import { buildRunSegmentMessageIndices, deriveTaskSteps, findReplyMessageIndex, getRunSegmentMessages, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
+import { buildRunSegmentMessageIndices, deriveTaskSteps, findReplyMessageIndex, getRunSegmentMessages, getPostTriggerSegmentMessages, segmentHasFinalReply, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useMinLoading } from '@/hooks/use-min-loading';
@@ -389,14 +389,17 @@ export function Chat() {
   const isEmpty = messages.length === 0 && !sending;
   const subagentCompletionInfos = messages.map((message) => parseSubagentCompletionInfo(message));
   // Build an index of the *next* real user message after each position.
-  const nextUserMessageIndexes = new Array<number>(messages.length).fill(-1);
-  let nextUserMessageIndex = -1;
-  for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
-    nextUserMessageIndexes[idx] = nextUserMessageIndex;
-    if (isRealUserMessage(messages[idx]) && !subagentCompletionInfos[idx]) {
-      nextUserMessageIndex = idx;
+  const nextUserMessageIndexes = useMemo(() => {
+    const indexes = new Array<number>(messages.length).fill(-1);
+    let nextUserMessageIndex = -1;
+    for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
+      indexes[idx] = nextUserMessageIndex;
+      if (isRealUserMessage(messages[idx]) && !subagentCompletionInfos[idx]) {
+        nextUserMessageIndex = idx;
+      }
     }
-  }
+    return indexes;
+  }, [messages, subagentCompletionInfos]);
 
   const isRunTrigger = useCallback(
     (message: RawMessage, index: number) => isRealUserMessage(message) && !subagentCompletionInfos[index],
@@ -435,30 +438,7 @@ export function Chat() {
     const hasToolActivity = segmentMessages.some((m) =>
       m.role === 'assistant' && extractToolUse(m).length > 0,
     );
-    // Locate the last tool-use message so we only count text messages that
-    // come AFTER all tool calls as "final reply".  Intermediate narration
-    // messages (pure text, no tool_use) sit BEFORE tool calls and must not
-    // be misread as the concluding reply — otherwise `runStillExecutingTools`
-    // flips to false between tool rounds, collapsing the trailing
-    // "Thinking..." indicator during the brief gap before the next stream chunk.
-    let lastToolUseOffset = -1;
-    for (let i = segmentMessages.length - 1; i >= 0; i -= 1) {
-      const m = segmentMessages[i];
-      if (m.role === 'assistant' && extractToolUse(m).length > 0) {
-        lastToolUseOffset = i;
-        break;
-      }
-    }
-    const hasFinalReply = segmentMessages.some((m, i) => {
-      if (i <= lastToolUseOffset) return false;
-      if (m.role !== 'assistant') return false;
-      if (extractText(m).trim().length === 0) return false;
-      const content = m.content;
-      if (!Array.isArray(content)) return true;
-      return !(content as Array<{ type?: string }>).some(
-        (b) => b.type === 'tool_use' || b.type === 'toolCall',
-      );
-    });
+    const hasFinalReply = segmentHasFinalReply(segmentMessages);
     const runStillExecutingTools = hasToolActivity && !hasFinalReply;
     // runStillExecutingTools bridges the brief gap between tool rounds when
     // Gateway temporarily clears sending.  However, after an explicit abort
@@ -467,9 +447,18 @@ export function Chat() {
     // terminal model error has been surfaced so the run doesn't appear active.
     // userAbortedRun provides an additional safety net for abort detection.
     const isLatestRunSegment = nextUserIndex === -1;
+    // History may already contain the final answer while lifecycle flags are
+    // still armed (missing Gateway terminal phase, blocked chat.send RPC, etc.).
+    // Treat the run as closed for graph/input UI when the transcript is done
+    // and nothing is actively streaming. Require prior tool activity so an early
+    // narration-only history snapshot does not collapse the graph mid-chain.
+    const runCompletedInHistory = hasFinalReply
+      && !hasAnyStreamContent
+      && (hasToolActivity || !sending);
     const isLatestOpenRun = isLatestRunSegment
       && !runError
       && !userAbortedRun
+      && !runCompletedInHistory
       && (sending || pendingFinal || hasAnyStreamContent || (runStillExecutingTools && !!activeRunId));
     const replyIndexOffset = findReplyMessageIndex(segmentMessages, isLatestOpenRun);
     const replyIndex = replyIndexOffset === -1 ? null : idx + 1 + replyIndexOffset;
@@ -667,6 +656,23 @@ export function Chat() {
     return { userRunCards, foldedNarrationIndices };
   }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError, isRunTrigger]);
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
+  let latestRunSegmentCompletion = { hasFinalReply: false, hasToolActivity: false };
+  for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
+    if (!isRealUserMessage(messages[idx]) || subagentCompletionInfos[idx]) continue;
+    const nextUserIndex = nextUserMessageIndexes[idx];
+    const postTrigger = getPostTriggerSegmentMessages(messages, idx, nextUserIndex);
+    latestRunSegmentCompletion = {
+      hasFinalReply: segmentHasFinalReply(postTrigger),
+      hasToolActivity: postTrigger.some((m) =>
+        m.role === 'assistant' && extractToolUse(m).length > 0,
+      ),
+    };
+    break;
+  }
+  const runSettledInHistory = latestRunSegmentCompletion.hasFinalReply
+    && !hasAnyStreamContent
+    && (latestRunSegmentCompletion.hasToolActivity || !sending);
+  const inputRunActive = (sending || hasActiveExecutionGraph) && !runSettledInHistory;
   const replyTextOverrides = useMemo(() => {
     const map = new Map<number, string>();
     for (const card of userRunCards) {
@@ -868,11 +874,24 @@ export function Chat() {
     }
   }, [userRunCards, messages, currentSessionKey]);
 
+  const platform = window.electron?.platform;
+  const isMac = platform === 'darwin';
+  const isWindows = platform === 'win32';
+
   return (
     <div
       ref={splitContainerRef}
-      className={cn('relative flex min-h-0 -m-6 transition-colors duration-500 dark:bg-background')}
-      style={{ height: 'calc(100vh - 2.5rem)' }}
+      data-testid="chat-page"
+      className={cn(
+        'relative flex min-h-0 -m-6 overflow-hidden transition-colors duration-500',
+        'bg-background',
+        // Stack above MainLayout's mac-main-drag-region (z-10) so the right-hand
+        // artifact/preview pane stays clickable; window drag is handled by the
+        // sidebar + chat-toolbar drag strips instead.
+        isMac && 'z-20 rounded-tl-2xl shadow-[inset_1px_1px_0_hsl(var(--border)/0.55)]',
+        isWindows && 'rounded-tl-2xl',
+      )}
+      style={{ height: isMac ? '100vh' : 'calc(100vh - 2.5rem)' }}
     >
       {/* Left column: chat */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -893,7 +912,7 @@ export function Chat() {
           )}
           {isEmpty ? (
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl space-y-4 transition-all duration-300">
+              <div className="mx-auto w-full max-w-3xl space-y-4">
                 <WelcomeScreen />
               </div>
             </div>
@@ -987,7 +1006,7 @@ export function Chat() {
                         type="button"
                         onClick={() => void loadMoreHistory()}
                         disabled={loadingMoreHistory || isLoadingMore}
-                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
                         data-testid="chat-load-more-history"
                       >
                         {(loadingMoreHistory || isLoadingMore) && (
@@ -1002,8 +1021,8 @@ export function Chat() {
                 },
                 Footer: () => {
                   const hasStreaming = shouldRenderStreaming && (streamingReplyText != null || !hasActiveExecutionGraph);
-                  const hasActivity = sending && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph;
-                  const hasTyping = sending && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph;
+                  const hasActivity = inputRunActive && pendingFinal && !shouldRenderStreaming && !hasActiveExecutionGraph;
+                  const hasTyping = inputRunActive && !pendingFinal && !hasAnyStreamContent && !hasActiveExecutionGraph;
                   if (!hasStreaming && !hasActivity && !hasTyping) return null;
                   return (
                     <div className="mx-auto max-w-4xl">
@@ -1095,8 +1114,7 @@ export function Chat() {
         onSend={handleSend}
         onStop={abortRun}
         disabled={!isGatewayRunning}
-        sending={sending || hasActiveExecutionGraph}
-        isEmpty={isEmpty}
+        sending={inputRunActive}
       />
       </div>
 
@@ -1107,7 +1125,11 @@ export function Chat() {
             <PanelResizeDividerLazy containerRef={splitContainerRef} />
           </Suspense>
           <aside
-            className="hidden shrink-0 border-l border-black/5 dark:border-white/10 lg:flex lg:flex-col"
+            data-testid="artifact-panel-aside"
+            className={cn(
+              'relative z-20 hidden shrink-0 border-l border-black/5 dark:border-white/10 lg:flex lg:flex-col',
+              isMac && 'no-drag',
+            )}
             style={{ width: `${panelWidthPct}%` }}
           >
             <Suspense
@@ -1255,7 +1277,7 @@ function QuestionDirectory({ items }: { items: QuestionDirectoryItem[] }) {
 // ── Typing Indicator ────────────────────────────────────────────
 function TypingIndicator({ label }: { label?: string }) {
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3" data-testid="chat-typing-indicator">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
         <Sparkles className="h-4 w-4" />
       </div>
@@ -1278,7 +1300,7 @@ function TypingIndicator({ label }: { label?: string }) {
 function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
   void phase;
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3" data-testid="chat-activity-indicator">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1 bg-primary/10 text-primary">
         <Sparkles className="h-4 w-4" />
       </div>

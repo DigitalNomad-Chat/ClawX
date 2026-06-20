@@ -26,6 +26,7 @@ import type { QuickAccessSkill } from '@/types/skill';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { rendererExtensionRegistry } from '@/extensions/registry';
+import { collectDroppedFiles } from '@/lib/collect-dropped-files';
 import { DesensitizePanel } from '@/components/desensitize/DesensitizePanel';
 import type { SensitiveMap } from '@/lib/desensitize';
 
@@ -47,10 +48,11 @@ interface ChatInputProps {
   onStop?: () => void;
   disabled?: boolean;
   sending?: boolean;
-  isEmpty?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
+
+const DIRECTORY_MIME_TYPE = 'application/x-directory';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -227,6 +229,7 @@ function renderHighlightedComposerText(
 }
 
 function FileIcon({ mimeType, className }: { mimeType: string; className?: string }) {
+  if (mimeType === DIRECTORY_MIME_TYPE) return <FolderOpen className={className} />;
   if (mimeType.startsWith('video/')) return <Film className={className} />;
   if (mimeType.startsWith('audio/')) return <Music className={className} />;
   if (mimeType.startsWith('text/') || mimeType === 'application/json' || mimeType === 'application/xml') return <FileText className={className} />;
@@ -261,7 +264,7 @@ function readFileAsBase64(file: globalThis.File): Promise<string> {
 
 // ── Component ────────────────────────────────────────────────────
 
-export function ChatInput({ onSend, onStop, disabled = false, sending = false, isEmpty = false }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, disabled = false, sending = false }: ChatInputProps) {
   const { t } = useTranslation('chat');
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -624,35 +627,29 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
     }
   }, [currentAgent, defaultModelRef, effectiveModelRef, switchingModelRef, t, updateAgentModel]);
 
-  // ── File staging via native dialog ─────────────────────────────
+  // ── File staging via native dialog / Electron drag-drop paths ──
 
-  const pickFiles = useCallback(async () => {
+  const stagePathFiles = useCallback(async (filePaths: string[]) => {
+    if (filePaths.length === 0) return;
+
+    const tempIds: string[] = [];
+    for (const filePath of filePaths) {
+      const tempId = crypto.randomUUID();
+      tempIds.push(tempId);
+      const fileName = filePath.split(/[\\/]/).pop() || 'file';
+      setAttachments(prev => [...prev, {
+        id: tempId,
+        fileName,
+        mimeType: '',
+        fileSize: 0,
+        stagedPath: '',
+        preview: null,
+        status: 'staging' as const,
+      }]);
+    }
+
     try {
-      const result = await invokeIpc('dialog:open', {
-        properties: ['openFile', 'multiSelections'],
-      }) as { canceled: boolean; filePaths?: string[] };
-      if (result.canceled || !result.filePaths?.length) return;
-
-      // Add placeholder entries immediately
-      const tempIds: string[] = [];
-      for (const filePath of result.filePaths) {
-        const tempId = crypto.randomUUID();
-        tempIds.push(tempId);
-        // Handle both Unix (/) and Windows (\) path separators
-        const fileName = filePath.split(/[\\/]/).pop() || 'file';
-        setAttachments(prev => [...prev, {
-          id: tempId,
-          fileName,
-          mimeType: '',
-          fileSize: 0,
-          stagedPath: '',
-          preview: null,
-          status: 'staging' as const,
-        }]);
-      }
-
-      // Stage all files via IPC
-      console.log('[pickFiles] Staging files:', result.filePaths);
+      console.log('[stagePathFiles] Staging files:', filePaths);
       const staged = await hostApiFetch<Array<{
         id: string;
         fileName: string;
@@ -662,11 +659,10 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
         preview: string | null;
       }>>('/api/files/stage-paths', {
         method: 'POST',
-        body: JSON.stringify({ filePaths: result.filePaths }),
+        body: JSON.stringify({ filePaths }),
       });
-      console.log('[pickFiles] Stage result:', staged?.map(s => ({ id: s?.id, fileName: s?.fileName, mimeType: s?.mimeType, fileSize: s?.fileSize, stagedPath: s?.stagedPath, hasPreview: !!s?.preview })));
+      console.log('[stagePathFiles] Stage result:', staged?.map(s => ({ id: s?.id, fileName: s?.fileName, mimeType: s?.mimeType, fileSize: s?.fileSize, stagedPath: s?.stagedPath, hasPreview: !!s?.preview })));
 
-      // Update each placeholder with real data
       setAttachments(prev => {
         let updated = [...prev];
         for (let i = 0; i < tempIds.length; i++) {
@@ -679,7 +675,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
                 : a,
             );
           } else {
-            console.warn(`[pickFiles] No staged data for tempId=${tempId} at index ${i}`);
+            console.warn(`[stagePathFiles] No staged data for tempId=${tempId} at index ${i}`);
             updated = updated.map(a =>
               a.id === tempId
                 ? { ...a, status: 'error' as const, error: 'Staging failed' }
@@ -690,9 +686,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
         return updated;
       });
     } catch (err) {
-      console.error('[pickFiles] Failed to stage files:', err);
-      // Mark any stuck 'staging' attachments as 'error' so the user can remove them
-      // and the send button isn't permanently blocked
+      console.error('[stagePathFiles] Failed to stage files:', err);
       setAttachments(prev => prev.map(a =>
         a.status === 'staging'
           ? { ...a, status: 'error' as const, error: String(err) }
@@ -700,6 +694,18 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       ));
     }
   }, []);
+
+  const pickFiles = useCallback(async () => {
+    try {
+      const result = await invokeIpc('dialog:open', {
+        properties: ['openFile', 'multiSelections'],
+      }) as { canceled: boolean; filePaths?: string[] };
+      if (result.canceled || !result.filePaths?.length) return;
+      await stagePathFiles(result.filePaths);
+    } catch (err) {
+      console.error('[pickFiles] Failed to open file dialog:', err);
+    }
+  }, [stagePathFiles]);
 
   // ── Stage browser File objects (paste / drag-drop) ─────────────
 
@@ -997,18 +1003,23 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false, i
       e.preventDefault();
       e.stopPropagation();
       setDragOver(false);
-      if (e.dataTransfer?.files?.length) {
-        stageBufferFiles(Array.from(e.dataTransfer.files));
+      if (!e.dataTransfer) return;
+
+      const { pathFiles, bufferFiles } = collectDroppedFiles(e.dataTransfer);
+      if (pathFiles.length === 0 && bufferFiles.length === 0) {
+        toast.error(t('composer.folderDropUnsupported'));
+        return;
       }
+      if (pathFiles.length > 0) void stagePathFiles(pathFiles);
+      if (bufferFiles.length > 0) void stageBufferFiles(bufferFiles);
     },
-    [stageBufferFiles],
+    [stageBufferFiles, stagePathFiles, t],
   );
 
   return (
     <div
       className={cn(
-        "p-4 pb-6 w-full mx-auto transition-all duration-300",
-        isEmpty ? "max-w-3xl" : "max-w-4xl"
+        "p-4 pb-6 w-full mx-auto max-w-3xl"
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1693,6 +1704,7 @@ function AttachmentPreview({
   attachment: FileAttachment;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation('chat');
   const isImage = attachment.mimeType.startsWith('image/') && attachment.preview;
 
   return (
@@ -1713,7 +1725,11 @@ function AttachmentPreview({
           <div className="min-w-0 overflow-hidden">
             <p className="text-xs font-medium truncate">{attachment.fileName}</p>
             <p className="text-2xs text-muted-foreground">
-              {attachment.fileSize > 0 ? formatFileSize(attachment.fileSize) : '...'}
+              {attachment.mimeType === DIRECTORY_MIME_TYPE
+                ? t('composer.folderAttachment')
+                : attachment.fileSize > 0
+                  ? formatFileSize(attachment.fileSize)
+                  : '...'}
             </p>
           </div>
         </div>

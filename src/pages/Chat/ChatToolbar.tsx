@@ -67,7 +67,7 @@ export function ChatToolbar({
                 size="icon"
                 className={cn(
                   'h-8 w-8 rounded-lg transition-all duration-200',
-                  'hover:bg-foreground/6 dark:hover:bg-white/8',
+                  'hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
                   browserActive && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                 )}
                 onClick={() => (browserActive ? closePanel() : openBrowser())}
@@ -113,7 +113,7 @@ export function ChatToolbar({
               size="icon"
               className={cn(
                 'h-8 w-8 rounded-lg transition-all duration-200',
-                'hover:bg-foreground/6 dark:hover:bg-white/8',
+                'hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
                 questionDirectoryOpen && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
               )}
               onClick={onToggleQuestionDirectory}
@@ -134,7 +134,7 @@ export function ChatToolbar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-foreground/6 dark:hover:bg-white/8"
+              className="h-8 w-8 rounded-lg transition-all duration-200 hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
               onClick={() => refresh()}
               disabled={loading}
               aria-label={t('toolbar.refresh')}

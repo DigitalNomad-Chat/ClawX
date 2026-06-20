@@ -137,6 +137,16 @@ describe('Chat artifact panel layout', () => {
     expect(aside).toBeInTheDocument();
     expect(aside).toHaveClass('lg:flex');
     expect(aside).toHaveClass('border-l');
+    expect(aside).toHaveClass('no-drag');
     expect(aside).toHaveStyle({ width: '34%' });
+  });
+
+  it('stacks the chat page above the macOS main drag strip', async () => {
+    window.electron.platform = 'darwin';
+
+    render(<Chat />);
+
+    const chatPage = await screen.findByTestId('chat-page');
+    expect(chatPage).toHaveClass('z-20');
   });
 });

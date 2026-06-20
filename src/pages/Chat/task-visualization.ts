@@ -104,6 +104,46 @@ export function getRunSegmentMessages(
   return [...orphans, ...core];
 }
 
+/**
+ * Messages strictly after the triggering user turn up to the next user.
+ * Use this for run lifecycle (final reply detection, reply index, open-run
+ * state) — never count paginated orphan assistants from a prior turn.
+ */
+export function getPostTriggerSegmentMessages(
+  messages: RawMessage[],
+  triggerIndex: number,
+  nextUserIndex: number,
+): RawMessage[] {
+  const segmentEnd = nextUserIndex === -1 ? messages.length : nextUserIndex;
+  return messages.slice(triggerIndex + 1, segmentEnd);
+}
+
+/**
+ * True when a run segment already contains a conclusive assistant reply: the
+ * last assistant message with user-visible text that appears after all tool
+ * calls (if any). Intermediate narration before tools does not count.
+ */
+export function segmentHasFinalReply(segmentMessages: RawMessage[]): boolean {
+  let lastToolUseOffset = -1;
+  for (let i = segmentMessages.length - 1; i >= 0; i -= 1) {
+    const message = segmentMessages[i];
+    if (message.role === 'assistant' && extractToolUse(message).length > 0) {
+      lastToolUseOffset = i;
+      break;
+    }
+  }
+  return segmentMessages.some((message, index) => {
+    if (index <= lastToolUseOffset) return false;
+    if (message.role !== 'assistant') return false;
+    if (extractText(message).trim().length === 0) return false;
+    const content = message.content;
+    if (!Array.isArray(content)) return true;
+    return !(content as Array<{ type?: string }>).some(
+      (block) => block.type === 'tool_use' || block.type === 'toolCall',
+    );
+  });
+}
+
 interface DeriveTaskStepsInput {
   messages: RawMessage[];
   streamingMessage: unknown | null;
