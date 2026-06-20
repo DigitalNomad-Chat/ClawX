@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { HostApiContext } from '../context';
-import { sendJson } from '../route-utils';
+import { parseJsonBody, sendJson } from '../route-utils';
+import { runOpenClawDoctor, runOpenClawDoctorFix } from '../../utils/openclaw-doctor';
 export async function handleAppRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -30,6 +31,14 @@ export async function handleAppRoutes(
       path: null,
       installCommand: null,
     });
+    return true;
+  }
+
+  // OpenClaw doctor host API
+  if (url.pathname === '/api/app/openclaw-doctor' && req.method === 'POST') {
+    const body = await parseJsonBody<{ mode?: string }>(req);
+    const result = body.mode === 'fix' ? await runOpenClawDoctorFix() : await runOpenClawDoctor();
+    sendJson(res, 200, result);
     return true;
   }
 
