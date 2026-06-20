@@ -29,6 +29,8 @@ import {
 } from './provider-keys';
 import { normalizePiAiModelCost, type PiAiModelCostRates } from '../shared/pi-ai-model-cost';
 import { withConfigLock } from './config-mutex';
+import { PORTS } from './config';
+import { getSetting } from './store';
 import {
   OPENCLAW_API_PROTOCOLS,
   assertValidApiProtocol,
@@ -1485,6 +1487,31 @@ export const OPENAI_CODEX_OAUTH_PROVIDER_CONFIG = {
   api: 'openai-codex-responses' as const,
 };
 
+function applyOpenClawProviderAgentRuntimePinsToConfig(config: Record<string, unknown>): string[] {
+  const models = (config.models || {}) as Record<string, unknown>;
+  const providers = (models.providers || {}) as Record<string, unknown>;
+  const pinned: string[] = [];
+
+  for (const provider of Object.keys(OPENCLAW_PROVIDER_PINNED_AGENT_RUNTIME)) {
+    const entry = providers[provider];
+    if (!isPlainRecord(entry)) continue;
+    const before = entry.agentRuntime;
+    applyPinnedAgentRuntime(provider, entry);
+    const after = entry.agentRuntime;
+    if (before !== after) {
+      providers[provider] = entry;
+      pinned.push(provider);
+    }
+  }
+
+  if (pinned.length > 0) {
+    models.providers = providers;
+    config.models = models;
+  }
+
+  return pinned;
+}
+
 function applyPinnedAgentRuntime(
   provider: string,
   nextProvider: Record<string, unknown>,
@@ -1575,29 +1602,12 @@ function upsertOpenClawProviderEntry(
  * Returns the list of provider keys that received a runtime pin, for logging.
  */
 export async function ensureOpenClawProviderAgentRuntimePins(): Promise<string[]> {
-  const pinned: string[] = [];
+  let pinned: string[] = [];
   await withConfigLock(async () => {
     const config = await readOpenClawJson();
-    const models = (config.models || {}) as Record<string, unknown>;
-    const providers = (models.providers || {}) as Record<string, unknown>;
-    let modified = false;
+    pinned = applyOpenClawProviderAgentRuntimePinsToConfig(config);
 
-    for (const [provider, runtimeId] of Object.entries(OPENCLAW_PROVIDER_PINNED_AGENT_RUNTIME)) {
-      const entry = providers[provider];
-      if (!isPlainRecord(entry)) continue;
-      const existing = (entry as Record<string, unknown>).agentRuntime;
-      if (isPlainRecord(existing) && typeof existing.id === 'string' && existing.id.trim()) {
-        continue;
-      }
-      (entry as Record<string, unknown>).agentRuntime = { id: runtimeId };
-      providers[provider] = entry;
-      pinned.push(provider);
-      modified = true;
-    }
-
-    if (modified) {
-      models.providers = providers;
-      config.models = models;
+    if (pinned.length > 0) {
       await writeOpenClawJson(config);
     }
   });
@@ -1902,6 +1912,17 @@ export async function getOpenClawProvidersConfig(): Promise<{
 /**
  * Write the ClawDock gateway token into ~/.openclaw/openclaw.json.
  */
+function applyControlUiAllowedOrigins(controlUi: Record<string, unknown>, port: number): void {
+  const allowedOrigins = Array.isArray(controlUi.allowedOrigins)
+    ? (controlUi.allowedOrigins as unknown[]).filter((value): value is string => typeof value === 'string')
+    : [];
+  const next = new Set(allowedOrigins);
+  next.add('file://');
+  next.add(`http://127.0.0.1:${port}`);
+  next.add(`http://localhost:${port}`);
+  controlUi.allowedOrigins = [...next];
+}
+
 export async function syncGatewayTokenToConfig(token: string): Promise<void> {
   return withConfigLock(async () => {
     const config = await readOpenClawJson();
@@ -1918,23 +1939,13 @@ export async function syncGatewayTokenToConfig(token: string): Promise<void> {
         : {}
     ) as Record<string, unknown>;
 
-    auth.mode = 'token';
-    auth.token = token;
-    gateway.auth = auth;
-
-    // Packaged ClawDock loads the renderer from file://, so the gateway must allow
-    // that origin for the chat WebSocket handshake.
     const controlUi = (
       gateway.controlUi && typeof gateway.controlUi === 'object'
         ? { ...(gateway.controlUi as Record<string, unknown>) }
         : {}
     ) as Record<string, unknown>;
-    const allowedOrigins = Array.isArray(controlUi.allowedOrigins)
-      ? (controlUi.allowedOrigins as unknown[]).filter((value): value is string => typeof value === 'string')
-      : [];
-    if (!allowedOrigins.includes('file://')) {
-      controlUi.allowedOrigins = [...allowedOrigins, 'file://'];
-    }
+    const gatewayPort = (await getSetting('gatewayPort')) || PORTS.OPENCLAW_GATEWAY;
+    applyControlUiAllowedOrigins(controlUi, gatewayPort);
     gateway.controlUi = controlUi;
 
     if (!gateway.mode) gateway.mode = 'local';
@@ -1943,6 +1954,53 @@ export async function syncGatewayTokenToConfig(token: string): Promise<void> {
     await writeOpenClawJson(config);
     console.log('Synced gateway token to openclaw.json');
   });
+}
+
+/**
+ * Default web_fetch SSRF policy for fake-IP / transparent-proxy environments
+ * (e.g. Clash/Surge resolving public hostnames into 198.18.0.0/15). OpenClaw's
+ * web_fetch tool does not read browser.ssrfPolicy — it uses tools.web.fetch only.
+ */
+function ensureWebFetchSsrfPolicyInConfig(config: Record<string, unknown>): boolean {
+  const tools = (
+    config.tools && typeof config.tools === 'object'
+      ? { ...(config.tools as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>;
+  const web = (
+    tools.web && typeof tools.web === 'object'
+      ? { ...(tools.web as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>;
+  const fetch = (
+    web.fetch && typeof web.fetch === 'object'
+      ? { ...(web.fetch as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>;
+
+  const ssrfPolicy = (
+    fetch.ssrfPolicy && typeof fetch.ssrfPolicy === 'object'
+      ? { ...(fetch.ssrfPolicy as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>;
+
+  let changed = false;
+  if (ssrfPolicy.allowRfc2544BenchmarkRange === undefined) {
+    ssrfPolicy.allowRfc2544BenchmarkRange = true;
+    changed = true;
+  }
+  if (ssrfPolicy.allowIpv6UniqueLocalRange === undefined) {
+    ssrfPolicy.allowIpv6UniqueLocalRange = true;
+    changed = true;
+  }
+
+  if (!changed) return false;
+
+  fetch.ssrfPolicy = ssrfPolicy;
+  web.fetch = fetch;
+  tools.web = web;
+  config.tools = tools;
+  return true;
 }
 
 /**
@@ -1984,9 +2042,13 @@ export async function syncBrowserConfigToOpenClaw(): Promise<void> {
 
     if (!changed) return;
 
+    changed = ensureWebFetchSsrfPolicyInConfig(config) || changed;
+
+    if (!changed) return;
+
     config.browser = browser;
     await writeOpenClawJson(config);
-    console.log('Synced browser config to openclaw.json');
+    console.log('Synced browser and web_fetch config to openclaw.json');
   });
 }
 
@@ -2062,12 +2124,8 @@ export async function batchSyncConfigFields(token: string): Promise<void> {
         ? { ...(gateway.controlUi as Record<string, unknown>) }
         : {}
     ) as Record<string, unknown>;
-    const allowedOrigins = Array.isArray(controlUi.allowedOrigins)
-      ? (controlUi.allowedOrigins as unknown[]).filter((v): v is string => typeof v === 'string')
-      : [];
-    if (!allowedOrigins.includes('file://')) {
-      controlUi.allowedOrigins = [...allowedOrigins, 'file://'];
-    }
+    const gatewayPort = (await getSetting('gatewayPort')) || PORTS.OPENCLAW_GATEWAY;
+    applyControlUiAllowedOrigins(controlUi, gatewayPort);
     gateway.controlUi = controlUi;
     if (!gateway.mode) gateway.mode = 'local';
     config.gateway = gateway;
@@ -2102,6 +2160,18 @@ export async function batchSyncConfigFields(token: string): Promise<void> {
       modified = true;
     }
 
+    // ── web_fetch SSRF policy (fake-IP / transparent-proxy environments) ──
+    if (ensureWebFetchSsrfPolicyInConfig(config)) {
+      modified = true;
+    }
+
+    // ── Pin OpenAI provider runtimes before Gateway launch ──
+    const pinnedProviderRuntimes = applyOpenClawProviderAgentRuntimePinsToConfig(config);
+    if (pinnedProviderRuntimes.length > 0) {
+      modified = true;
+      console.log(`[batch-sync] Pinned embedded agent runtime for models.providers entries: ${pinnedProviderRuntimes.join(', ')}`);
+    }
+
     // ── Session idle minutes ──
     const session = (
       config.session && typeof config.session === 'object'
@@ -2120,7 +2190,7 @@ export async function batchSyncConfigFields(token: string): Promise<void> {
 
     if (modified) {
       await writeOpenClawJson(config);
-      console.log('Synced gateway token, browser config, and session idle to openclaw.json');
+      console.log('Synced gateway token, browser config, web_fetch SSRF policy, and session idle to openclaw.json');
     }
   });
 }
@@ -2447,6 +2517,13 @@ export async function sanitizeOpenClawConfig(): Promise<void> {
     // here before Gateway startup.
     if (healAnthropicMessagesMaxTokensInConfig(config)) {
       modified = true;
+    }
+
+    // ── Pin OpenAI provider runtimes before Gateway launch ──
+    const pinnedProviderRuntimes = applyOpenClawProviderAgentRuntimePinsToConfig(config);
+    if (pinnedProviderRuntimes.length > 0) {
+      modified = true;
+      console.log(`[sanitize] Pinned embedded agent runtime for models.providers entries: ${pinnedProviderRuntimes.join(', ')}`);
     }
 
     // ── plugins.entries.feishu cleanup ──────────────────────────────

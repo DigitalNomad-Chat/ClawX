@@ -2,11 +2,12 @@ import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { testHome, testUserData } = vi.hoisted(() => {
+const { testHome, testUserData, getSettingMock } = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
   return {
     testHome: `/tmp/clawdock-openclaw-auth-${suffix}`,
     testUserData: `/tmp/clawdock-openclaw-auth-user-data-${suffix}`,
+    getSettingMock: vi.fn(),
   };
 });
 
@@ -28,6 +29,10 @@ vi.mock('electron', () => ({
     getPath: () => testUserData,
     getVersion: () => '0.0.0-test',
   },
+}));
+
+vi.mock('@electron/utils/store', () => ({
+  getSetting: getSettingMock,
 }));
 
 vi.mock('@electron/utils/paths', async () => {
@@ -1818,5 +1823,190 @@ describe('anthropic-messages maxTokens', () => {
 
     expect(entry.maxTokens).toBe(MINIMAX_M27_MAX_TOKENS);
     expect(models[0]?.maxTokens).toBe(MINIMAX_M27_MAX_TOKENS);
+  });
+});
+
+describe('web_fetch SSRF policy', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('adds allowRfc2544BenchmarkRange and allowIpv6UniqueLocalRange via batchSyncConfigFields', async () => {
+    getSettingMock.mockImplementation(async (key: string) => {
+      if (key === 'gatewayToken') return 'test-token';
+      if (key === 'gatewayPort') return 18789;
+      return undefined;
+    });
+
+    await writeOpenClawJson({});
+
+    const { batchSyncConfigFields } = await import('@electron/utils/openclaw-auth');
+    await batchSyncConfigFields('test-token');
+
+    const result = await readOpenClawJson();
+    const tools = result.tools as Record<string, unknown>;
+    const web = tools.web as Record<string, unknown>;
+    const fetch = web.fetch as Record<string, unknown>;
+    const ssrfPolicy = fetch.ssrfPolicy as Record<string, unknown>;
+
+    expect(ssrfPolicy.allowRfc2544BenchmarkRange).toBe(true);
+    expect(ssrfPolicy.allowIpv6UniqueLocalRange).toBe(true);
+  });
+
+  it('does not overwrite existing web_fetch SSRF policy values', async () => {
+    getSettingMock.mockImplementation(async (key: string) => {
+      if (key === 'gatewayToken') return 'test-token';
+      if (key === 'gatewayPort') return 18789;
+      return undefined;
+    });
+
+    await writeOpenClawJson({
+      tools: {
+        web: {
+          fetch: {
+            ssrfPolicy: {
+              allowRfc2544BenchmarkRange: false,
+              allowIpv6UniqueLocalRange: false,
+            },
+          },
+        },
+      },
+    });
+
+    const { batchSyncConfigFields } = await import('@electron/utils/openclaw-auth');
+    await batchSyncConfigFields('test-token');
+
+    const result = await readOpenClawJson();
+    const tools = result.tools as Record<string, unknown>;
+    const web = tools.web as Record<string, unknown>;
+    const fetch = web.fetch as Record<string, unknown>;
+    const ssrfPolicy = fetch.ssrfPolicy as Record<string, unknown>;
+
+    expect(ssrfPolicy.allowRfc2544BenchmarkRange).toBe(false);
+    expect(ssrfPolicy.allowIpv6UniqueLocalRange).toBe(false);
+  });
+});
+
+describe('batchSyncConfigFields', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+    getSettingMock.mockReset();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('sets gateway auth token, controlUi allowedOrigins, browser config, SSRF policy, session idle, and OpenAI runtime pin in one write', async () => {
+    getSettingMock.mockImplementation(async (key: string) => {
+      if (key === 'gatewayToken') return 'test-token';
+      if (key === 'gatewayPort') return 19001;
+      return undefined;
+    });
+
+    await writeOpenClawJson({
+      models: {
+        providers: {
+          openai: {
+            baseUrl: 'https://api.openai.com/v1',
+            api: 'openai-responses',
+            models: [],
+          },
+        },
+      },
+    });
+
+    const { batchSyncConfigFields } = await import('@electron/utils/openclaw-auth');
+    await batchSyncConfigFields('test-token');
+
+    const result = await readOpenClawJson();
+
+    const gateway = result.gateway as Record<string, unknown>;
+    expect((gateway.auth as Record<string, unknown>).token).toBe('test-token');
+    const controlUi = gateway.controlUi as Record<string, unknown>;
+    expect(controlUi.allowedOrigins).toEqual(
+      expect.arrayContaining(['file://', 'http://127.0.0.1:19001', 'http://localhost:19001']),
+    );
+
+    const browser = result.browser as Record<string, unknown>;
+    expect(browser.enabled).toBe(true);
+    expect(browser.defaultProfile).toBe('openclaw');
+    expect((browser.ssrfPolicy as Record<string, unknown>).dangerouslyAllowPrivateNetwork).toBe(true);
+
+    const tools = result.tools as Record<string, unknown>;
+    const fetch = ((tools.web as Record<string, unknown>).fetch as Record<string, unknown>);
+    expect((fetch.ssrfPolicy as Record<string, unknown>).allowRfc2544BenchmarkRange).toBe(true);
+
+    const openai = ((result.models as Record<string, unknown>).providers as Record<string, unknown>).openai as Record<string, unknown>;
+    expect(openai.agentRuntime).toEqual({ id: 'pi' });
+
+    const session = result.session as Record<string, unknown>;
+    expect(session.idleMinutes).toBe(10_080);
+  });
+});
+
+describe('sanitizeOpenClawConfig OpenAI runtime pin', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('pins openai and openai-codex runtimes during sanitization', async () => {
+    await writeOpenClawJson({
+      models: {
+        providers: {
+          openai: {
+            baseUrl: 'https://api.openai.com/v1',
+            api: 'openai-responses',
+            models: [],
+          },
+          'openai-codex': {
+            baseUrl: 'https://api.openai.com/v1',
+            api: 'openai-codex-responses',
+            models: [],
+          },
+          'minimax-portal': {
+            baseUrl: 'https://api.minimax.io/anthropic',
+            api: 'anthropic-messages',
+            models: [],
+          },
+        },
+      },
+    });
+
+    const { sanitizeOpenClawConfig } = await import('@electron/utils/openclaw-auth');
+    await sanitizeOpenClawConfig();
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    expect((providers.openai as Record<string, unknown>).agentRuntime).toEqual({ id: 'pi' });
+    expect((providers['openai-codex'] as Record<string, unknown>).agentRuntime).toEqual({ id: 'pi' });
+    expect((providers['minimax-portal'] as Record<string, unknown>).agentRuntime).toBeUndefined();
+  });
+
+  it('preserves an existing user-configured agentRuntime.id during sanitization', async () => {
+    await writeOpenClawJson({
+      models: {
+        providers: {
+          openai: {
+            baseUrl: 'https://api.openai.com/v1',
+            api: 'openai-responses',
+            agentRuntime: { id: 'custom-harness' },
+            models: [],
+          },
+        },
+      },
+    });
+
+    const { sanitizeOpenClawConfig } = await import('@electron/utils/openclaw-auth');
+    await sanitizeOpenClawConfig();
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    expect((providers.openai as Record<string, unknown>).agentRuntime).toEqual({ id: 'custom-harness' });
   });
 });
