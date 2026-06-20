@@ -306,6 +306,11 @@ AI を開発ワークフローに統合できます。エージェントを使�
 
 - **Node.js**: 22以上（LTS推奨）
 - **パッケージマネージャー**: pnpm 9以上（推奨）またはnpm
+- **Linux（Ubuntu/Debian）**: Electron を実行する前に、必要なシステムライブラリをインストールしてください:
+  ```bash
+  sudo apt-get install -y libnss3 libgtk-3-0 libxss1 libxtst6 libatspi2.0-0 libnotify4 xdg-utils
+  ```
+  Ubuntu 24.04以降では、一部のパッケージに `t64` サフィックスが付いています。上記コマンドを実行すると `apt` が自動的に適切なバリアントを選択します。
 
 ### プロジェクト構成
 
