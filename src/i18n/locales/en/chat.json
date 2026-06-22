@@ -207,5 +207,10 @@
         "moreHint": "{{count}} more questions not shown"
     },
     "loadMoreHistory": "Load earlier messages",
-    "loadingMoreHistory": "Loading more..."
+    "loadingMoreHistory": "Loading more...",
+    "imageGeneration": {
+        "generating": "Generating image, please wait…",
+        "previewLoading": "Loading image preview…",
+        "previewUnavailable": "Image preview is temporarily unavailable"
+    }
 }

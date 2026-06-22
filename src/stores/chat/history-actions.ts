@@ -5,6 +5,7 @@ import {
   clearHistoryPoll,
   dropRedundantOptimisticUserMessages,
   enrichWithCachedImages,
+  enrichWithToolCallAttachments,
   enrichWithToolResultFiles,
   getLatestOptimisticUserMessage,
   getMessageErrorMessage,
@@ -12,12 +13,11 @@ import {
   getMessageText,
   hasAssistantAfterLastRealUser,
   hasOptimisticServerEcho,
-  isInternalMessage,
   isRecoverableRuntimeError,
-  isToolResultRole,
   loadMissingPreviews,
   mergePendingOptimisticUserMessages,
   setLastChatEventAt,
+  shouldDropMessageFromHistory,
   toMs,
 } from './helpers';
 import { buildCronSessionHistoryPath, isCronSessionKey } from './cron-session-utils';
@@ -28,6 +28,11 @@ import {
   shouldRetryStartupHistoryLoad,
   sleep,
 } from './history-startup-retry';
+import {
+  buildChatHistoryRpcParams,
+  getChatHistoryMaxChars,
+} from './history-rpc-params';
+import { hydrateGatewayHistoryFromTranscript } from './history-transcript-hydrate';
 import type { RawMessage } from './types';
 import type { ChatGet, ChatSet, SessionHistoryActions } from './store-api';
 
@@ -107,7 +112,8 @@ export function createHistoryActions(
         if (!isCurrentSession()) return false;
         // Before filtering: attach images/files from tool_result messages to the next assistant message
         const messagesWithToolImages = enrichWithToolResultFiles(rawMessages);
-        const filteredMessages = messagesWithToolImages.filter((msg) => !isToolResultRole(msg.role) && !isInternalMessage(msg));
+        const messagesWithToolAttachments = enrichWithToolCallAttachments(messagesWithToolImages);
+        const filteredMessages = messagesWithToolAttachments.filter((msg) => !shouldDropMessageFromHistory(msg));
         // Restore file attachments for user/assistant messages (from cache + text patterns)
         const enrichedMessages = enrichWithCachedImages(filteredMessages);
 
@@ -127,6 +133,67 @@ export function createHistoryActions(
           }
         }
         finalMessages = dropRedundantOptimisticUserMessages(currentSessionKey, finalMessages);
+
+        // Preserve locally-resolved previews (gatewayUrl → filePath, preview, fileSize)
+        // that were built before this history load. The Gateway response may rebuild
+        // `_attachedFiles` with stale placeholders (preview=null, fileSize=0); merge
+        // the existing preview data back so the UI keeps showing resolved images.
+        type AttachedFile = NonNullable<RawMessage['_attachedFiles']>[number];
+        const getAttachmentMergeKey = (file: AttachedFile): string | null => (
+          file.filePath || file.gatewayUrl || null
+        );
+        const preserveExistingAttachmentPreviews = (
+          currentMessages: RawMessage[],
+          nextMessages: RawMessage[],
+        ): RawMessage[] => {
+          const currentFilesByMessageKey = new Map<string, Map<string, AttachedFile>>();
+          for (const message of currentMessages) {
+            if (!message._attachedFiles?.length) continue;
+            const filesByKey = new Map<string, AttachedFile>();
+            for (const file of message._attachedFiles) {
+              const key = getAttachmentMergeKey(file);
+              if (!key) continue;
+              if (!file.preview && !file.fileSize && !file.previewStatus) continue;
+              filesByKey.set(key, file);
+            }
+            if (filesByKey.size > 0) {
+              currentFilesByMessageKey.set(getPreviewMergeKey(message), filesByKey);
+            }
+          }
+
+          if (currentFilesByMessageKey.size === 0) return nextMessages;
+
+          return nextMessages.map((message) => {
+            if (!message._attachedFiles?.length) return message;
+            const currentFiles = currentFilesByMessageKey.get(getPreviewMergeKey(message));
+            if (!currentFiles) return message;
+
+            let changed = false;
+            const attachedFiles = message._attachedFiles.map((file) => {
+              const key = getAttachmentMergeKey(file);
+              const currentFile = key ? currentFiles.get(key) : undefined;
+              if (!currentFile) return file;
+
+              let nextFile = file;
+              if (!nextFile.preview && currentFile.preview) {
+                nextFile = { ...nextFile, preview: currentFile.preview };
+                changed = true;
+              }
+              if (!nextFile.fileSize && currentFile.fileSize) {
+                nextFile = { ...nextFile, fileSize: currentFile.fileSize };
+                changed = true;
+              }
+              if (!nextFile.previewStatus && currentFile.previewStatus) {
+                nextFile = { ...nextFile, previewStatus: currentFile.previewStatus };
+                changed = true;
+              }
+              return nextFile;
+            });
+
+            return changed ? { ...message, _attachedFiles: attachedFiles } : message;
+          });
+        };
+        finalMessages = preserveExistingAttachmentPreviews(get().messages, finalMessages);
 
         const { pendingFinal, lastUserMessageAt, sending: isSendingNow } = get();
         const userMsTs = lastUserMessageAt ? toMs(lastUserMessageAt) : 0;
@@ -237,6 +304,28 @@ export function createHistoryActions(
       };
 
       try {
+        const gatewayRpc = async <T>(
+          method: string,
+          params?: unknown,
+          timeoutMs?: number,
+        ): Promise<T> => {
+          const result = await invokeIpc(
+            'gateway:rpc',
+            method,
+            params,
+            ...(timeoutMs != null ? [timeoutMs] as const : []),
+          ) as { success: boolean; result?: T; error?: string };
+          if (!result.success) {
+            throw new Error(result.error || `RPC ${method} failed`);
+          }
+          return result.result as T;
+        };
+        const chatHistoryParams = buildChatHistoryRpcParams(
+          currentSessionKey,
+          200,
+          getChatHistoryMaxChars(gatewayRpc),
+        );
+
         let result: { success: boolean; result?: Record<string, unknown>; error?: string } | null = null;
         let lastError: unknown = null;
 
@@ -249,7 +338,7 @@ export function createHistoryActions(
             result = await invokeIpc(
               'gateway:rpc',
               'chat.history',
-              { sessionKey: currentSessionKey, limit: 200 },
+              chatHistoryParams,
               ...(historyTimeoutOverride != null ? [historyTimeoutOverride] as const : []),
             ) as { success: boolean; result?: Record<string, unknown>; error?: string };
 
@@ -293,6 +382,13 @@ export function createHistoryActions(
           const thinkingLevel = data.thinkingLevel ? String(data.thinkingLevel) : null;
           if (rawMessages.length === 0 && isCronSessionKey(currentSessionKey)) {
             rawMessages = await loadCronFallbackMessages(currentSessionKey, 200);
+          } else if (rawMessages.length > 0) {
+            rawMessages = await hydrateGatewayHistoryFromTranscript(
+              currentSessionKey,
+              rawMessages,
+              200,
+              get().messages,
+            );
           }
           const applied = applyLoadedMessages(rawMessages, thinkingLevel);
           if (applied && isInitialForegroundLoad) {

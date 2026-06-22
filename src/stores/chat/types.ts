@@ -16,6 +16,12 @@ export interface AttachedFileMeta {
    * loads the original file off disk.
    */
   gatewayUrl?: string;
+  /**
+   * Marks image previews that could not be resolved (file missing, Gateway
+   * record gone, etc.) so we don't keep retrying them forever. Introduced by
+   * the loadMissingPreviews retry loop; see `markMissingImagePreviewsUnavailable`.
+   */
+  previewStatus?: 'unavailable';
 }
 
 /** Raw message from OpenClaw chat.history */

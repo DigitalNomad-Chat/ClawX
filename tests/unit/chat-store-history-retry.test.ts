@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { chatHistoryRpcParams, prewarmChatHistoryMaxCharsCache } from './gateway-rpc-test-utils';
 
 const { gatewayRpcMock, agentsState, hostApiFetchMock } = vi.hoisted(() => ({
   gatewayRpcMock: vi.fn(),
@@ -27,13 +28,24 @@ vi.mock('@/lib/host-api', () => ({
   hostApiFetch: (...args: unknown[]) => hostApiFetchMock(...args),
 }));
 
+async function loadChatStore() {
+  const mod = await import('@/stores/chat');
+  await prewarmChatHistoryMaxCharsCache();
+  return mod;
+}
+
 describe('useChatStore startup history retry', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.useFakeTimers();
     window.localStorage.clear();
     agentsState.agents = [];
     gatewayRpcMock.mockReset();
+    gatewayRpcMock.mockImplementation(async (method: string) => {
+      if (method === 'config.get') return {};
+      if (method === 'chat.history') return { messages: [] };
+      throw new Error(`Unexpected gateway RPC: ${method}`);
+    });
     hostApiFetchMock.mockReset();
     hostApiFetchMock.mockResolvedValue({ success: true, messages: [] });
   });
@@ -44,7 +56,7 @@ describe('useChatStore startup history retry', () => {
 
   it('uses the longer timeout only for the initial foreground history load', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
       currentAgentId: 'main',
@@ -80,13 +92,13 @@ describe('useChatStore startup history retry', () => {
     expect(gatewayRpcMock).toHaveBeenNthCalledWith(
       1,
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     );
     expect(gatewayRpcMock).toHaveBeenNthCalledWith(
       2,
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       undefined,
     );
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 191_800);
@@ -94,7 +106,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('forces the internal final-message reload through the quiet history cooldown', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
       currentAgentId: 'main',
@@ -166,7 +178,7 @@ describe('useChatStore startup history retry', () => {
 
   it('keeps non-startup foreground loading safety timeout at 15 seconds', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
       currentAgentId: 'main',
@@ -202,7 +214,7 @@ describe('useChatStore startup history retry', () => {
     expect(gatewayRpcMock).toHaveBeenNthCalledWith(
       2,
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       undefined,
     );
     expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 15_000);
@@ -210,7 +222,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('keeps cached session messages visible without foreground loading overlay during refresh', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
 
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
@@ -256,7 +268,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('switchSession restores cached session messages immediately while refreshing in background', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
 
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
@@ -300,7 +312,7 @@ describe('useChatStore startup history retry', () => {
 
   it('treats the same session as a fresh foreground load after gateway runtime changes', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
       currentAgentId: 'main',
@@ -340,7 +352,7 @@ describe('useChatStore startup history retry', () => {
         }),
       },
     }));
-    const { useChatStore: useChatStoreReloaded } = await import('@/stores/chat');
+    const { useChatStore: useChatStoreReloaded } = await loadChatStore();
     useChatStoreReloaded.setState({
       currentSessionKey: 'agent:main:main',
       currentAgentId: 'main',
@@ -364,9 +376,9 @@ describe('useChatStore startup history retry', () => {
     setTimeoutSpy.mockClear();
     await useChatStoreReloaded.getState().loadHistory(false);
 
-    expect(gatewayRpcMock).toHaveBeenLastCalledWith(
+    expect(gatewayRpcMock).toHaveBeenCalledWith(
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     );
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 191_800);
@@ -378,7 +390,7 @@ describe('useChatStore startup history retry', () => {
     // vi.doMock to inject a local mock, but Vitest did not apply the dynamic
     // override for an already vi.mock'ed module in this file, so chat.ts kept
     // using the hoisted gatewayRpcMock.
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     useChatStore.setState({
@@ -453,19 +465,21 @@ describe('useChatStore startup history retry', () => {
     await secondLoad;
 
     expect(gatewayRpcMock).toHaveBeenCalledTimes(3);
-    expect(gatewayRpcMock.mock.calls[0]).toEqual([
+    const chatHistoryCalls = gatewayRpcMock.mock.calls.filter(([method]) => method === 'chat.history');
+    expect(chatHistoryCalls).toHaveLength(3);
+    expect(chatHistoryCalls[0]).toEqual([
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     ]);
-    expect(gatewayRpcMock.mock.calls[1]).toEqual([
+    expect(chatHistoryCalls[1]).toEqual([
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     ]);
-    expect(gatewayRpcMock.mock.calls[2]).toEqual([
+    expect(chatHistoryCalls[2]).toEqual([
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     ]);
     expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['restored after retry']);
@@ -481,7 +495,7 @@ describe('useChatStore startup history retry', () => {
 
   it('stops retrying once the user switches sessions mid-load', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
 
     useChatStore.setState({
       currentSessionKey: 'agent:main:main',
@@ -514,7 +528,7 @@ describe('useChatStore startup history retry', () => {
 
     await useChatStore.getState().loadHistory(false);
 
-    expect(gatewayRpcMock).toHaveBeenCalledTimes(1);
+    expect(gatewayRpcMock.mock.calls.filter(([method]) => method === 'chat.history')).toHaveLength(1);
     expect(useChatStore.getState().currentSessionKey).toBe('agent:main:other');
     expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['other session']);
     expect(useChatStore.getState().error).toBeNull();
@@ -523,7 +537,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('keeps the optimistic user message when completion refresh wins the transcript write race', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     let historyMessages: Array<Record<string, unknown>> = [];
     let resolveSend: ((value: { runId: string }) => void) | null = null;
 
@@ -595,7 +609,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('does not restore a pending optimistic message after deleting the session', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     let resolveSend: ((value: { runId: string }) => void) | null = null;
 
     gatewayRpcMock.mockImplementation((method: string) => {
@@ -660,7 +674,7 @@ describe('useChatStore startup history retry', () => {
   // inactive, the Thinking… dot to vanish, and ChatInput's stop button to
   // revert to a send button while the agent was still running tools.
   it('keeps the run open across intermediate [thinking, toolCall] history snapshots', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-1',
       currentAgentId: 'main',
@@ -713,7 +727,7 @@ describe('useChatStore startup history retry', () => {
   // armed. Without `hasPendingToolUse`, the closer would match this on the
   // text block and clear sending.
   it('keeps the run open for mixed [thinking, text, toolCall] turns with stopReason=toolUse', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-2',
       currentAgentId: 'main',
@@ -764,7 +778,7 @@ describe('useChatStore startup history retry', () => {
   // Positive case: a real final reply (text/image, no pending tool) SHOULD
   // close the run when applyLoadedMessages observes it via history poll.
   it('closes the run when a final assistant reply (text, stopReason=endTurn) appears', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-3',
       currentAgentId: 'main',
@@ -817,7 +831,7 @@ describe('useChatStore startup history retry', () => {
   // detect the intermediate turn via `stop_reason: "tool_use"` plus
   // `content[].type === "tool_use"`.
   it('keeps the run open for Anthropic-native [thinking, tool_use] (snake_case stop_reason)', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-anthropic',
       currentAgentId: 'main',
@@ -869,7 +883,7 @@ describe('useChatStore startup history retry', () => {
   // choice level which doesn't reach the message object). `hasPendingToolUse`
   // must still flag this via the `tool_calls` array check.
   it('keeps the run open for OpenAI ChatCompletions message with tool_calls array', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-openai-cc',
       currentAgentId: 'main',
@@ -921,7 +935,7 @@ describe('useChatStore startup history retry', () => {
   // Cross-protocol coverage: OpenAI Chat Completions FINAL reply. No
   // tool_calls, plain text content. Must close the run normally.
   it('closes the run for OpenAI ChatCompletions plain-text final reply', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-openai-cc-final',
       currentAgentId: 'main',
@@ -964,7 +978,7 @@ describe('useChatStore startup history retry', () => {
   });
 
   it('unsticks sending when history has a final reply after tools without pendingFinal', async () => {
-    const { useChatStore } = await import('@/stores/chat');
+    const { useChatStore } = await loadChatStore();
     useChatStore.setState({
       currentSessionKey: 'agent:main:session-stuck',
       currentAgentId: 'main',

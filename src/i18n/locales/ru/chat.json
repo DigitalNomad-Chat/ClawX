@@ -207,5 +207,10 @@
         "moreHint": "Ещё {{count}} вопросов не показано"
     },
     "loadMoreHistory": "Загрузить более ранние сообщения",
-    "loadingMoreHistory": "Загрузка ещё..."
+    "loadingMoreHistory": "Загрузка ещё...",
+    "imageGeneration": {
+        "generating": "Изображение генерируется, подождите…",
+        "previewLoading": "Загрузка предпросмотра изображения…",
+        "previewUnavailable": "Предпросмотр изображения временно недоступен"
+    }
 }
