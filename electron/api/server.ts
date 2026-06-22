@@ -22,6 +22,7 @@ import { handleCronRoutes } from './routes/cron';
 import { handleDiagnosticsRoutes } from './routes/diagnostics';
 import { handleConfigRoutes } from './routes/config';
 import { handleOfficeToolsRoutes } from './routes/office-tools';
+import { handleMediaRoutes } from './routes/media';
 import { sendJson, setCorsHeaders, requireJsonContentType } from './route-utils';
 import { moduleRouteHandlers } from '../modules/registry';
 
@@ -53,6 +54,7 @@ const coreRouteHandlers: RouteHandler[] = [
   handleLogRoutes,
   handleUsageRoutes,
   ...(enableOfficeTools ? [handleOfficeToolsRoutes] : []),
+  handleMediaRoutes,
 ];
 
 function buildRouteHandlers(): RouteHandler[] {

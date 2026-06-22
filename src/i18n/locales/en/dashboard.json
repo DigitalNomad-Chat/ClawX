@@ -61,5 +61,47 @@
         "close": "Close",
         "noUsage": "No usage",
         "usageParseError": "Usage parse error"
+    },
+    "imageGeneration": {
+        "title": "Image Generation",
+        "description": "Configure one custom OpenAI Images-compatible endpoint for the image_generate tool. It is independent from chat providers.",
+        "timeout": "Timeout (ms)",
+        "agentAuthTitle": "Per-agent authentication",
+        "agentAuthDesc": "Image generation uses the API key saved for this custom image endpoint in each agent's auth-profiles.json.",
+        "agentColumn": "Agent",
+        "authColumn": "Custom image endpoint auth",
+        "defaultAgent": "default",
+        "authConfigured": "Ready",
+        "authMissing": "Missing key",
+        "testAgent": "Test as agent",
+        "testButton": "Test generate",
+        "testing": "Generating…",
+        "save": "Save",
+        "saving": "Saving…",
+        "testPrompt": "插画，未来主义，光效应艺术风格，深邃蓝色背景，幻觉+重复+致幻，动态角度+大张力角度，视觉错觉，艺术感加强，超现实主义，氛围感加强，反光+珠光，超清晰，高级的氛围感 意识流，宇宙星空，浪漫灯塔，背景是一大片星空，星星颜色的鱼在天空中游动形成巨大的漩涡，幻想风格，充满了幻想和魔幻的元素，空中的巨型鲸鱼和星光，深蓝色的夜空，点缀闪烁的星星，宁静而神秘的氛围，浪漫而神秘，精细的描绘，梦幻，绚丽，仰视视角，氛围感，手绘风格，深蓝色调，风格定位：融合现代潮流元素与搞怪风格，形象整体看起来时尚、有趣且充满活力，适合年轻人的审美。细节细腻，风格清新。画面清晰。画面下方：主题用流动的毛笔手绘字体：\"Don't wait for inspiration\"（纤细的笔画，笔画拉丝，灵动的曲线，有质感），极小的装饰性小字，极细无衬线小字体\"2026\"，白色极细无衬线字体水印\"LUOBOS\"+\"INSPIRATION\"+\"AIGC\"+\"Every great idea begins with a spark\"，质感，肌理感，梦幻的，耀变，反射，艺术抽象，诗意的，高级，杰作，极具视觉冲击力，获奖作品，大师级配色，大师级排版，高细节，高级感，超高清，布局协调。",
+        "toast": {
+            "saved": "Image generation settings saved",
+            "saveBeforeTest": "Save settings before running a test",
+            "testSuccess": "Test image generated ({{ms}} ms)",
+            "testSuccessWithPath": "Test image generated ({{ms}} ms): {{path}}",
+            "testFailed": "Image generation test failed"
+        },
+        "openAiRelay": {
+            "title": "Custom image endpoint",
+            "description": "Send image generation to a dedicated OpenAI Images-compatible endpoint (/v1/images/generations). This does not change any chat provider.",
+            "baseUrl": "Image Base URL",
+            "baseUrlHint": "e.g. https://taolat.com/v1 — /v1 is appended automatically when omitted.",
+            "apiKey": "API key",
+            "apiKeyPlaceholder": "sk-...",
+            "model": "Model name",
+            "modelHint": "Enter only the model id, for example gpt-image-2. Do not include provider/model."
+        },
+        "errors": {
+            "invalidTimeout": "Timeout must be a positive number",
+            "relayBaseUrlRequired": "Image Base URL is required",
+            "relayApiKeyRequired": "API key is required",
+            "relayModelRequired": "Model name is required",
+            "relayModelInvalid": "Enter only the model name, for example gpt-image-2. Do not include provider/model."
+        }
     }
 }

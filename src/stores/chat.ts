@@ -27,6 +27,11 @@ import {
   sleep,
 } from './chat/history-startup-retry';
 import {
+  buildChatHistoryRpcParams,
+  getChatHistoryMaxChars,
+} from './chat/history-rpc-params';
+import { hydrateGatewayHistoryFromTranscript } from './chat/history-transcript-hydrate';
+import {
   DEFAULT_CANONICAL_PREFIX,
   DEFAULT_SESSION_KEY,
   type AttachedFileMeta,
@@ -41,6 +46,11 @@ import {
   hasPendingToolUse,
   mergePendingOptimisticUserMessages,
 } from './chat/helpers';
+import {
+  isGeneratingStatusNarration,
+  isInternalAssistantReplyText,
+  isOpenClawRuntimeEventPrompt,
+} from '@/pages/Chat/message-utils';
 
 export type {
   AttachedFileMeta,
@@ -117,6 +127,10 @@ const _chatEventDedupe = new Map<string, number>();
 const OPTIMISTIC_USER_TIMESTAMP_MATCH_MS = 120_000;
 /** Grace period before surfacing mid-run Gateway errors that often self-recover. */
 const ERROR_RECOVERY_DELAY_MS = 12_000;
+/** OpenClaw LLM idle timeout before an internal retry. */
+const LLM_IDLE_HINT_MS = 120_000;
+/** Wait past one LLM idle window before declaring a hard no-response failure. */
+const NO_RESPONSE_SAFETY_TIMEOUT_MS = 130_000;
 
 function clearErrorRecoveryTimer(): void {
   if (_errorRecoveryTimer) {
@@ -385,19 +399,39 @@ function normalizeStreamingMessage(message: unknown): unknown {
  * used to dedupe optimistic vs server echoes must operate on the same
  * cleaned form — otherwise the same visible message renders twice.
  */
+function stripInboundMediaVisionEnvelope(text: string): string {
+  if (!/\[Image\]/i.test(text) && !/^User text:/im.test(text) && !/\nDescription:\s*\n/i.test(text)) {
+    return text;
+  }
+
+  let result = text.replace(/^\s*\[Image\]\s*\n?/i, '');
+
+  const userTextBlock = result.match(/^User text:\s*\n([\s\S]*?)(?:\n\s*Description:\s*\n[\s\S]*)?\s*$/i);
+  if (userTextBlock) {
+    const userText = userTextBlock[1].trim();
+    return /^Process the attached file\(s\)\.\s*$/i.test(userText) ? '' : userText;
+  }
+
+  return result.replace(/\n\s*Description:\s*\n[\s\S]*$/i, '').trim();
+}
+
 function stripGatewayUserMetadata(text: string): string {
-  return text
+  return stripInboundMediaVisionEnvelope(
+    text
     .replace(/^\s*\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[^\]]+\]\s*/i, '')
     .replace(/\s*\[media attached:[^\]]*\]/g, '')
     .replace(/\s*\[message_id:\s*[^\]]+\]/g, '')
     .replace(/^Conversation info\s*\([^)]*\):\s*```[a-z]*\n[\s\S]*?```\s*/i, '')
-    .replace(/^Conversation info\s*\([^)]*\):\s*\{[\s\S]*?\}\s*/i, '');
+    .replace(/^Conversation info\s*\([^)]*\):\s*\{[\s\S]*?\}\s*/i, ''),
+  );
 }
 
 function normalizeComparableUserText(content: unknown): string {
-  return stripGatewayUserMetadata(getMessageText(content))
+  const text = stripGatewayUserMetadata(getMessageText(content))
     .replace(/\s+/g, ' ')
     .trim();
+  if (/^\(file attached\)$/i.test(text)) return '';
+  return text;
 }
 
 function getComparableAttachmentSignature(message: Pick<RawMessage, '_attachedFiles'>): string {
@@ -432,6 +466,13 @@ function matchesOptimisticUserMessage(
   if (sameText && sameAttachments) return true;
   if (sameText && (!optimisticAttachments || !candidateAttachments) && (timestampMatches || !hasCandidateTimestamp)) return true;
   if (sameAttachments && (!optimisticText || !candidateText) && (timestampMatches || !hasCandidateTimestamp)) return true;
+
+  const optimisticHadAttachmentsOnly = optimisticAttachments.length > 0 && !optimisticText;
+  const candidateIsAttachmentEcho = !candidateText
+    && /\[(?:media attached:|\s*Image\s*\])/i.test(getMessageText(candidate.content));
+  if (optimisticHadAttachmentsOnly && candidateIsAttachmentEcho && (timestampMatches || !hasCandidateTimestamp)) {
+    return true;
+  }
   return false;
 }
 
@@ -506,6 +547,13 @@ function getMessageText(content: unknown): string {
       .map(b => b.text!);
     return compactProgressiveTextParts(parts).join('\n');
   }
+  return '';
+}
+
+function getMessageTextForFilter(msg: { content?: unknown; text?: unknown }): string {
+  const fromContent = getMessageText(msg.content);
+  if (fromContent.trim()) return fromContent;
+  if (typeof msg.text === 'string') return msg.text;
   return '';
 }
 
@@ -594,10 +642,73 @@ function mimeFromExtension(filePath: string): string {
   return map[ext] || 'application/octet-stream';
 }
 
+/** Extract local file paths declared in tool call arguments. */
+function extractFilePathsFromToolArgs(args: Record<string, unknown>): string[] {
+  const paths: string[] = [];
+  const direct = args.file_path ?? args.filePath ?? args.path ?? args.file;
+  if (typeof direct === 'string' && direct.trim()) paths.push(direct.trim());
+
+  const attachments = args.attachments;
+  if (Array.isArray(attachments)) {
+    for (const item of attachments) {
+      if (!item || typeof item !== 'object') continue;
+      const att = item as Record<string, unknown>;
+      const filePath = att.filePath ?? att.file_path ?? att.path ?? att.file;
+      if (typeof filePath === 'string' && filePath.trim()) {
+        paths.push(filePath.trim());
+      }
+    }
+  }
+
+  return paths;
+}
+
 const DIRECTORY_MIME_TYPE = 'application/x-directory';
 
 function trimPathTerminators(filePath: string): string {
   return filePath.replace(/[，。；;,.!?]+$/u, '');
+}
+
+type MarkdownImageRef =
+  | { filePath: string; mimeType: string; fileName: string }
+  | { gatewayUrl: string; mimeType: string; fileName: string; source: 'gateway-media' };
+
+/** Extract image targets from markdown `![alt](target)` in assistant text. */
+function extractMarkdownImageRefs(text: string): MarkdownImageRef[] {
+  if (!text) return [];
+  const refs: MarkdownImageRef[] = [];
+  const seen = new Set<string>();
+  const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = markdownImageRegex.exec(text)) !== null) {
+    const alt = match[1]?.trim() || 'image';
+    let target = match[2]?.trim() ?? '';
+    if (!target) continue;
+    if (target.startsWith('file://')) {
+      target = decodeURIComponent(target.replace(/^file:\/\//, ''));
+    }
+    if (target.startsWith('/api/chat/media/')) {
+      if (seen.has(target)) continue;
+      seen.add(target);
+      refs.push({
+        gatewayUrl: target,
+        mimeType: 'image/png',
+        fileName: alt,
+        source: 'gateway-media',
+      });
+      continue;
+    }
+    const normalizedPath = trimPathTerminators(target);
+    if (!normalizedPath.startsWith('/') && !normalizedPath.startsWith('~/')) continue;
+    if (seen.has(normalizedPath)) continue;
+    seen.add(normalizedPath);
+    refs.push({
+      filePath: normalizedPath,
+      mimeType: mimeFromExtension(normalizedPath),
+      fileName: alt,
+    });
+  }
+  return refs;
 }
 
 /**
@@ -607,7 +718,7 @@ function trimPathTerminators(filePath: string): string {
  *
  * Also recognises the `MEDIA:` / `media:` prefix the OpenClaw runtime
  * emits for produced artifacts (e.g.
- * `MEDIA:/tmp/desktop_screenshot.png`) — without this the leading colon
+ * `MEDIA:/tmp/desktop_screenshot.png`, `MEDIA:C:\Users\me\out.svg`) — without this the leading colon
  * trips the URL guard on the unix regex below and the artifact never
  * surfaces as an attachment. Mirrors `chat/helpers.ts::extractRawFilePaths`.
  */
@@ -626,7 +737,7 @@ function extractRawFilePaths(text: string): Array<{ filePath: string; mimeType: 
   // and other space-containing paths the agent emits with the explicit
   // `MEDIA:` marker still resolve. Newline and quote characters remain
   // path terminators so we don't accidentally swallow trailing prose.
-  const taggedRegex = new RegExp(`(?:^|[\\s(\\[{>])(?:MEDIA|media):((?:\\/|~\\/)[^\\n"'()\\[\\],<>` + '`' + `]*?\\.(?:${exts}))(?=$|[\\s\\n"'()\\[\\],<>` + '`' + `]|[，。；;,.!?])`, 'g');
+  const taggedRegex = new RegExp(`(?:^|[\\s(\\[{>])(?:MEDIA|media):((?:\\/|~\\/|[A-Za-z]:\\\\)[^\\n"'()\\[\\],<>` + '`' + `]*?\\.(?:${exts}))(?=$|[\\s\\n"'()\\[\\],<>` + '`' + `]|[，。；;,.!?])`, 'g');
   let workingText = text;
   let taggedMatch: RegExpExecArray | null;
   while ((taggedMatch = taggedRegex.exec(text)) !== null) {
@@ -759,8 +870,8 @@ function getToolCallFilePath(msg: RawMessage, toolCallId: string): string | unde
       if ((block.type === 'tool_use' || block.type === 'toolCall') && block.id === toolCallId) {
         const args = (block.input ?? block.arguments) as Record<string, unknown> | undefined;
         if (args) {
-          const fp = args.file_path ?? args.filePath ?? args.path ?? args.file;
-          if (typeof fp === 'string') return fp;
+          const paths = extractFilePathsFromToolArgs(args);
+          if (paths[0]) return paths[0];
         }
       }
     }
@@ -778,8 +889,8 @@ function getToolCallFilePath(msg: RawMessage, toolCallId: string): string | unde
         args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : (fn.arguments ?? fn.input) as Record<string, unknown>;
       } catch { /* ignore */ }
       if (args) {
-        const fp = args.file_path ?? args.filePath ?? args.path ?? args.file;
-        if (typeof fp === 'string') return fp;
+        const paths = extractFilePathsFromToolArgs(args);
+        if (paths[0]) return paths[0];
       }
     }
   }
@@ -797,8 +908,8 @@ function collectToolCallPaths(msg: RawMessage, paths: Map<string, string>): void
       if ((block.type === 'tool_use' || block.type === 'toolCall') && block.id) {
         const args = (block.input ?? block.arguments) as Record<string, unknown> | undefined;
         if (args) {
-          const fp = args.file_path ?? args.filePath ?? args.path ?? args.file;
-          if (typeof fp === 'string') paths.set(block.id, fp);
+          const filePaths = extractFilePathsFromToolArgs(args);
+          if (filePaths[0]) paths.set(block.id, filePaths[0]);
         }
       }
     }
@@ -815,8 +926,8 @@ function collectToolCallPaths(msg: RawMessage, paths: Map<string, string>): void
         args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : (fn.arguments ?? fn.input) as Record<string, unknown>;
       } catch { /* ignore */ }
       if (args) {
-        const fp = args.file_path ?? args.filePath ?? args.path ?? args.file;
-        if (typeof fp === 'string') paths.set(id, fp);
+        const filePaths = extractFilePathsFromToolArgs(args);
+        if (filePaths[0]) paths.set(id, filePaths[0]);
       }
     }
   }
@@ -893,6 +1004,11 @@ function enrichWithToolResultFiles(messages: RawMessage[]): RawMessage[] {
     }
 
     if (msg.role === 'assistant' && pending.length > 0) {
+      // Internal-only turns (NO_REPLY, interim narration, ...) must not consume
+      // pending attachments — the next visible assistant reply should get them.
+      if (isInternalMessage(msg) && !messageHasToolUse(msg)) {
+        return msg;
+      }
       const toAttach = pending.splice(0);
       // Deduplicate against files already on the assistant message
       const existingPaths = new Set(
@@ -907,6 +1023,62 @@ function enrichWithToolResultFiles(messages: RawMessage[]): RawMessage[] {
     }
 
     return msg;
+  });
+}
+
+/**
+ * Surface user-facing attachments declared in assistant tool calls (e.g.
+ * `message` tool `attachments: [{ filePath }]`) on the calling turn itself.
+ */
+function enrichWithToolCallAttachments(messages: RawMessage[]): RawMessage[] {
+  return messages.map((msg) => {
+    if (msg.role !== 'assistant') return msg;
+
+    const attachmentPaths = new Set<string>();
+    const content = msg.content;
+    if (Array.isArray(content)) {
+      for (const block of content as ContentBlock[]) {
+        if (block.type !== 'tool_use' && block.type !== 'toolCall') continue;
+        const args = (block.input ?? block.arguments) as Record<string, unknown> | undefined;
+        if (!args) continue;
+        for (const filePath of extractFilePathsFromToolArgs(args)) {
+          attachmentPaths.add(filePath);
+        }
+      }
+    }
+
+    const msgAny = msg as unknown as Record<string, unknown>;
+    const toolCalls = msgAny.tool_calls ?? msgAny.toolCalls;
+    if (Array.isArray(toolCalls)) {
+      for (const tc of toolCalls as Array<Record<string, unknown>>) {
+        const fn = (tc.function ?? tc) as Record<string, unknown>;
+        let args: Record<string, unknown> | undefined;
+        try {
+          args = typeof fn.arguments === 'string'
+            ? JSON.parse(fn.arguments)
+            : (fn.arguments ?? fn.input) as Record<string, unknown>;
+        } catch { /* ignore */ }
+        if (!args) continue;
+        for (const filePath of extractFilePathsFromToolArgs(args)) {
+          attachmentPaths.add(filePath);
+        }
+      }
+    }
+
+    if (attachmentPaths.size === 0) return msg;
+
+    const existingPaths = new Set(
+      (msg._attachedFiles || []).map((file) => file.filePath).filter(Boolean),
+    );
+    const newFiles = [...attachmentPaths]
+      .filter((filePath) => !existingPaths.has(filePath))
+      .map((filePath) => ({ ...makeAttachedFile({ filePath, mimeType: mimeFromExtension(filePath) }), source: 'tool-result' as const }));
+
+    if (newFiles.length === 0) return msg;
+    return {
+      ...msg,
+      _attachedFiles: [...(msg._attachedFiles || []), ...newFiles],
+    };
   });
 }
 
@@ -953,6 +1125,13 @@ function enrichWithCachedImages(messages: RawMessage[]): RawMessage[] {
     if (msg.role === 'assistant' && !isToolOnlyMessage(msg)) {
       // Own text
       rawRefs = extractRawFilePaths(text).filter(r => !mediaRefPaths.has(r.filePath));
+      const rawPathSet = new Set(rawRefs.map((ref) => ref.filePath));
+      for (const ref of extractMarkdownImageRefs(text)) {
+        if ('filePath' in ref && !mediaRefPaths.has(ref.filePath) && !rawPathSet.has(ref.filePath)) {
+          rawPathSet.add(ref.filePath);
+          rawRefs.push({ filePath: ref.filePath, mimeType: ref.mimeType });
+        }
+      }
 
       // Nearest preceding user message text (look back up to 5 messages)
       const seenPaths = new Set(rawRefs.map(r => r.filePath));
@@ -980,7 +1159,14 @@ function enrichWithCachedImages(messages: RawMessage[]): RawMessage[] {
     }
 
     const allRefs = [...mediaRefs, ...rawRefs];
-    if (allRefs.length === 0 && gatewayMediaFiles.length === 0) {
+    const markdownImageRefs = msg.role === 'assistant' && !isToolOnlyMessage(msg)
+      ? extractMarkdownImageRefs(text)
+      : [];
+    if (
+      allRefs.length === 0
+      && gatewayMediaFiles.length === 0
+      && markdownImageRefs.length === 0
+    ) {
       // Preserve any previously-attached `_attachedFiles` (e.g. set by
       // `enrichWithToolResultFiles` for non-image artifacts). When nothing
       // new applies, returning `msg` unmodified keeps those attachments.
@@ -1003,21 +1189,31 @@ function enrichWithCachedImages(messages: RawMessage[]): RawMessage[] {
     const dedupedGatewayMedia = gatewayMediaFiles.filter(
       file => file.gatewayUrl && !existingGatewayUrls.has(file.gatewayUrl),
     );
-    if (files.length === 0 && dedupedGatewayMedia.length === 0) return msg;
-    return { ...msg, _attachedFiles: [...existingFiles, ...files, ...dedupedGatewayMedia] };
+    const markdownGatewayMedia: AttachedFileMeta[] = markdownImageRefs
+      .filter((ref): ref is Extract<MarkdownImageRef, { gatewayUrl: string }> => 'gatewayUrl' in ref)
+      .filter((ref) => ref.gatewayUrl && !existingGatewayUrls.has(ref.gatewayUrl))
+      .map((ref) => ({
+        fileName: ref.fileName,
+        mimeType: ref.mimeType,
+        fileSize: 0,
+        preview: null,
+        gatewayUrl: ref.gatewayUrl,
+        source: 'gateway-media' as const,
+      }));
+    if (files.length === 0 && dedupedGatewayMedia.length === 0 && markdownGatewayMedia.length === 0) return msg;
+    return { ...msg, _attachedFiles: [...existingFiles, ...files, ...dedupedGatewayMedia, ...markdownGatewayMedia] };
   });
 }
 
-/**
- * Async: load missing previews from disk via IPC for messages that have
- * _attachedFiles with null previews. Updates messages in-place and triggers re-render.
- * Handles both [media attached: ...] patterns and raw filePath entries.
- */
-async function loadMissingPreviews(messages: RawMessage[]): Promise<boolean> {
-  // See helpers.ts loadMissingPreviews for the canonical comment block —
-  // this monolithic copy is kept in sync so legacy chat.ts callers also
-  // resolve Gateway-injected outgoing media URLs into local previews.
-  type PreviewRef = { filePath?: string; gatewayUrl?: string; mimeType: string };
+type PreviewRef = { filePath?: string; gatewayUrl?: string; mimeType: string };
+
+const IMAGE_PREVIEW_RETRY_DELAYS_MS = [300, 900, 1800];
+
+function waitForPreviewRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function collectMissingPreviewRefs(messages: RawMessage[]): PreviewRef[] {
   const needPreview: PreviewRef[] = [];
   const seenKeys = new Set<string>();
 
@@ -1029,7 +1225,7 @@ async function loadMissingPreviews(messages: RawMessage[]): Promise<boolean> {
       const key = file.filePath || file.gatewayUrl;
       if (!key || seenKeys.has(key)) continue;
       const needsLoad = file.mimeType.startsWith('image/')
-        ? !file.preview
+        ? !file.preview && file.previewStatus !== 'unavailable'
         : file.fileSize === 0;
       if (!needsLoad) continue;
       seenKeys.add(key);
@@ -1048,7 +1244,9 @@ async function loadMissingPreviews(messages: RawMessage[]): Promise<boolean> {
         const file = msg._attachedFiles[i];
         const ref = refs[i];
         if (!file || !ref || seenKeys.has(ref.filePath)) continue;
-        const needsLoad = ref.mimeType.startsWith('image/') ? !file.preview : file.fileSize === 0;
+        const needsLoad = ref.mimeType.startsWith('image/')
+          ? !file.preview && file.previewStatus !== 'unavailable'
+          : file.fileSize === 0;
         if (needsLoad) {
           seenKeys.add(ref.filePath);
           needPreview.push({ filePath: ref.filePath, mimeType: ref.mimeType });
@@ -1057,61 +1255,115 @@ async function loadMissingPreviews(messages: RawMessage[]): Promise<boolean> {
     }
   }
 
-  if (needPreview.length === 0) {
-    return false;
-  }
+  return needPreview;
+}
 
-  try {
-    const thumbnails = await hostApiFetch<Record<string, { preview: string | null; fileSize: number }>>(
-      '/api/files/thumbnails',
-      {
-        method: 'POST',
-        body: JSON.stringify({ paths: needPreview }),
-      },
-    );
+function applyPreviewResults(
+  messages: RawMessage[],
+  thumbnails: Record<string, { preview: string | null; fileSize: number }>,
+): boolean {
+  let updated = false;
+  for (const msg of messages) {
+    if (!msg._attachedFiles) continue;
 
-    let updated = false;
-    for (const msg of messages) {
-      if (!msg._attachedFiles) continue;
+    // Update files that have filePath OR gatewayUrl
+    for (const file of msg._attachedFiles) {
+      const key = file.filePath || file.gatewayUrl;
+      if (!key) continue;
+      const thumb = thumbnails[key];
+      if (thumb && (thumb.preview || thumb.fileSize)) {
+        if (thumb.preview) file.preview = thumb.preview;
+        if (thumb.fileSize) file.fileSize = thumb.fileSize;
+        delete file.previewStatus;
+        if (file.filePath) {
+          _imageCache.set(file.filePath, { ...file });
+        }
+        updated = true;
+      }
+    }
 
-      // Update files that have filePath OR gatewayUrl
-      for (const file of msg._attachedFiles) {
-        const key = file.filePath || file.gatewayUrl;
-        if (!key) continue;
-        const thumb = thumbnails[key];
+    // Legacy: update by index for [media attached: ...] refs
+    if (msg.role === 'user') {
+      const text = getMessageText(msg.content);
+      const refs = extractMediaRefs(text);
+      for (let i = 0; i < refs.length; i++) {
+        const file = msg._attachedFiles[i];
+        const ref = refs[i];
+        if (!file || !ref || file.filePath) continue; // skip if already handled via filePath
+        const thumb = thumbnails[ref.filePath];
         if (thumb && (thumb.preview || thumb.fileSize)) {
           if (thumb.preview) file.preview = thumb.preview;
           if (thumb.fileSize) file.fileSize = thumb.fileSize;
-          if (file.filePath) {
-            _imageCache.set(file.filePath, { ...file });
-          }
+          delete file.previewStatus;
+          _imageCache.set(ref.filePath, { ...file });
           updated = true;
         }
       }
-
-      // Legacy: update by index for [media attached: ...] refs
-      if (msg.role === 'user') {
-        const text = getMessageText(msg.content);
-        const refs = extractMediaRefs(text);
-        for (let i = 0; i < refs.length; i++) {
-          const file = msg._attachedFiles[i];
-          const ref = refs[i];
-          if (!file || !ref || file.filePath) continue; // skip if already handled via filePath
-          const thumb = thumbnails[ref.filePath];
-          if (thumb && (thumb.preview || thumb.fileSize)) {
-            if (thumb.preview) file.preview = thumb.preview;
-            if (thumb.fileSize) file.fileSize = thumb.fileSize;
-            _imageCache.set(ref.filePath, { ...file });
-            updated = true;
-          }
-        }
-      }
     }
-    if (updated) saveImageCache(_imageCache);
-    return updated;
-  } catch (err) {
-    console.warn('[loadMissingPreviews] Failed:', err);
-    return false;
+  }
+
+  if (updated) saveImageCache(_imageCache);
+  return updated;
+}
+
+function markMissingImagePreviewsUnavailable(messages: RawMessage[]): boolean {
+  let updated = false;
+  for (const msg of messages) {
+    if (!msg._attachedFiles) continue;
+    for (const file of msg._attachedFiles) {
+      if (!file.mimeType.startsWith('image/')) continue;
+      if (file.preview || file.previewStatus === 'unavailable') continue;
+      if (!file.filePath && !file.gatewayUrl) continue;
+      file.previewStatus = 'unavailable';
+      updated = true;
+    }
+  }
+  return updated;
+}
+
+/**
+ * Async: load missing previews from disk via IPC for messages that have
+ * _attachedFiles with null previews. Updates messages in-place and triggers re-render.
+ * Handles both [media attached: ...] patterns and raw filePath entries.
+ */
+async function loadMissingPreviews(messages: RawMessage[]): Promise<boolean> {
+  // See helpers.ts loadMissingPreviews for the canonical comment block —
+  // this monolithic copy is kept in sync so legacy chat.ts callers also
+  // resolve Gateway-injected outgoing media URLs into local previews.
+  let updatedAny = false;
+  let attempt = 0;
+
+  while (true) {
+    const needPreview = collectMissingPreviewRefs(messages);
+    if (needPreview.length === 0) return updatedAny;
+    if (attempt > 0) {
+      const delayMs = IMAGE_PREVIEW_RETRY_DELAYS_MS[attempt - 1];
+      if (delayMs) await waitForPreviewRetry(delayMs);
+    }
+
+    try {
+      const thumbnails = await hostApiFetch<Record<string, { preview: string | null; fileSize: number }>>(
+        '/api/files/thumbnails',
+        {
+          method: 'POST',
+          body: JSON.stringify({ paths: needPreview }),
+        },
+      );
+      if (applyPreviewResults(messages, thumbnails)) {
+        updatedAny = true;
+      }
+    } catch (err) {
+      console.warn('[loadMissingPreviews] Failed:', err);
+      return updatedAny;
+    }
+
+    if (!collectMissingPreviewRefs(messages).some((ref) => ref.mimeType.startsWith('image/'))) {
+      return updatedAny;
+    }
+    if (attempt >= IMAGE_PREVIEW_RETRY_DELAYS_MS.length) {
+      return markMissingImagePreviewsUnavailable(messages) || updatedAny;
+    }
+    attempt += 1;
   }
 }
 
@@ -1169,9 +1421,6 @@ function reconcileCurrentSessionIdleFromBackend(
   const current = sessions.find((session) => session.key === state.currentSessionKey);
   if (!sessionIndicatesIdle(current)) return;
 
-  // Avoid clearing a brand-new send from stale sessions.list metadata.  The
-  // backend's session row must have been updated at or after the user message
-  // that armed the renderer run state.
   if (
     state.lastUserMessageAt != null
     && typeof current?.updatedAt === 'number'
@@ -1398,11 +1647,12 @@ function isToolResultRole(role: unknown): boolean {
 }
 
 /** True for internal plumbing messages that should never be shown in the UI. */
-function isInternalMessage(msg: { role?: unknown; content?: unknown; idempotencyKey?: unknown; model?: unknown }): boolean {
+function isInternalMessage(msg: { role?: unknown; content?: unknown; idempotencyKey?: unknown; model?: unknown; text?: unknown }): boolean {
   if (msg.role === 'system') return true;
-  const text = getMessageText(msg.content);
+  const text = getMessageTextForFilter(msg);
   if (msg.role === 'assistant') {
-    if (/^(HEARTBEAT_OK|NO_REPLY)\s*$/.test(text)) return true;
+    if (isInternalAssistantReplyText(text)) return true;
+    if (isGeneratingStatusNarration(text)) return true;
     // OpenClaw's gateway writes a fallback `assistant-media` transcript
     // message when its `createManagedOutgoingImageBlocks` pipeline fails
     // ("could not be prepared" warning in stderr). The fallback has:
@@ -1427,12 +1677,41 @@ function isInternalMessage(msg: { role?: unknown; content?: unknown; idempotency
       // canonical render — keep them. Only hide the text-only fallback.
       if (!hasImageUrlBlock) return true;
     }
+    if (!text.trim() && Array.isArray(msg.content)) {
+      const blocks = msg.content as ContentBlock[];
+      const hasThinking = blocks.some((block) => block.type === 'thinking' && block.thinking?.trim());
+      const hasVisibleText = blocks.some((block) => block.type === 'text' && block.text?.trim());
+      if (hasThinking && !hasVisibleText) return true;
+    }
   }
   if (msg.role === 'user' && /^\[OpenClaw heartbeat poll\]\s*$/i.test(text.trim())) return true;
   // Runtime system injections: these arrive as user or assistant-role messages
   // but are internal plumbing (exec results, async-command notices, time pings, etc.)
   if ((msg.role === 'user' || msg.role === 'assistant') && isRuntimeSystemInjection(text)) return true;
   return false;
+}
+
+function messageHasToolUse(msg: { role?: unknown; content?: unknown; tool_calls?: unknown; toolCalls?: unknown }): boolean {
+  if (msg.role !== 'assistant') return false;
+  if (Array.isArray(msg.content)) {
+    const blocks = msg.content as ContentBlock[];
+    if (blocks.some((block) => block.type === 'tool_use' || block.type === 'toolCall')) {
+      return true;
+    }
+  }
+  const toolCalls = msg.tool_calls ?? msg.toolCalls;
+  return Array.isArray(toolCalls) && toolCalls.length > 0;
+}
+
+/**
+ * History filtering must keep assistant tool-call turns even when their visible
+ * text is internal narration (e.g. "生成中，稍等" + `image_generate`). Those
+ * turns power the execution graph and run lifecycle detection.
+ */
+function shouldDropMessageFromHistory(msg: { role?: unknown; content?: unknown; text?: unknown; tool_calls?: unknown; toolCalls?: unknown }): boolean {
+  if (isToolResultRole(msg.role)) return true;
+  if (messageHasToolUse(msg)) return false;
+  return isInternalMessage(msg);
 }
 
 /**
@@ -1459,6 +1738,8 @@ function isRuntimeSystemInjection(text: string): boolean {
   ) {
     return true;
   }
+  if (/^\[Inter-session message\]/i.test(normalized)) return true;
+  if (isOpenClawRuntimeEventPrompt(normalized)) return true;
   return false;
 }
 
@@ -1713,6 +1994,13 @@ function collectToolUpdates(message: unknown, eventState: string): ToolStatus[] 
   return updates;
 }
 
+function messageHasImageContent(message: RawMessage | undefined): boolean {
+  if (!message) return false;
+  if ((message._attachedFiles ?? []).some((file) => file.mimeType.startsWith('image/'))) return true;
+  const content = message.content;
+  return Array.isArray(content) && (content as ContentBlock[]).some((block) => block.type === 'image');
+}
+
 function hasNonToolAssistantContent(message: RawMessage | undefined): boolean {
   if (!message) return false;
   if (typeof message.content === 'string' && message.content.trim()) return true;
@@ -1724,6 +2012,7 @@ function hasNonToolAssistantContent(message: RawMessage | undefined): boolean {
       if (block.type === 'image') return true;
     }
   }
+  if (messageHasImageContent(message)) return true;
 
   const msg = message as unknown as Record<string, unknown>;
   if (typeof msg.text === 'string' && msg.text.trim()) return true;
@@ -1736,6 +2025,70 @@ function isRealUserBoundaryMessage(msg: RawMessage): boolean {
   if (!Array.isArray(msg.content)) return true;
   const blocks = msg.content as Array<{ type?: string }>;
   return blocks.length === 0 || !blocks.every((block) => block.type === 'tool_result' || block.type === 'toolResult');
+}
+
+/** True when the segment has real run output (not a thinking-only stub). */
+function segmentHasMeaningfulAssistantProgress(segment: RawMessage[]): boolean {
+  return segment.some((msg) => {
+    if (msg.role !== 'assistant') return false;
+    if (isTerminalAssistantErrorMessage(msg)) return true;
+    if (hasPendingToolUse(msg)) return true;
+    return hasNonToolAssistantContent(msg);
+  });
+}
+
+// NOTE: hasMeaningfulAssistantProgressAfterLastUser is kept for upstream parity
+// but currently unused in this monolithic store path.
+
+/** True when streaming state carries visible progress (not a role-only placeholder). */
+function hasMeaningfulStreamingActivity(
+  streamingMessage: unknown | null,
+  streamingText: string,
+  streamingTools: ToolStatus[],
+): boolean {
+  if (streamingText.trim()) return true;
+  if (streamingTools.length > 0) return true;
+  if (!streamingMessage || typeof streamingMessage !== 'object') return false;
+
+  const msg = streamingMessage as RawMessage;
+  if (typeof msg.content === 'string' && msg.content.trim()) return true;
+
+  const content = msg.content;
+  if (Array.isArray(content)) {
+    for (const block of content as ContentBlock[]) {
+      if (block.type === 'text' && block.text?.trim()) return true;
+      if (block.type === 'thinking' && block.thinking?.trim()) return true;
+      if (block.type === 'tool_use' || block.type === 'toolCall') return true;
+      if (block.type === 'image') return true;
+    }
+  }
+
+  const raw = msg as unknown as Record<string, unknown>;
+  if (typeof raw.text === 'string' && raw.text.trim()) return true;
+  const toolCalls = raw.tool_calls ?? raw.toolCalls;
+  return Array.isArray(toolCalls) && toolCalls.length > 0;
+}
+
+/** Segment after the user turn that matches the in-flight send (not prior history). */
+function getOpenRunSegmentFromHistory(
+  filteredMessages: RawMessage[],
+  lastUserMessageAt: number | null,
+): RawMessage[] {
+  if (lastUserMessageAt == null) {
+    return postUserSegmentMessages(filteredMessages);
+  }
+  const userMsTs = toMs(lastUserMessageAt);
+  const CLOCK_SKEW_MS = 5_000;
+  for (let i = filteredMessages.length - 1; i >= 0; i -= 1) {
+    const message = filteredMessages[i];
+    if (!isRealUserBoundaryMessage(message)) continue;
+    const ts = message.timestamp ? toMs(message.timestamp as number) : null;
+    if (ts == null) continue;
+    if (ts + CLOCK_SKEW_MS >= userMsTs && ts <= userMsTs + OPTIMISTIC_USER_TIMESTAMP_MATCH_MS) {
+      return filteredMessages.slice(i + 1);
+    }
+  }
+  return [];
 }
 
 function hasAssistantAfterLastRealUser(messages: RawMessage[]): boolean {
@@ -1811,11 +2164,15 @@ function segmentHasOpenToolRun(segmentMessages: RawMessage[]): boolean {
     }
   }
 
+  // The tool run is closed if any assistant message after the last tool call
+  // is a non-tool response — either with visible content or a thinking-only
+  // terminal turn (the model ended without producing more tool calls).
   return !segmentMessages.some((message, index) => {
     if (index <= lastToolUseOffset) return false;
     if (message.role !== 'assistant') return false;
     if (hasPendingToolUse(message)) return false;
-    return hasNonToolAssistantContent(message);
+    if (hasNonToolAssistantContent(message)) return true;
+    return !isToolOnlyMessage(message);
   });
 }
 
@@ -2362,7 +2719,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Before filtering: attach images/files from tool_result messages to the next assistant message
       const messagesWithToolImages = enrichWithToolResultFiles(rawMessages);
-      const filteredMessages = messagesWithToolImages.filter((msg) => !isToolResultRole(msg.role) && !isInternalMessage(msg));
+      const messagesWithToolAttachments = enrichWithToolCallAttachments(messagesWithToolImages);
+      const filteredMessages = messagesWithToolAttachments.filter((msg) => !shouldDropMessageFromHistory(msg));
       // Restore file attachments for user/assistant messages (from cache + text patterns)
       const enrichedMessages = enrichWithCachedImages(filteredMessages);
 
@@ -2403,10 +2761,72 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       finalMessages = dropRedundantOptimisticUserMessages(currentSessionKey, finalMessages);
 
+      // Preserve locally-resolved previews (gatewayUrl → filePath, preview, fileSize)
+      // that were built before this history load. The Gateway response may rebuild
+      // `_attachedFiles` with stale placeholders (preview=null, fileSize=0); merge
+      // the existing preview data back so the UI keeps showing resolved images.
+      type AttachedFile = NonNullable<RawMessage['_attachedFiles']>[number];
+      const getAttachmentMergeKey = (file: AttachedFile): string | null => (
+        file.filePath || file.gatewayUrl || null
+      );
+      const preserveExistingAttachmentPreviews = (
+        currentMessages: RawMessage[],
+        nextMessages: RawMessage[],
+      ): RawMessage[] => {
+        const currentFilesByMessageKey = new Map<string, Map<string, AttachedFile>>();
+        for (const message of currentMessages) {
+          if (!message._attachedFiles?.length) continue;
+          const filesByKey = new Map<string, AttachedFile>();
+          for (const file of message._attachedFiles) {
+            const key = getAttachmentMergeKey(file);
+            if (!key) continue;
+            if (!file.preview && !file.fileSize && !file.previewStatus) continue;
+            filesByKey.set(key, file);
+          }
+          if (filesByKey.size > 0) {
+            currentFilesByMessageKey.set(getPreviewMergeKey(message), filesByKey);
+          }
+        }
+
+        if (currentFilesByMessageKey.size === 0) return nextMessages;
+
+        return nextMessages.map((message) => {
+          if (!message._attachedFiles?.length) return message;
+          const currentFiles = currentFilesByMessageKey.get(getPreviewMergeKey(message));
+          if (!currentFiles) return message;
+
+          let changed = false;
+          const attachedFiles = message._attachedFiles.map((file) => {
+            const key = getAttachmentMergeKey(file);
+            const currentFile = key ? currentFiles.get(key) : undefined;
+            if (!currentFile) return file;
+
+            let nextFile = file;
+            if (!nextFile.preview && currentFile.preview) {
+              nextFile = { ...nextFile, preview: currentFile.preview };
+              changed = true;
+            }
+            if (!nextFile.fileSize && currentFile.fileSize) {
+              nextFile = { ...nextFile, fileSize: currentFile.fileSize };
+              changed = true;
+            }
+            if (!nextFile.previewStatus && currentFile.previewStatus) {
+              nextFile = { ...nextFile, previewStatus: currentFile.previewStatus };
+              changed = true;
+            }
+            return nextFile;
+          });
+
+          return changed ? { ...message, _attachedFiles: attachedFiles } : message;
+        });
+      };
+      finalMessages = preserveExistingAttachmentPreviews(get().messages, finalMessages);
+
       const { pendingFinal, lastUserMessageAt, sending: isSendingNow } = get();
-      const userMsTs = lastUserMessageAt ? toMs(lastUserMessageAt) : 0;
+      const userMsTs = lastUserMessageAt != null ? toMs(lastUserMessageAt) : 0;
       const isAfterUserMsg = (msg: RawMessage): boolean => {
-        if (!userMsTs || !msg.timestamp) return true;
+        if (lastUserMessageAt == null) return true;
+        if (!msg.timestamp) return false;
         return toMs(msg.timestamp) >= userMsTs;
       };
       const isRealUserBoundary = (msg: RawMessage): boolean => {
@@ -2415,16 +2835,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const blocks = msg.content as Array<{ type?: string }>;
         return blocks.length === 0 || !blocks.every((block) => block.type === 'tool_result' || block.type === 'toolResult');
       };
-      const postBoundaryMessages = userMsTs
-        ? filteredMessages.filter((msg) => isAfterUserMsg(msg))
-        : (() => {
-            for (let i = filteredMessages.length - 1; i >= 0; i -= 1) {
-              if (isRealUserBoundary(filteredMessages[i])) {
-                return filteredMessages.slice(i + 1);
+      const openRunSegment = isSendingNow && lastUserMessageAt != null
+        ? getOpenRunSegmentFromHistory(filteredMessages, lastUserMessageAt)
+        : postUserSegmentMessages(filteredMessages);
+      const postBoundaryMessages = isSendingNow && lastUserMessageAt != null
+        ? openRunSegment
+        : (lastUserMessageAt != null
+          ? filteredMessages.filter((msg) => isAfterUserMsg(msg))
+          : (() => {
+              for (let i = filteredMessages.length - 1; i >= 0; i -= 1) {
+                if (isRealUserBoundary(filteredMessages[i])) {
+                  return filteredMessages.slice(i + 1);
+                }
               }
-            }
-            return filteredMessages;
-          })();
+              return filteredMessages;
+            })());
       const lastAssistantAfterBoundary = [...postBoundaryMessages].reverse().find((msg) => msg.role === 'assistant');
       const latestTerminalAssistantErrorMessage = lastAssistantAfterBoundary
         && (getMessageStopReason(lastAssistantAfterBoundary) === 'error'
@@ -2506,56 +2931,94 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // (WS disconnect, console-only runs, etc.). Any assistant turn after the
       // user's message counts as progress so the safety timeout does not emit a
       // false "No response received" error while tool chains are still running.
-      if (isSendingNow && hasAssistantAfterLastRealUser(filteredMessages)) {
+      const progressSegment = openRunSegment;
+      if (isSendingNow && segmentHasMeaningfulAssistantProgress(progressSegment)) {
         _lastChatEventAt = Date.now();
-        if (get().error) {
-          set({ error: null });
+        if (get().error || get().runError) {
+          set({ error: null, runError: null });
         }
       }
 
-      if (isSendingNow && !pendingFinal && hasAssistantAfterLastRealUser(filteredMessages)) {
-        // Only arm pendingFinal when the assistant produced user-visible
-        // content (text/image). A bare [thinking, toolCall] turn is still
-        // mid-tool-chain and should not flip pendingFinal yet.
-        const segment = postUserSegmentMessages(filteredMessages);
-        if (segment.some((m) => m.role === 'assistant' && hasNonToolAssistantContent(m))) {
+      if (isSendingNow && !pendingFinal) {
+        const hasFinalLikeAssistant = openRunSegment.some((msg) => {
+          if (msg.role !== 'assistant') return false;
+          if (hasPendingToolUse(msg)) return false;
+          return hasNonToolAssistantContent(msg);
+        });
+        if (hasFinalLikeAssistant) {
           set({ pendingFinal: true });
         }
       }
 
       // If pendingFinal, check whether the AI produced a final text response.
       if (pendingFinal || get().pendingFinal) {
-        const recentAssistant = [...filteredMessages].reverse().find((msg) => {
+        const recentAssistant = [...openRunSegment].reverse().find((msg) => {
           if (msg.role !== 'assistant') return false;
           // A mixed text+toolCall turn with stopReason=tool_use is still
           // waiting for tool results; don't treat it as the final reply.
           if (hasPendingToolUse(msg)) return false;
-          if (!hasNonToolAssistantContent(msg)) return false;
-          return isAfterUserMsg(msg);
+          return hasNonToolAssistantContent(msg);
         });
         if (recentAssistant) {
           clearHistoryPoll();
-          set({ sending: false, activeRunId: null, pendingFinal: false });
+          set({ sending: false, activeRunId: null, pendingFinal: false, runError: null });
+          captureSessionRunState(currentSessionKey, DEFAULT_SESSION_RUN_STATE);
         }
       }
 
       // Unstick lifecycle when history already has a conclusive reply but the
       // Gateway never emitted a terminal phase event (WS drop, console run, etc.).
-      if (isSendingNow && !get().streamingMessage && get().streamingTools.length === 0) {
-        const openSegment = postUserSegmentMessages(filteredMessages);
+      // Allow unsticking when streamingTools is empty OR all entries are completed
+      // (completed tool entries linger after tool rounds and must not block this).
+      const noRunningTools = !get().streamingTools.some((t) => t.status === 'running');
+      if (isSendingNow && !get().streamingMessage && noRunningTools) {
+        const openSegment = openRunSegment;
         const hasConclusiveReply = openSegment.some((message) => {
           if (message.role !== 'assistant') return false;
           if (hasPendingToolUse(message)) return false;
           return hasNonToolAssistantContent(message);
         });
-        if (hasConclusiveReply && !segmentHasOpenToolRun(openSegment)) {
+        const hasDeliveredImageReply = openSegment.some((message) => message.role === 'assistant' && messageHasImageContent(message));
+        if (hasDeliveredImageReply && !segmentHasOpenToolRun(openSegment)) {
           clearHistoryPoll();
           set({
             sending: false,
             activeRunId: null,
             pendingFinal: false,
             lastUserMessageAt: null,
+            runError: null,
+            streamingMessage: null,
+            streamingText: '',
+            streamingTools: [],
+            pendingToolImages: [],
           });
+          captureSessionRunState(currentSessionKey, DEFAULT_SESSION_RUN_STATE);
+        } else if (hasConclusiveReply && !segmentHasOpenToolRun(openSegment)) {
+          clearHistoryPoll();
+          set({
+            sending: false,
+            activeRunId: null,
+            pendingFinal: false,
+            lastUserMessageAt: null,
+            runError: null,
+          });
+          captureSessionRunState(currentSessionKey, DEFAULT_SESSION_RUN_STATE);
+        }
+        // Also unstick when all tool calls are resolved but the model's
+        // terminal response was thinking-only (no visible content). The
+        // `segmentHasOpenToolRun` update above detects this, but we still
+        // need an explicit conclusive-reply fallback for the case where
+        // hasConclusiveReply is false (thinking-only terminal turn).
+        if (!hasConclusiveReply && !segmentHasOpenToolRun(openSegment) && openSegment.length > 0) {
+          clearHistoryPoll();
+          set({
+            sending: false,
+            activeRunId: null,
+            pendingFinal: false,
+            lastUserMessageAt: null,
+            runError: null,
+          });
+          captureSessionRunState(currentSessionKey, DEFAULT_SESSION_RUN_STATE);
         }
       }
 
@@ -2614,15 +3077,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
           let data: Record<string, unknown> | null = null;
           let lastError: unknown = null;
 
+          const gatewayRpc = useGatewayStore.getState().rpc.bind(useGatewayStore.getState());
+          const chatHistoryParams = buildChatHistoryRpcParams(
+            currentSessionKey,
+            INITIAL_HISTORY_LIMIT,
+            getChatHistoryMaxChars(gatewayRpc),
+          );
+
           for (let attempt = 0; attempt <= CHAT_HISTORY_STARTUP_RETRY_DELAYS_MS.length; attempt += 1) {
             if (!isCurrentSession()) {
               break;
             }
 
             try {
-              data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
+              data = await gatewayRpc<Record<string, unknown>>(
                 'chat.history',
-                { sessionKey: currentSessionKey, limit: INITIAL_HISTORY_LIMIT },
+                chatHistoryParams,
                 historyTimeoutOverride,
               );
               lastError = null;
@@ -2679,6 +3149,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (rawMessages.length === 0 && isCronSessionKey(currentSessionKey)) {
           rawMessages = await loadCronFallbackMessages(currentSessionKey, INITIAL_HISTORY_LIMIT);
+        } else if (rawMessages.length > 0) {
+          rawMessages = await hydrateGatewayHistoryFromTranscript(
+            currentSessionKey,
+            rawMessages,
+            INITIAL_HISTORY_LIMIT,
+            get().messages,
+          );
         }
 
         if (rawMessages.length > 0 || !get().error) {
@@ -2752,9 +3229,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Fallback to gateway RPC
         if (!usedHostApi || newRawMessages.length === 0) {
-          const data = await useGatewayStore.getState().rpc<Record<string, unknown>>(
+          const gatewayRpc = useGatewayStore.getState().rpc.bind(useGatewayStore.getState());
+          const chatHistoryParams = buildChatHistoryRpcParams(
+            currentSessionKey,
+            nextLimit,
+            getChatHistoryMaxChars(gatewayRpc),
+          );
+          const data = await gatewayRpc<Record<string, unknown>>(
             'chat.history',
-            { sessionKey: currentSessionKey, limit: nextLimit },
+            chatHistoryParams,
             30_000,
           );
           newRawMessages = Array.isArray(data.messages) ? (data.messages as RawMessage[]) : [];
@@ -2778,8 +3261,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         const messagesWithToolImages = enrichWithToolResultFiles(earlierRaw);
-        const filteredMessages = messagesWithToolImages.filter(
-          (msg) => !isToolResultRole(msg.role) && !isInternalMessage(msg),
+        const messagesWithToolAttachments = enrichWithToolCallAttachments(messagesWithToolImages);
+        const filteredMessages = messagesWithToolAttachments.filter(
+          (msg) => !shouldDropMessageFromHistory(msg),
         );
         const enrichedMessages = enrichWithCachedImages(filteredMessages);
 
@@ -2897,33 +3381,68 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
     _historyPollTimer = setTimeout(pollHistory, POLL_START_DELAY);
 
-    const SAFETY_TIMEOUT_MS = 90_000;
     const checkStuck = () => {
       const state = get();
       if (!state.sending) return;
-      if (state.streamingMessage || state.streamingText) return;
-      if (state.pendingFinal) {
+
+      const hasStream = hasMeaningfulStreamingActivity(
+        state.streamingMessage,
+        state.streamingText,
+        state.streamingTools,
+      );
+      if (hasStream) {
         setTimeout(checkStuck, 10_000);
         return;
       }
-      if (hasAssistantProgressSinceSend(state.messages, state.lastUserMessageAt)) {
+
+      // Gateway run-start / model-switch deltas can set `{ role: 'assistant' }`
+      // with no payload. That placeholder must not block the safety timeout.
+      if (state.streamingMessage || state.streamingText) {
+        set({ streamingMessage: null, streamingText: '' });
+      }
+
+      const sendAgeMs = state.lastUserMessageAt
+        ? Date.now() - toMs(state.lastUserMessageAt)
+        : 0;
+      const hasProgress = hasAssistantProgressSinceSend(state.messages, state.lastUserMessageAt);
+
+      if (sendAgeMs >= LLM_IDLE_HINT_MS && !state.runError && !hasProgress) {
+        set({
+          runError: 'The model did not respond within 120 seconds. Retrying…',
+        });
+      }
+
+      if (state.pendingFinal) {
+        if (hasProgress) {
+          setTimeout(checkStuck, 10_000);
+          return;
+        }
+        set({ pendingFinal: false });
+      }
+
+      if (hasProgress) {
         _lastChatEventAt = Date.now();
-        if (state.error) {
-          set({ error: null });
+        if (state.error || state.runError) {
+          set({ error: null, runError: null });
         }
         setTimeout(checkStuck, 10_000);
         return;
       }
-      if (Date.now() - _lastChatEventAt < SAFETY_TIMEOUT_MS) {
+
+      if (Date.now() - _lastChatEventAt < NO_RESPONSE_SAFETY_TIMEOUT_MS) {
         setTimeout(checkStuck, 10_000);
         return;
       }
+
       clearHistoryPoll();
       set({
         error: 'No response received from the model. The provider may be unavailable or the API key may have insufficient quota. Please check your provider settings.',
         sending: false,
         activeRunId: null,
         lastUserMessageAt: null,
+        pendingFinal: false,
+        streamingMessage: null,
+        streamingText: '',
       });
     };
     setTimeout(checkStuck, 30_000);
@@ -3220,10 +3739,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
           const toolOnly = isToolOnlyMessage(normalizedFinalMessage);
           const hasOutput = hasNonToolAssistantContent(normalizedFinalMessage);
+          // When the model ends its turn with only `thinking` blocks (no text,
+          // no images, no tool calls), `hasOutput` is false and `toolOnly` is
+          // false. This is a valid terminal state (the model decided not to
+          // produce user-visible content — common after image_generate +
+          // message-send tool chains on MiniMax-M2.7). Without this flag the
+          // lifecycle stays armed indefinitely, leaving the UI stuck on
+          // "Thinking…" even though the run is complete.
+          const isEmptyTerminalResponse = !toolOnly && !hasOutput && !hasPendingToolUse(normalizedFinalMessage);
+          const clearLifecycle = hasOutput || isEmptyTerminalResponse;
           const msgId = normalizedFinalMessage.id || (toolOnly ? `run-${runId}-tool-${Date.now()}` : `run-${runId}`);
           set((s) => {
             const nextTools = updates.length > 0 ? upsertToolStatuses(s.streamingTools, updates) : s.streamingTools;
-            const streamingTools = hasOutput ? [] : nextTools;
+            const streamingTools = clearLifecycle ? [] : nextTools;
 
             // Note: it would be tempting to also surface `MEDIA:/path`
             // markers from `normalizedFinalMessage.content`'s text here, so
@@ -3246,7 +3774,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
               }
               : { ...normalizedFinalMessage, role: (normalizedFinalMessage.role || 'assistant') as RawMessage['role'], id: msgId };
             const clearPendingImages = { pendingToolImages: [] as AttachedFileMeta[] };
-
             // Check if message already exists (prevent duplicates)
             const alreadyExists = s.messages.some(m => m.id === msgId);
             if (alreadyExists) {
@@ -3259,9 +3786,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               } : {
                 streamingText: '',
                 streamingMessage: null,
-                sending: hasOutput ? false : s.sending,
-                activeRunId: hasOutput ? null : s.activeRunId,
-                pendingFinal: hasOutput ? false : true,
+                sending: clearLifecycle ? false : s.sending,
+                activeRunId: clearLifecycle ? null : s.activeRunId,
+                pendingFinal: clearLifecycle ? false : true,
                 streamingTools,
                 ...clearPendingImages,
               };
@@ -3277,17 +3804,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messages: [...s.messages, msgWithImages],
               streamingText: '',
               streamingMessage: null,
-              sending: hasOutput ? false : s.sending,
-              activeRunId: hasOutput ? null : s.activeRunId,
-              pendingFinal: hasOutput ? false : true,
+              sending: clearLifecycle ? false : s.sending,
+              activeRunId: clearLifecycle ? null : s.activeRunId,
+              pendingFinal: clearLifecycle ? false : true,
               streamingTools,
               ...clearPendingImages,
             };
           });
           // After the final response, quietly reload history to surface all intermediate
           // tool-use turns (thinking + tool blocks) from the Gateway's authoritative record.
-          if (hasOutput && !toolOnly) {
+          // Also reload for empty terminal responses (thinking-only) so the
+          // delayed follow-up can pick up the Gateway's `assistant-media`
+          // bubble that may still be getting written.
+          if (clearLifecycle && !toolOnly) {
             clearHistoryPoll();
+            captureSessionRunState(get().currentSessionKey, DEFAULT_SESSION_RUN_STATE);
             forceNextHistoryLoad(get().currentSessionKey);
             void get().loadHistory(true);
 

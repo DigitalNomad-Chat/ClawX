@@ -23,6 +23,49 @@ function parseSessionUpdatedAtMs(value: unknown): number | undefined {
   return undefined;
 }
 
+function parseSessionStatus(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
+}
+
+function sessionIndicatesIdle(session: ChatSession | undefined): boolean {
+  if (!session) return false;
+  if (session.hasActiveRun === false) return true;
+  return session.status === 'done'
+    || session.status === 'completed'
+    || session.status === 'finished'
+    || session.status === 'failed'
+    || session.status === 'error'
+    || session.status === 'aborted'
+    || session.status === 'cancelled';
+}
+
+function reconcileCurrentSessionIdleFromBackend(set: ChatSet, get: ChatGet, sessions: ChatSession[]): void {
+  const state = get();
+  if (!state.sending && state.activeRunId == null && !state.pendingFinal) return;
+
+  const current = sessions.find((session) => session.key === state.currentSessionKey);
+  if (!sessionIndicatesIdle(current)) return;
+
+  if (
+    state.lastUserMessageAt != null
+    && typeof current?.updatedAt === 'number'
+    && current.updatedAt < toMs(state.lastUserMessageAt)
+  ) {
+    return;
+  }
+
+  set({
+    sending: false,
+    activeRunId: null,
+    pendingFinal: false,
+    lastUserMessageAt: null,
+    streamingText: '',
+    streamingMessage: null,
+    streamingTools: [],
+    pendingToolImages: [],
+  });
+}
+
 export function createSessionActions(
   set: ChatSet,
   get: ChatGet,
@@ -46,6 +89,8 @@ export function createSessionActions(
             thinkingLevel: s.thinkingLevel ? String(s.thinkingLevel) : undefined,
             model: s.model ? String(s.model) : undefined,
             updatedAt: parseSessionUpdatedAtMs(s.updatedAt),
+            status: parseSessionStatus(s.status),
+            hasActiveRun: typeof s.hasActiveRun === 'boolean' ? s.hasActiveRun : undefined,
             derivedTitle: s.derivedTitle ? String(s.derivedTitle) : undefined,
           })).filter((s: ChatSession) => s.key);
 
@@ -110,6 +155,8 @@ export function createSessionActions(
               ...discoveredActivity,
             },
           }));
+
+          reconcileCurrentSessionIdleFromBackend(set, get, sessionsWithCurrent);
 
           if (currentSessionKey !== nextSessionKey) {
             get().loadHistory();

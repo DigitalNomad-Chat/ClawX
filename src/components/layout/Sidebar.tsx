@@ -21,6 +21,7 @@ import {
   Check,
   X,
   Cpu,
+  ImagePlus,
   Moon,
   Store,
   ChevronRight,
@@ -287,7 +288,10 @@ export function Sidebar() {
     { to: '/skills', icon: <Puzzle className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.skills'), testId: 'sidebar-nav-skills' },
     { to: '/cron', icon: <Clock className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.cronTasks'), testId: 'sidebar-nav-cron' },
     ...(devModeUnlocked
-      ? [{ to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' }]
+      ? [
+        { to: '/image-generation', icon: <ImagePlus className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.imageGeneration'), testId: 'sidebar-nav-image-generation' },
+        { to: '/dreams', icon: <Moon className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('common:sidebar.openClawDreams'), testId: 'sidebar-nav-dreams' },
+      ]
       : []),
     { to: '/advanced-config', icon: <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.advancedConfig') || '高级配置', testId: 'sidebar-nav-advanced-config' },
     // Module nav items (dashboard, collaboration, etc.) — placed before marketplace

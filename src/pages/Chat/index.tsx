@@ -657,6 +657,7 @@ export function Chat() {
   }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError, isRunTrigger]);
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
   let latestRunSegmentCompletion = { hasFinalReply: false, hasToolActivity: false };
+  let hasDeliveredImageReply = false;
   for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
     if (!isRealUserMessage(messages[idx]) || subagentCompletionInfos[idx]) continue;
     const nextUserIndex = nextUserMessageIndexes[idx];
@@ -667,9 +668,13 @@ export function Chat() {
         m.role === 'assistant' && extractToolUse(m).length > 0,
       ),
     };
+    hasDeliveredImageReply = postTrigger.some((m) =>
+      m.role === 'assistant'
+      && (m._attachedFiles ?? []).some((f) => f.mimeType.startsWith('image/')),
+    );
     break;
   }
-  const runSettledInHistory = latestRunSegmentCompletion.hasFinalReply
+  const runSettledInHistory = (latestRunSegmentCompletion.hasFinalReply || hasDeliveredImageReply)
     && !hasAnyStreamContent
     && (latestRunSegmentCompletion.hasToolActivity || !sending);
   const inputRunActive = (sending || hasActiveExecutionGraph) && !runSettledInHistory;

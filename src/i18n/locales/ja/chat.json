@@ -207,5 +207,10 @@
         "moreHint": "さらに {{count}} 件の質問は表示されていません"
     },
     "loadMoreHistory": "さらに前のメッセージを読み込む",
-    "loadingMoreHistory": "読み込み中..."
+    "loadingMoreHistory": "読み込み中...",
+    "imageGeneration": {
+        "generating": "画像を生成しています。少々お待ちください…",
+        "previewLoading": "画像プレビューを読み込んでいます…",
+        "previewUnavailable": "画像プレビューを一時的に表示できません"
+    }
 }

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { chatHistoryRpcParams, prewarmChatHistoryMaxCharsCache } from './gateway-rpc-test-utils';
 
 const invokeIpcMock = vi.fn();
 const hostApiFetchMock = vi.fn();
 const gatewayStoreGetStateMock = vi.fn();
 const clearHistoryPoll = vi.fn();
 const enrichWithCachedImages = vi.fn((messages) => messages);
+const enrichWithToolCallAttachments = vi.fn((messages) => messages);
 const enrichWithToolResultFiles = vi.fn((messages) => messages);
 const getMessageErrorMessage = vi.fn((message: { errorMessage?: string; error_message?: string } | undefined) => {
   if (!message) return null;
@@ -48,6 +50,7 @@ vi.mock('@/stores/gateway', () => ({
 vi.mock('@/stores/chat/helpers', () => ({
   clearHistoryPoll: (...args: unknown[]) => clearHistoryPoll(...args),
   enrichWithCachedImages: (...args: unknown[]) => enrichWithCachedImages(...args),
+  enrichWithToolCallAttachments: (...args: unknown[]) => enrichWithToolCallAttachments(...args),
   enrichWithToolResultFiles: (...args: unknown[]) => enrichWithToolResultFiles(...args),
   getLatestOptimisticUserMessage: (messages: Array<{ role: string; timestamp?: number }>, userTimestampMs: number) =>
     [...messages].reverse().find(
@@ -86,6 +89,15 @@ vi.mock('@/stores/chat/helpers', () => ({
   }),
   dropRedundantOptimisticUserMessages: (_sessionKey: string, messages: unknown[]) => messages,
   isRecoverableRuntimeError: (message: string) => /\bterminated\b/i.test(message),
+  shouldDropMessageFromHistory: (msg: { role?: unknown; content?: unknown }) => {
+    if (msg.role === 'toolresult' || msg.role === 'tool_result') return true;
+    if (msg.role === 'system') return true;
+    if (msg.role === 'assistant') {
+      const text = typeof msg.content === 'string' ? msg.content : '';
+      if (/^(HEARTBEAT_OK|NO_REPLY)\s*$/.test(text)) return true;
+    }
+    return false;
+  },
   matchesOptimisticUserMessage: (
     candidate: { role: string; timestamp?: number; content?: unknown; _attachedFiles?: Array<{ filePath?: string; fileName?: string; mimeType?: string; fileSize?: number }> },
     optimistic: { role: string; timestamp?: number; content?: unknown; _attachedFiles?: Array<{ filePath?: string; fileName?: string; mimeType?: string; fileSize?: number }> },
@@ -113,6 +125,8 @@ vi.mock('@/stores/chat/helpers', () => ({
   getMessageErrorMessage: (...args: unknown[]) => getMessageErrorMessage(...args),
   getMessageStopReason: (...args: unknown[]) => getMessageStopReason(...args),
   toMs: (...args: unknown[]) => toMs(...args as Parameters<typeof toMs>),
+  hasAssistantAfterLastRealUser: (messages: Array<{ role: string }>) =>
+    messages.some((message) => message.role === 'assistant'),
 }));
 
 type ChatLikeState = {
@@ -156,7 +170,7 @@ function makeHarness(initial?: Partial<ChatLikeState>) {
 }
 
 describe('chat history actions', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
     vi.resetModules();
     vi.useRealTimers();
@@ -165,6 +179,7 @@ describe('chat history actions', () => {
     gatewayStoreGetStateMock.mockReturnValue({
       status: { state: 'running', port: 18789, connectedAt: Date.now() },
     });
+    await prewarmChatHistoryMaxCharsCache();
   });
 
   it('uses cron session fallback when gateway history is empty', async () => {
@@ -397,14 +412,14 @@ describe('chat history actions', () => {
       1,
       'gateway:rpc',
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     );
     expect(invokeIpcMock).toHaveBeenNthCalledWith(
       2,
       'gateway:rpc',
       'chat.history',
-      { sessionKey: 'agent:main:main', limit: 200 },
+      chatHistoryRpcParams('agent:main:main', 200),
       35_000,
     );
     expect(h.read().messages.map((message) => message.content)).toEqual(['restored after retry']);

@@ -2010,3 +2010,239 @@ describe('sanitizeOpenClawConfig OpenAI runtime pin', () => {
     expect((providers.openai as Record<string, unknown>).agentRuntime).toEqual({ id: 'custom-harness' });
   });
 });
+
+describe('syncOpenAiCompatibleImageRelay', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+    await rm(testHome, { recursive: true, force: true });
+    await rm(testUserData, { recursive: true, force: true });
+  });
+
+  it('writes a ClawX-owned provider with a custom image base URL without changing OpenAI chat config', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [
+          {
+            id: 'main',
+            name: 'Main',
+            default: true,
+            workspace: '~/.openclaw/workspace',
+            agentDir: '~/.openclaw/agents/main/agent',
+          },
+        ],
+      },
+      models: {
+        providers: {
+          openai: { baseUrl: 'https://api.openai.com/v1', api: 'openai-responses', models: [] },
+        },
+      },
+    });
+
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+    await syncOpenAiCompatibleImageRelay({
+      enabled: true,
+      baseUrl: 'https://relay.example.com',
+      apiKey: 'sk-relay-test',
+      imageModelIds: ['gpt-image-2'],
+    });
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    const openai = providers.openai as Record<string, unknown>;
+    const imageRelay = providers['clawx-openai-image'] as Record<string, unknown>;
+    expect(openai.baseUrl).toBe('https://api.openai.com/v1');
+    expect(openai.api).toBe('openai-responses');
+    expect(imageRelay.baseUrl).toBe('https://relay.example.com/v1');
+    expect(imageRelay.api).toBe('openai-completions');
+    expect(imageRelay.request).toEqual({ allowPrivateNetwork: true });
+    expect(imageRelay.models).toEqual([{ id: 'gpt-image-2', name: 'gpt-image-2' }]);
+
+    const plugins = result.plugins as Record<string, unknown>;
+    const entries = plugins.entries as Record<string, unknown>;
+    expect((entries['clawx-openai-image'] as Record<string, unknown>).enabled).toBe(true);
+
+    const auth = await readAuthProfiles('main');
+    expect((auth.profiles['clawx-openai-image:default'] as Record<string, unknown>).key).toBe('sk-relay-test');
+  });
+
+  it('removes only the ClawX image provider and clears the stored key when relay is disabled', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [
+          {
+            id: 'main',
+            name: 'Main',
+            default: true,
+            workspace: '~/.openclaw/workspace',
+            agentDir: '~/.openclaw/agents/main/agent',
+          },
+        ],
+        defaults: {
+          imageGenerationModel: { primary: 'clawx-openai-image/gpt-image-2', timeoutMs: 180000 },
+        },
+      },
+      models: {
+        providers: {
+          openai: { baseUrl: 'https://api.openai.com/v1', api: 'openai-responses', models: [] },
+          'clawx-openai-image': { baseUrl: 'https://relay.example.com/v1', api: 'openai-completions', models: [] },
+        },
+      },
+      plugins: {
+        allow: ['clawx-openai-image'],
+        entries: { 'clawx-openai-image': { enabled: true } },
+      },
+    });
+
+    // Seed an existing stored key so we can assert it gets removed.
+    await mkdir(join(testHome, '.openclaw', 'agents', 'main', 'agent'), { recursive: true });
+    await writeFile(
+      join(testHome, '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+      JSON.stringify({
+        version: 1,
+        profiles: {
+          'clawx-openai-image:default': { type: 'api_key', provider: 'clawx-openai-image', key: 'sk-stale' },
+        },
+      }, null, 2),
+      'utf8',
+    );
+
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+    await syncOpenAiCompatibleImageRelay({ enabled: false });
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    expect(providers.openai).toEqual({ baseUrl: 'https://api.openai.com/v1', api: 'openai-responses', models: [] });
+    expect(providers['clawx-openai-image']).toBeUndefined();
+    const defaults = (result.agents as Record<string, unknown>).defaults as Record<string, unknown>;
+    expect(defaults.imageGenerationModel).toBeUndefined();
+
+    const auth = await readAuthProfiles('main');
+    expect(auth.profiles['clawx-openai-image:default']).toBeUndefined();
+  });
+
+  it('normalizes a relay base URL without trailing /v1', async () => {
+    await writeOpenClawJson({ agents: { list: [{ id: 'main', name: 'Main', default: true, agentDir: '~/.openclaw/agents/main/agent' }] } });
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+    await syncOpenAiCompatibleImageRelay({
+      enabled: true,
+      baseUrl: 'https://relay.example.com/v1/',
+      imageModelIds: ['gpt-image-2'],
+    });
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    expect((providers['clawx-openai-image'] as Record<string, unknown>).baseUrl).toBe('https://relay.example.com/v1');
+  });
+
+  it('throws on an empty base URL when enabling', async () => {
+    await writeOpenClawJson({ agents: { list: [{ id: 'main', name: 'Main', default: true, agentDir: '~/.openclaw/agents/main/agent' }] } });
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+    await expect(syncOpenAiCompatibleImageRelay({
+      enabled: true,
+      baseUrl: '',
+      imageModelIds: ['gpt-image-2'],
+    })).rejects.toThrow(/base URL is required/);
+  });
+
+  it('readOpenAiCompatibleImageRelayState reports ClawX provider and openai legacy fallback', async () => {
+    const { readOpenAiCompatibleImageRelayState } = await import('@electron/utils/openclaw-auth');
+    expect(readOpenAiCompatibleImageRelayState({
+      models: { providers: { 'clawx-openai-image': { baseUrl: 'https://relay.example.com/v1' } } },
+    })).toEqual({ enabled: true, baseUrl: 'https://relay.example.com/v1', providerKey: 'clawx-openai-image' });
+
+    expect(readOpenAiCompatibleImageRelayState({
+      models: { providers: { openai: { baseUrl: 'https://api.openai.com/v1' } } },
+    })).toEqual({ enabled: false, baseUrl: '', providerKey: undefined });
+
+    expect(readOpenAiCompatibleImageRelayState({
+      models: { providers: { openai: { baseUrl: 'https://custom.example.com/v1' } } },
+    })).toEqual({ enabled: true, baseUrl: 'https://custom.example.com/v1', providerKey: 'openai' });
+  });
+
+  it('enable writes provider with allowPrivateNetwork, saves the key, and registers the plugin', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [
+          {
+            id: 'main',
+            name: 'Main',
+            default: true,
+            workspace: '~/.openclaw/workspace',
+            agentDir: '~/.openclaw/agents/main/agent',
+          },
+        ],
+      },
+      models: { providers: {} },
+    });
+
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+
+    await syncOpenAiCompatibleImageRelay({
+      enabled: true,
+      baseUrl: 'https://relay.example.com',
+      apiKey: 'sk-relay',
+      imageModelIds: ['gpt-image-2'],
+    });
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    const relay = providers['clawx-openai-image'] as Record<string, unknown>;
+    // Provider entry carries the private-network request flag.
+    expect(relay.request).toEqual({ allowPrivateNetwork: true });
+    // Plugin registration enabled (entries.enabled set by ensurePluginRegistrationEnabled).
+    const plugins = result.plugins as Record<string, unknown>;
+    const entries = plugins.entries as Record<string, Record<string, unknown>>;
+    expect(entries['clawx-openai-image'].enabled).toBe(true);
+    // Key persisted to per-agent auth profiles (saveProviderKeyToOpenClaw side effect).
+    const auth = await readAuthProfiles('main');
+    expect((auth.profiles['clawx-openai-image:default'] as Record<string, unknown>).key).toBe('sk-relay');
+  });
+
+  it('disable deletes the provider entry, removes the plugin registration, and clears the stored key', async () => {
+    await writeOpenClawJson({
+      agents: {
+        list: [
+          {
+            id: 'main',
+            name: 'Main',
+            default: true,
+            workspace: '~/.openclaw/workspace',
+            agentDir: '~/.openclaw/agents/main/agent',
+          },
+        ],
+        defaults: { imageGenerationModel: { primary: 'clawx-openai-image/gpt-image-2' } },
+      },
+      models: {
+        providers: {
+          'clawx-openai-image': { baseUrl: 'https://relay.example.com/v1', api: 'openai-completions', models: [] },
+        },
+      },
+      plugins: { allow: ['clawx-openai-image'], entries: { 'clawx-openai-image': { enabled: true } } },
+    });
+    await mkdir(join(testHome, '.openclaw', 'agents', 'main', 'agent'), { recursive: true });
+    await writeFile(
+      join(testHome, '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json'),
+      JSON.stringify({
+        version: 1,
+        profiles: { 'clawx-openai-image:default': { type: 'api_key', provider: 'clawx-openai-image', key: 'sk-stale' } },
+      }, null, 2),
+      'utf8',
+    );
+
+    const { syncOpenAiCompatibleImageRelay } = await import('@electron/utils/openclaw-auth');
+
+    await syncOpenAiCompatibleImageRelay({ enabled: false });
+
+    const result = await readOpenClawJson();
+    const providers = (result.models as Record<string, unknown>).providers as Record<string, unknown>;
+    // Provider entry deleted.
+    expect(providers['clawx-openai-image']).toBeUndefined();
+    // Plugin registration removed (removePluginRegistrations side effect).
+    const plugins = (result.plugins as Record<string, unknown> | undefined) ?? {};
+    const entries = (plugins.entries as Record<string, unknown> | undefined) ?? {};
+    expect(entries['clawx-openai-image']).toBeUndefined();
+    // Stored key removed (removeProviderKeyFromOpenClaw side effect).
+    const auth = await readAuthProfiles('main');
+    expect(auth.profiles['clawx-openai-image:default']).toBeUndefined();
+  });
+});

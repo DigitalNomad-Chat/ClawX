@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+ 
 /**
  * ScrollArea Component
  * Based on shadcn/ui scroll-area

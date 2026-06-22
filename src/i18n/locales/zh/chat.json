@@ -207,5 +207,10 @@
         "moreHint": "还有 {{count}} 个问题未显示"
     },
     "loadMoreHistory": "加载更早的消息",
-    "loadingMoreHistory": "加载更多中..."
+    "loadingMoreHistory": "加载更多中...",
+    "imageGeneration": {
+        "generating": "图片生成中，请稍候…",
+        "previewLoading": "正在载入图片预览…",
+        "previewUnavailable": "图片预览暂时不可用"
+    }
 }
