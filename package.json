@@ -34,7 +34,7 @@
     "license": "MIT",
     "private": true,
     "scripts": {
-        "postinstall": "node scripts/patch-browser-hint.mjs",
+        "postinstall": "node scripts/patch-browser-hint.mjs && node scripts/patch-openclaw-image-url.mjs node_modules/openclaw",
         "native:build": "cd native && node-gyp rebuild",
         "native:build:dev": "cd native && node-gyp rebuild --debug",
         "obfuscate": "node scripts/obfuscate-main.mjs && node scripts/obfuscate-renderer.mjs",

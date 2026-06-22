@@ -103,7 +103,7 @@ async function nousLoginWorker(session: NousSession, authPath: string): Promise<
             agentKey = mintData.api_key
             agentKeyExpiresAt = mintData.expires_at
             if (mintData.inference_base_url) {
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+               
               void mintData.inference_base_url
             }
           }
