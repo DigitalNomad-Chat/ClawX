@@ -16,6 +16,7 @@ import { Channels } from './pages/Channels';
 import { Skills } from './pages/Skills';
 import { Cron } from './pages/Cron';
 import { Dreams } from './pages/Dreams';
+import { ImageGenerationPage } from './pages/ImageGeneration';
 import { moduleRoutes } from './modules/registry';
 import { GoClawLayout } from './modules/goclaw/layout';
 import { GoClawMarketplace } from './modules/goclaw/marketplace';
@@ -224,6 +225,7 @@ function App() {
             <Route path="/channels" element={<Channels />} />
             <Route path="/skills" element={<Skills />} />
             <Route path="/cron" element={<Cron />} />
+            <Route path="/image-generation" element={devModeUnlocked ? <ImageGenerationPage /> : <Navigate to="/" replace />} />
             <Route path="/dreams" element={devModeUnlocked ? <Dreams /> : <Navigate to="/" replace />} />
             <Route path="/goclaw" element={<GoClawLayout />}>
               <Route index element={<Navigate to="/goclaw/marketplace" replace />} />

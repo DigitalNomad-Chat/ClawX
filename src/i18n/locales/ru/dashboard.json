@@ -61,5 +61,47 @@
         "close": "Закрыть",
         "noUsage": "Нет использования",
         "usageParseError": "Ошибка解析 использования"
+    },
+    "imageGeneration": {
+        "title": "Генерация изображений",
+        "description": "Настройте один пользовательский OpenAI Images-совместимый endpoint для image_generate. Он независим от чат-провайдеров.",
+        "timeout": "Таймаут (мс)",
+        "agentAuthTitle": "Аутентификация по агентам",
+        "agentAuthDesc": "Генерация изображений использует API-ключ этого пользовательского endpoint из auth-profiles.json каждого агента.",
+        "agentColumn": "Агент",
+        "authColumn": "Авторизация endpoint изображений",
+        "defaultAgent": "по умолчанию",
+        "authConfigured": "Готово",
+        "authMissing": "Нет ключа",
+        "testAgent": "Агент для теста",
+        "testButton": "Тестовая генерация",
+        "testing": "Генерация…",
+        "save": "Сохранить",
+        "saving": "Сохранение…",
+        "testPrompt": "插画，未来主义，光效应艺术风格，深邃蓝色背景，幻觉+重复+致幻，动态角度+大张力角度，视觉错觉，艺术感加强，超现实主义，氛围感加强，反光+珠光，超清晰，高级的氛围感 意识流，宇宙星空，浪漫灯塔，背景是一大片星空，星星颜色的鱼在天空中游动形成巨大的漩涡，幻想风格，充满了幻想和魔幻的元素，空中的巨型鲸鱼和星光，深蓝色的夜空，点缀闪烁的星星，宁静而神秘的氛围，浪漫而神秘，精细的描绘，梦幻，绚丽，仰视视角，氛围感，手绘风格，深蓝色调，风格定位：融合现代潮流元素与搞怪风格，形象整体看起来时尚、有趣且充满活力，适合年轻人的审美。细节细腻，风格清新。画面清晰。画面下方：主题用流动的毛笔手绘字体：\"Don't wait for inspiration\"（纤细的笔画，笔画拉丝，灵动的曲线，有质感），极小的装饰性小字，极细无衬线小字体\"2026\"，白色极细无衬线字体水印\"LUOBOS\"+\"INSPIRATION\"+\"AIGC\"+\"Every great idea begins with a spark\"，质感，肌理感，梦幻的，耀变，反射，艺术抽象，诗意的，高级，杰作，极具视觉冲击力，获奖作品，大师级配色，大师级排版，高细节，高级感，超高清，布局协调。",
+        "toast": {
+            "saved": "Настройки генерации изображений сохранены",
+            "saveBeforeTest": "Сохраните настройки перед тестом",
+            "testSuccess": "Тестовое изображение создано ({{ms}} мс)",
+            "testSuccessWithPath": "Тестовое изображение создано ({{ms}} мс): {{path}}",
+            "testFailed": "Тест генерации изображения не удался"
+        },
+        "openAiRelay": {
+            "title": "Пользовательский endpoint изображений",
+            "description": "Отправлять генерацию изображений на отдельный OpenAI Images-совместимый endpoint (/v1/images/generations), не меняя чат-провайдеры.",
+            "baseUrl": "Base URL изображений",
+            "baseUrlHint": "например https://taolat.com/v1 — /v1 добавится автоматически.",
+            "apiKey": "API key",
+            "apiKeyPlaceholder": "sk-...",
+            "model": "Имя модели",
+            "modelHint": "Введите только id модели, например gpt-image-2. Не используйте provider/model."
+        },
+        "errors": {
+            "invalidTimeout": "Таймаут должен быть положительным числом",
+            "relayBaseUrlRequired": "Укажите Base URL для изображений",
+            "relayApiKeyRequired": "Укажите API key",
+            "relayModelRequired": "Укажите имя модели",
+            "relayModelInvalid": "Введите только имя модели, например gpt-image-2. Не используйте provider/model."
+        }
     }
 }
