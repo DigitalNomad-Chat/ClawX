@@ -19,6 +19,7 @@
 import 'zx/globals';
 import { ELECTRON_MAIN_RUNTIME_PACKAGES, EXTRA_BUNDLED_PACKAGES } from './openclaw-bundle-config.mjs';
 import { patchExtensionOpenClawSelfImports } from './openclaw-self-import-patch.mjs';
+import { patchOpenClawImageUrlSupport, findOpenClawImageGenerationDist } from './patch-openclaw-image-url.mjs';
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'build', 'openclaw');
@@ -1043,6 +1044,17 @@ function patchBundledRuntime(outputDir) {
 
   if (ptyCount > 0) {
     echo`   🩹 Patched ${ptyCount} bundled PTY site(s)`;
+  }
+
+  // --- OpenClaw image generation URL response patch ---
+  // The SDK only parses b64_json; LiteLLM/openai-style relays often return url.
+  // Apply the same patch we use in node_modules so bundled apps work too.
+  const imageGenerationTargets = findOpenClawImageGenerationDist(outputDir);
+  for (const target of imageGenerationTargets) {
+    const result = patchOpenClawImageUrlSupport(target);
+    if (result.patched) {
+      echo`   🩹 Patched bundled image generation for URL responses: ${path.basename(target)}`;
+    }
   }
 
   // --- Browser tool hint patch ---
