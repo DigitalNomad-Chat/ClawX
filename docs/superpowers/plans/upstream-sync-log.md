@@ -355,6 +355,118 @@ v0.4.2 → v0.4.5 同步验证已完成。后续处理剩余测试债务：#13 s
 
 ---
 
+### 2026-06-19：同步到 v0.4.7（Phase 5：#1064 hydrate truncated chat history）
+
+- **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
+- **上游版本**：`v0.4.7`
+- **上游提交**：`#1064` — Hydrate truncated chat history from session transcript fallback
+- **当前分支**：`feat/membership-system-merge-v0.4.4`
+- **合并范围**：解决 Gateway `chat.history` 返回截断消息内容时，通过 `/api/sessions/transcript` 和本地 store 回填完整文本，并保留本地元数据。
+
+#### 合并说明
+
+1. **RPC 参数**
+   - 新增 `src/stores/chat/history-rpc-params.ts`：bounded `maxChars` 参数（默认 500_000，上限 `OPENCLAW_CHAT_HISTORY_MAX_CHARS_CAP`），异步从 `config.get` 读取 `gateway.webchat.chatHistoryMaxChars`。
+   - `history-actions.ts` 构建 `chat.history` RPC 时传入 `sessionKey`、`limit`、`maxChars`。
+
+2. **截断检测与合并**
+   - 新增 `src/stores/chat/history-transcript-merge.ts`：
+     - `isTruncatedHistoryText` 检测 `..(truncated)..`、`…(truncated)…`、`[chat.history omitted: message too large]` 后缀。
+     - `gatewayHistoryNeedsTranscriptHydration` 判断是否需要 transcript fallback。
+     - `mergeGatewayHistoryWithTranscript` 按 `id` 或索引匹配消息，用 transcript 文本替换截断内容，保留 gateway 消息的本地字段（`_attachedFiles`、`_desensitizeMap`）。
+
+3. **Transcript fallback**
+   - 新增 `src/stores/chat/history-transcript-fallback.ts`：调用 `hostApiFetch('/api/sessions/transcript')` 获取会话 transcript；Renderer 不直接调用 Gateway HTTP。
+   - 新增 `src/stores/chat/history-transcript-hydrate.ts`：如果 transcript 仍截断，则回退到本地 messages 再合并一次。
+
+4. **双轨同步**
+   - `src/stores/chat.ts`（monolithic）与 `src/stores/chat/history-actions.ts`（拆分文件）同步使用 `hydrateGatewayHistoryFromTranscript`。
+
+5. **测试**
+   - 新增/更新 `history-rpc-params.test.ts`、`history-transcript-merge.test.ts`、`history-transcript-fallback.test.ts`、`history-transcript-hydrate.test.ts`、`chat-history-actions.test.ts`、`chat-store-history-retry.test.ts`、`chat-target-routing.test.ts`。
+
+#### 验证结果
+
+- ✅ `pnpm run typecheck` 通过
+- ✅ Phase 5 相关单元测试通过
+- ⚠️ 全量单元测试仍有基线失败（`main-layout`、`title-bar`），与 Phase 5 无关
+
+#### 下一步计划
+
+继续同步上游 **Phase 6：图片生成功能（#1066 → #1098 全链）**。
+
+---
+
+### 2026-06-20：同步到 v0.4.8（Phase 6：图片生成功能 #1066 → #1098 全链）
+
+- **上游仓库**：`https://github.com/ValueCell-ai/ClawX`
+- **上游版本**：`v0.4.8`
+- **上游提交链**：`#1066` → `#1068` → `#1080` → `#1086` → `#1095` → `#1096` → `#1097` → `#1098`
+- **当前分支**：`feat/membership-system-merge-v0.4.4`
+- **合并范围**：上游图片生成功能完整修复链，采用 **#1098 终态**（无 patch 脚本、SDK 包名导入、插件不自包含 `response_format`）。
+
+#### 合并说明
+
+本次合并采用「应用上游 diff + ClawDock 适配」策略，非 cherry-pick；8 个 commit 按依赖顺序落地，分 4 个子阶段提交。
+
+1. **阶段 6.1 — 后端核心基础设施**
+   - 新增 `electron/utils/openclaw-image-relay-constants.ts`：集中 `CLAWX_OPENAI_IMAGE_PROVIDER_KEY`、`DEFAULT_IMAGE_GENERATION_TIMEOUT_MS`、`MAX_GENERATED_IMAGE_BYTES` 等常量。
+   - 新增 `electron/utils/openclaw-image-generation.ts`：读写 `~/.openclaw/config.json` 中 `agents.defaults.imageGenerationModel.primary`、同步 `models.providers.clawx-openai-image` relay、快照恢复。
+   - 新增 `electron/utils/openclaw-image-generation-runtime.ts`：使用 SDK 包名 `openclaw/plugin-sdk/image-generation-runtime` 导入，实现 `generateImageInProcess` 与 `saveMediaBuffer`。
+   - 新增 `electron/api/routes/media.ts`：提供 `GET/PUT /api/media/image-generation`、`GET /api/media/image-generation/providers`、`POST /api/media/image-generation/test`。
+   - 新增 `resources/openclaw-plugins/clawx-openai-image/` 自包含插件（`index.mjs` + `openclaw.plugin.json` + `package.json`），不硬编码 `response_format`。
+   - 修改 `electron/utils/provider-keys.ts`：新增 `CLAWX_OPENAI_IMAGE_PROVIDER_KEY`、`HIDDEN_PROVIDER_KEYS_FOR_UI`、`filterActiveProviderKeysForUi`。
+   - 修改 `electron/utils/openclaw-auth.ts`：新增 `ProviderEntryBuildOptions.request` 字段、`syncOpenAiCompatibleImageRelay` 及相关辅助函数；保留所有 ClawDock maxTokens healing / agentRuntime pin / sanitize blocklist 定制。
+   - 修改 `electron/utils/plugin-install.ts` 与 `scripts/bundle-openclaw-plugins.mjs`：硬编码 1:1 注册 `clawx-openai-image` 插件。
+   - 修改 `electron/gateway/config-sync.ts`：`CHANNEL_PLUGIN_MAP` 加 image 条目，新增 `resolveImageGenerationPrimary` / `withConfiguredImageGenerationPlugins`，在 `syncGatewayConfigBeforeLaunch` 中包裹。
+
+2. **阶段 6.2 — 前端 UI**
+   - 新增 `src/pages/ImageGeneration/index.tsx` 壳页面与 `src/components/settings/ImageGenerationSettings.tsx`（baseUrl / model / apiKey / timeout / agent auth 表格 / Test 按钮）。
+   - 新增 `src/lib/image-generation.ts`：前端 API 封装，全走 `hostApiFetch`。
+   - 修改 `src/App.tsx` 与 `src/components/layout/Sidebar.tsx`：注册路由与导航入口。
+   - 四语言 i18n 同步（`en`/`ja`/`ru`/`zh` 的 `common.json`、`dashboard.json`、`chat.json`）。
+
+3. **阶段 6.3 — Chat 集成与媒体处理（双轨镜像）**
+   - 双轨同步修改 `src/stores/chat.ts` 与 `src/stores/chat/helpers.ts`：
+     - `#1068` enrichment：`stripInboundMediaVisionEnvelope`、`extractMarkdownImageRefs`、`extractFilePathsFromToolArgs`、Windows 路径正则、`shouldDropMessageFromHistory` 保留 tool-call turns。
+     - `#1080` `loadMissingPreviews` 重构（轮询 + 重试）。
+     - `#1086` deadlock 修复（`segmentHasOpenToolRun` / `isEmptyTerminalResponse` / `buildSessionSwitchPatch`）。
+     - `#1095` `extractRawFilePaths` Windows 路径正则、`files.ts` SVG 短路处理。
+     - `#1096` settle delivered media（`_sendGenerationCounter` / `messageHasImageContent` / `hasDeliveredImageReply`）。
+   - 新增 `src/pages/Chat/copy-image.ts`、`src/pages/Chat/image-generation-status.ts`。
+   - 修改 `src/pages/Chat/index.tsx` 与 `src/pages/Chat/message-utils.ts`：适配 image generate tool 状态与媒体显示。
+   - 修改 `electron/api/routes/files.ts` 与 `electron/main/ipc-handlers.ts`：SVG 预览直接 base64 编码，绕过 `nativeImage`。
+   - 在 `src/stores/chat.ts` 与 `src/stores/chat/history-actions.ts` 同步实现 `#1097` `preserveExistingAttachmentPreviews`，保留本地已解析的图片预览。
+
+4. **测试**
+   - 新增 `tests/unit/openclaw-image-generation.test.ts`、`tests/unit/clawx-openai-image-plugin.test.ts`。
+   - 更新 `tests/unit/openclaw-auth.test.ts`（relay enable/disable 断言）。
+   - 新增 `tests/unit/image-generation-settings.test.tsx`、`tests/e2e/image-generation-settings.spec.ts`。
+   - 更新 `tests/unit/chat-history-actions.test.ts` mock，覆盖 `enrichWithToolCallAttachments` 与修正 `shouldDropMessageFromHistory`。
+
+#### 冲突处理
+
+| 文件 | 处理方式 |
+|------|----------|
+| `electron/utils/openclaw-auth.ts` | 保留 ClawDock 的 maxTokens healing、agentRuntime pin、BUNDLED_ALLOWLIST_PRESERVE_IDS；在 `upsertOpenClawProviderEntry` 中先处理 `request` 字段再调用 `applyPinnedAgentRuntime` |
+| `src/stores/chat.ts` / `src/stores/chat/helpers.ts` | 双轨镜像所有 helpers 变更；以 monolithic store 为权威，同步到 `helpers.ts` |
+| `src/stores/chat/history-actions.ts` | 保留 Phase 5 的 `hydrateGatewayHistoryFromTranscript`，新增 `#1097` `preserveExistingAttachmentPreviews` |
+| `resources/openclaw-plugins/clawx-openai-image/index.mjs` | 采用 #1098 终态，移除 `response_format`，让 SDK 自适应 url/b64_json |
+| `scripts/bundle-openclaw.mjs` | 不引入 #1066 的 b64 patch 块，直接采用 #1098 终态 |
+
+#### 验证结果
+
+- ✅ `pnpm run typecheck` 通过
+- ✅ 全量单元测试：1074 通过 / 3 失败 / 1 skipped
+- ⚠️ 3 个失败为基线失败（`main-layout.test.tsx` 1 个 + `title-bar.test.tsx` 2 个），在本次合并前已存在，与图片生成功能无关
+
+#### 下一步计划
+
+- 与 Phase 5 合并进行手动端到端冒烟测试：配置 OpenAI relay → Test 生成 → Chat 触发 `image_generate` → 验证图片显示、复制、切 session 后预览保留。
+- 按需运行 `image-generation-settings.spec.ts` e2e 回归。
+
+---
+
 ## 版本对照表
 
 | 当前项目版本 | 同步上游版本 | 日期 |
@@ -366,4 +478,6 @@ v0.4.2 → v0.4.5 同步验证已完成。后续处理剩余测试债务：#13 s
 | `0.4.2-beta.2` | `v0.4.5`（B group `c14a0e9a`） | 2026-06-19 |
 | `0.4.2-beta.2` | `v0.4.5`（C group `3eb515be` + `d64c1c8c`） | 2026-06-19 |
 | `0.4.2-beta.2` | `v0.4.5`（D group #1043，工作树待提交） | 2026-06-19 |
+| `0.4.2-beta.2` | `v0.4.7`（Phase 5 #1064 hydrate truncated chat history） | 2026-06-19 |
+| `0.4.2-beta.2` | `v0.4.8`（Phase 6 #1066→#1098 图片生成全链） | 2026-06-20 |
 
