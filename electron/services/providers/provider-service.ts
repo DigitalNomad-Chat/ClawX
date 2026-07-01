@@ -455,7 +455,20 @@ export class ProviderService {
 
   /** Read an account's API key (clean alternative to getLegacyProviderApiKey). */
   async getAccountApiKey(accountId: string): Promise<string | null> {
-    return this._getProviderApiKeyInternal(accountId);
+    const account = await this.getAccount(accountId);
+    const runtimeProviderKey = account
+      ? resolveOpenClawProviderKey(account)
+      : accountId;
+    // Match the lookup priority in listAccountsKeyInfo so callers always get
+    // the same key that the UI reports as "configured".
+    return (
+      (await getProviderApiKeyFromOpenClaw(runtimeProviderKey)) ??
+      (await getProviderApiKeyFromOpenClaw(accountId)) ??
+      (await this._getProviderApiKeyInternal(accountId)) ??
+      (runtimeProviderKey !== accountId
+        ? await this._getProviderApiKeyInternal(runtimeProviderKey)
+        : null)
+    );
   }
 
   /** Check whether an account has an API key stored. */

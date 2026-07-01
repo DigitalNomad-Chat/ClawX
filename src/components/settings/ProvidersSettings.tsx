@@ -2,7 +2,7 @@
  * Providers Settings Component
  * Manage AI provider configurations and API keys
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -422,6 +422,7 @@ function ProviderCard({
   const [saving, setSaving] = useState(false);
   const [arkMode, setArkMode] = useState<ArkMode>('apikey');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const initialKeyRef = useRef<string | null>(null);
 
   const typeInfo = PROVIDER_TYPE_INFO.find((t) => t.id === account.vendorId);
   const providerDocsUrl = getProviderDocsUrl(typeInfo, i18n.language);
@@ -438,28 +439,58 @@ function ProviderCard({
   const canEditModelConfig = Boolean(typeInfo?.showBaseUrl || showModelIdField);
   const showUserAgentField = shouldShowUserAgentField(account);
 
+  // Reset edit-state form fields when the user opens the editor. Keep
+  // dependencies minimal and stable so this effect does not re-run while the
+  // user is typing or while async key loading is in flight.
   useEffect(() => {
-    if (isEditing) {
-      setNewKey('');
-      setShowKey(false);
-      setBaseUrl(account.baseUrl || '');
-      setApiProtocol(account.apiProtocol || 'openai-completions');
-      setUserAgent(getUserAgentHeader(account.headers));
-      setModelId(account.model || '');
-      setFallbackModelsText(normalizeFallbackModels(account.fallbackModels).join('\n'));
-      setFallbackProviderIds(normalizeFallbackProviderIds(account.fallbackAccountIds));
-      setValidationError(null);
-      setArkMode(
-        isArkCodePlanMode(
-          account.vendorId,
-          account.baseUrl,
-          account.model,
-          typeInfo?.codePlanPresetBaseUrl,
-          typeInfo?.codePlanPresetModelId,
-        ) ? 'codeplan' : 'apikey'
-      );
-    }
-  }, [isEditing, account.baseUrl, account.headers, account.fallbackModels, account.fallbackAccountIds, account.model, account.apiProtocol, account.vendorId, typeInfo?.codePlanPresetBaseUrl, typeInfo?.codePlanPresetModelId]);
+    if (!isEditing) return;
+    setNewKey('');
+    initialKeyRef.current = null;
+    setShowKey(false);
+    setBaseUrl(account.baseUrl || '');
+    setApiProtocol(account.apiProtocol || 'openai-completions');
+    setUserAgent(getUserAgentHeader(account.headers));
+    setModelId(account.model || '');
+    setFallbackModelsText(normalizeFallbackModels(account.fallbackModels).join('\n'));
+    setFallbackProviderIds(normalizeFallbackProviderIds(account.fallbackAccountIds));
+    setValidationError(null);
+    setArkMode(
+      isArkCodePlanMode(
+        account.vendorId,
+        account.baseUrl,
+        account.model,
+        typeInfo?.codePlanPresetBaseUrl,
+        typeInfo?.codePlanPresetModelId,
+      ) ? 'codeplan' : 'apikey'
+    );
+    // We intentionally run this reset only when editing starts, not when any
+    // individual account field changes. Re-running on account mutations would
+    // clobber the async-loaded API key and any user edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
+
+  // Load the plaintext API key when the user starts editing an api_key provider.
+  // Use the store getter directly to avoid re-running this effect due to a
+  // changing function reference, and guard against overwriting user input once
+  // they have started typing.
+  useEffect(() => {
+    if (!isEditing || account.authMode !== 'api_key' || !status?.hasKey) return;
+
+    let cancelled = false;
+    const loadKey = async () => {
+      const key = await useProviderStore.getState().getAccountApiKey(account.id);
+      if (cancelled || !key) return;
+      initialKeyRef.current = key;
+      setNewKey((current) => {
+        // Only pre-fill if the user has not already typed something.
+        return current.trim() === '' ? key : current;
+      });
+    };
+    loadKey();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditing, account.id, account.authMode, status?.hasKey]);
 
   const fallbackOptions = allProviders.filter((candidate) => candidate.account.id !== account.id);
 
@@ -478,8 +509,12 @@ function ProviderCard({
       const payload: { newApiKey?: string; updates?: Partial<ProviderConfig> } = {};
       const normalizedFallbackModels = normalizeFallbackModels(fallbackModelsText.split('\n'));
       const normalizedNewKey = normalizeProviderApiKeyInput(newKey);
+      const storedKey = initialKeyRef.current;
 
-      if (normalizedNewKey) {
+      // Only treat the key as changed if the user actually edited it.
+      const keyChanged = storedKey !== null ? normalizedNewKey !== storedKey : Boolean(normalizedNewKey);
+
+      if (keyChanged && normalizedNewKey) {
         setValidating(true);
         const result = await onValidateKey(normalizedNewKey, {
           baseUrl: baseUrl.trim() || undefined,
@@ -540,6 +575,7 @@ function ProviderCard({
       }
 
       await onSaveEdits(payload);
+      initialKeyRef.current = null;
       setNewKey('');
       toast.success(t('aiProviders.toast.updated'));
     } catch (error) {
@@ -556,6 +592,10 @@ function ProviderCard({
 
   const currentLabelClasses = isDefault ? "text-meta text-muted-foreground" : labelClasses;
   const currentSectionLabelClasses = isDefault ? "text-sm font-bold text-foreground/80" : labelClasses;
+
+  const normalizedStoredKey = initialKeyRef.current;
+  const normalizedNewKeyForUi = normalizeProviderApiKeyInput(newKey);
+  const keyChangedForUi = normalizedStoredKey !== null ? normalizedNewKeyForUi !== normalizedStoredKey : Boolean(normalizedNewKeyForUi);
 
   return (
     <div
@@ -596,14 +636,6 @@ function ProviderCard({
                   <span className="truncate max-w-[200px]">{account.model}</span>
                 </>
               )}
-              <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
-              <span className="flex items-center gap-1">
-                {hasConfiguredCredentials(account, status) ? (
-                  <><div className="w-1.5 h-1.5 rounded-full bg-green-500" /> {t('aiProviders.card.configured')}</>
-                ) : (
-                  <><div className="w-1.5 h-1.5 rounded-full bg-red-500" /> {t('aiProviders.dialog.apiKeyMissing')}</>
-                )}
-              </span>
               {((account.fallbackModels?.length ?? 0) > 0 || (account.fallbackAccountIds?.length ?? 0) > 0) && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
@@ -909,7 +941,7 @@ function ProviderCard({
                     validating
                     || saving
                     || (
-                      !newKey.trim()
+                      !keyChangedForUi
                       && (baseUrl.trim() || undefined) === (account.baseUrl || undefined)
                       && userAgent.trim() === getUserAgentHeader(account.headers).trim()
                       && (modelId.trim() || undefined) === (account.model || undefined)
