@@ -82,12 +82,12 @@ export const RENEWAL_STATUS_LABELS: Record<RenewalStatus, string> = {
   renewed: '已续费',
 };
 
-/** shadcn/ui Badge variant types for renewal statuses */
-export const RENEWAL_STATUS_TYPES: Record<RenewalStatus, 'success' | 'warning' | 'danger' | 'info'> = {
+/** Badge variants for renewal statuses */
+export const RENEWAL_STATUS_TYPES: Record<RenewalStatus, 'success' | 'warning' | 'destructive' | 'secondary'> = {
   normal: 'success',
   grace: 'warning',
-  lapsed: 'danger',
-  renewed: 'info',
+  lapsed: 'destructive',
+  renewed: 'secondary',
 };
 
 // ─── Payment Frequencies ───────────────────────────────────────────
@@ -133,29 +133,3 @@ export const CHINESE_TO_RELATIONSHIP: Record<string, Relationship> = {
   '其他': RELATIONSHIPS.OTHER,
 };
 
-/** Insurance type → Chinese (for CSV export) */
-export const INSURANCE_TYPE_TO_CHINESE: Record<InsuranceType, string> = {
-  [INSURANCE_TYPES.MEDICAL]: '医疗险',
-  [INSURANCE_TYPES.ACCIDENT]: '意外险',
-  [INSURANCE_TYPES.CRITICAL]: '重疾险',
-  [INSURANCE_TYPES.LIFE]: '定期寿险',
-  [INSURANCE_TYPES.ANNUITY]: '年金险',
-  [INSURANCE_TYPES.OTHER]: '其他',
-};
-
-/** Relationship → Chinese (for CSV export) */
-export const RELATIONSHIP_TO_CHINESE: Record<Relationship, string> = {
-  [RELATIONSHIPS.SELF]: '本人',
-  [RELATIONSHIPS.SPOUSE]: '配偶',
-  [RELATIONSHIPS.CHILD]: '子女',
-  [RELATIONSHIPS.PARENT]: '父母',
-  [RELATIONSHIPS.OTHER]: '其他',
-};
-
-/** Renewal status → Chinese (for CSV export) */
-export const RENEWAL_STATUS_TO_CHINESE: Record<RenewalStatus, string> = {
-  [RENEWAL_STATUSES.NORMAL]: '准备续费',
-  [RENEWAL_STATUSES.GRACE]: '保费宽限期',
-  [RENEWAL_STATUSES.LAPSED]: '保单失效',
-  [RENEWAL_STATUSES.RENEWED]: '已续费',
-};
