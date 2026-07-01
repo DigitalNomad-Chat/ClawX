@@ -133,3 +133,34 @@ export const CHINESE_TO_RELATIONSHIP: Record<string, Relationship> = {
   '其他': RELATIONSHIPS.OTHER,
 };
 
+/** Chinese → renewal status lookup (for CSV import) */
+export const CHINESE_TO_RENEWAL_STATUS: Record<string, RenewalStatus> = {
+  '准备续费': RENEWAL_STATUSES.NORMAL,
+  '保费宽限期': RENEWAL_STATUSES.GRACE,
+  '保单失效': RENEWAL_STATUSES.LAPSED,
+  '已续费': RENEWAL_STATUSES.RENEWED,
+};
+
+/** Chinese → payment frequency lookup (for CSV import) */
+export const CHINESE_TO_PAYMENT_FREQUENCY: Record<string, PaymentFrequency> = {
+  '年缴': PAYMENT_FREQUENCIES.ANNUAL,
+  '半年缴': PAYMENT_FREQUENCIES.SEMI_ANNUAL,
+  '季缴': PAYMENT_FREQUENCIES.QUARTERLY,
+  '月缴': PAYMENT_FREQUENCIES.MONTHLY,
+  '一次性': PAYMENT_FREQUENCIES.ONE_TIME,
+};
+
+// ─── Reverse Mappings (CSV Export) ─────────────────────────────────
+
+/** Renewal status → Chinese (reuse labels to avoid duplication) */
+export const RENEWAL_STATUS_TO_CHINESE: Record<RenewalStatus, string> = RENEWAL_STATUS_LABELS;
+
+/** Payment frequency → Chinese (reuse labels to avoid duplication) */
+export const PAYMENT_FREQUENCY_TO_CHINESE: Record<PaymentFrequency, string> = PAYMENT_FREQUENCY_LABELS;
+
+/** Insurance type → Chinese (reuse labels to avoid duplication) */
+export const INSURANCE_TYPE_TO_CHINESE: Record<InsuranceType, string> = INSURANCE_TYPE_LABELS;
+
+/** Relationship → Chinese (reuse labels to avoid duplication) */
+export const RELATIONSHIP_TO_CHINESE: Record<Relationship, string> = RELATIONSHIP_LABELS;
+
