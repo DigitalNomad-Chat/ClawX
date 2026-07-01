@@ -88,6 +88,7 @@
         "postversion": "node scripts/post-version-push.mjs"
     },
     "dependencies": {
+        "@anthropic-ai/sdk": "^0.91.1",
         "@monaco-editor/react": "^4.7.0",
         "@napi-rs/canvas": "^1.0.0",
         "@radix-ui/react-scroll-area": "^1.2.11",
@@ -115,6 +116,7 @@
         "remark-frontmatter": "^5.0.0",
         "remark-math": "^6.0.0",
         "tesseract.js": "^7.0.0",
+        "openai": "^6.37.0",
         "ws": "^8.19.0",
         "xlsx": "^0.18.5"
     },
