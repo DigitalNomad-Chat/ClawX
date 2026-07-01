@@ -16,20 +16,7 @@ interface PolicyFormProps {
   familyId: string;
   familyName: string;
   initial?: PolicyRecord | null;
-  onSubmit: (data: {
-    familyId: string;
-    familyName: string;
-    policyNo: string;
-    insurer: string;
-    productName: string;
-    premium: number;
-    sumAssured: number;
-    effectiveDate: string;
-    expiryDate: string;
-    status: PolicyRecord['status'];
-    beneficiary: string;
-    remarks: string;
-  }) => void;
+  onSubmit: (data: Omit<PolicyRecord, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onClose: () => void;
 }
 
@@ -51,6 +38,9 @@ export function PolicyForm({ open, mode, familyId, familyName, initial, onSubmit
   const [status, setStatus] = useState<PolicyRecord['status']>('active');
   const [beneficiary, setBeneficiary] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [policyHolder, setPolicyHolder] = useState('');
+  const [insuredPerson, setInsuredPerson] = useState('');
+  const [thisYearRenewed, setThisYearRenewed] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -64,6 +54,9 @@ export function PolicyForm({ open, mode, familyId, familyName, initial, onSubmit
       setStatus(initial.status || 'active');
       setBeneficiary(initial.beneficiary || '');
       setRemarks(initial.remarks || '');
+      setPolicyHolder(initial.policyHolder || '');
+      setInsuredPerson(initial.insuredPerson || '');
+      setThisYearRenewed(initial.thisYearRenewed);
     } else {
       setPolicyNo('');
       setInsurer('');
@@ -75,6 +68,9 @@ export function PolicyForm({ open, mode, familyId, familyName, initial, onSubmit
       setStatus('active');
       setBeneficiary('');
       setRemarks('');
+      setPolicyHolder('');
+      setInsuredPerson('');
+      setThisYearRenewed(false);
     }
   }, [initial, open]);
 
@@ -95,6 +91,9 @@ export function PolicyForm({ open, mode, familyId, familyName, initial, onSubmit
       status,
       beneficiary,
       remarks,
+      policyHolder,
+      insuredPerson,
+      thisYearRenewed,
     });
   };
 

@@ -2,6 +2,8 @@
  * Office Tools Module — Shared Types
  */
 
+import type { InsuranceType, Relationship, RenewalStatus, PaymentFrequency } from './constants';
+
 /** Tool card metadata displayed on the landing page */
 export interface OfficeTool {
   id: string;
@@ -28,6 +30,19 @@ export interface PolicyRecord {
   status: 'active' | 'lapsed' | 'terminated' | 'pending';
   beneficiary: string;
   remarks?: string;
+  insuranceType?: InsuranceType;
+  policyHolder: string;
+  insuredPerson: string;
+  relationship?: Relationship;
+  paymentAccount?: string;
+  purchasePlatform?: string;
+  paymentFrequency?: PaymentFrequency;
+  thisYearRenewed: boolean;
+  followUpRecord?: string;
+  statusTag?: string;
+  renewalStatus?: RenewalStatus;
+  daysToRenewal?: number;
+  renewalDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +54,8 @@ export interface PolicyFamily {
   memberCount: number;
   totalPremium: number;
   totalSumAssured: number;
+  contactInfo?: string;
+  remark?: string;
   policies: PolicyRecord[];
 }
 
@@ -67,4 +84,7 @@ export interface OfficeToolsStats {
   activePolicies: number;
   pendingPolicies: number;
   documentsParsed: number;
+  upcomingRenewals: { within7Days: number; within30Days: number; within60Days: number };
+  statusDistribution: { normal: number; grace: number; lapsed: number; renewed: number };
+  typeDistribution: Record<string, number>;
 }
