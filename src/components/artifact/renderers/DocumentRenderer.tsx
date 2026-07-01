@@ -8,7 +8,7 @@ export function DocumentRenderer({ artifact }: StreamArtifactRendererProps) {
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none h-full p-4 overflow-auto">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[[remarkGfm], [remarkMath]]}
         rehypePlugins={[rehypeKatex]}
       >
         {artifact.content}

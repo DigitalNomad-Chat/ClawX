@@ -55,7 +55,7 @@ export default function MarkdownPreview({ source, className }: MarkdownPreviewPr
         </pre>
       )}
       <ReactMarkdown
-        remarkPlugins={[[remarkFrontmatter, ['yaml', 'toml']], remarkGfm, remarkMath]}
+        remarkPlugins={[[remarkFrontmatter, ['yaml', 'toml']], [remarkGfm], [remarkMath]]}
         rehypePlugins={[rehypeKatex]}
         components={{
           h1: ({ children, ...props }) => (

@@ -294,7 +294,7 @@ const MessageBubble = memo(function MessageBubble({ message, agentEmoji, isStrea
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words">
               <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
+                remarkPlugins={[[remarkGfm], [remarkMath]]}
                 rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false, output: 'html' }]]}
                 components={{
                   code({ className, children, ...props }) {
