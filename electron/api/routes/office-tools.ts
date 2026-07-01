@@ -55,12 +55,16 @@ export async function handleOfficeToolsRoutes(
 
   if (url.pathname === '/api/office-tools/families' && req.method === 'POST') {
     try {
-      const body = await parseJsonBody<{ name: string }>(req);
+      const body = await parseJsonBody<{ name: string; contactInfo?: string; remark?: string }>(req);
       if (!body.name || !body.name.trim()) {
         sendJson(res, 400, { success: false, error: 'Family name is required' });
         return true;
       }
-      const family = await createFamily(body.name.trim());
+      const family = await createFamily({
+        name: body.name.trim(),
+        contactInfo: body.contactInfo,
+        remark: body.remark,
+      });
       sendJson(res, 200, { success: true, family });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
@@ -86,7 +90,7 @@ export async function handleOfficeToolsRoutes(
   if (url.pathname.startsWith('/api/office-tools/families/') && req.method === 'PUT') {
     try {
       const familyId = decodeURIComponent(url.pathname.slice('/api/office-tools/families/'.length));
-      const body = await parseJsonBody<{ name?: string }>(req);
+      const body = await parseJsonBody<{ name?: string; contactInfo?: string; remark?: string }>(req);
       const ok = await updateFamily(familyId, body);
       if (!ok) {
         sendJson(res, 404, { success: false, error: 'Family not found' });
@@ -140,6 +144,16 @@ export async function handleOfficeToolsRoutes(
         status?: string;
         beneficiary?: string;
         remarks?: string;
+        insuranceType?: string;
+        policyHolder?: string;
+        insuredPerson?: string;
+        relationship?: string;
+        paymentAccount?: string;
+        purchasePlatform?: string;
+        paymentFrequency?: string;
+        thisYearRenewed?: boolean;
+        followUpRecord?: string;
+        statusTag?: string;
       }>(req);
 
       if (!body.familyId || !body.policyNo || !body.insurer) {
@@ -160,6 +174,16 @@ export async function handleOfficeToolsRoutes(
         status: (body.status as 'active' | 'lapsed' | 'terminated' | 'pending') || 'active',
         beneficiary: body.beneficiary || '',
         remarks: body.remarks || '',
+        insuranceType: body.insuranceType as PolicyRecord['insuranceType'],
+        policyHolder: body.policyHolder || '',
+        insuredPerson: body.insuredPerson || '',
+        relationship: body.relationship as PolicyRecord['relationship'],
+        paymentAccount: body.paymentAccount || '',
+        purchasePlatform: body.purchasePlatform || '',
+        paymentFrequency: body.paymentFrequency as PolicyRecord['paymentFrequency'],
+        thisYearRenewed: body.thisYearRenewed ?? false,
+        followUpRecord: body.followUpRecord || '',
+        statusTag: body.statusTag || '',
       });
       sendJson(res, 200, { success: true, policy });
     } catch (error) {
@@ -206,9 +230,19 @@ export async function handleOfficeToolsRoutes(
         status: string;
         beneficiary: string;
         remarks: string;
+        insuranceType: string;
+        policyHolder: string;
+        insuredPerson: string;
+        relationship: string;
+        paymentAccount: string;
+        purchasePlatform: string;
+        paymentFrequency: string;
+        thisYearRenewed: boolean;
+        followUpRecord: string;
+        statusTag: string;
       }>>(req);
 
-      const patch: Partial<{ familyName: string; policyNo: string; insurer: string; productName: string; premium: number; sumAssured: number; effectiveDate: string; expiryDate: string; status: 'active' | 'lapsed' | 'terminated' | 'pending'; beneficiary: string; remarks: string; familyId: string; updatedAt: string }> = {};
+      const patch: Partial<Omit<PolicyRecord, 'id' | 'createdAt'>> = {};
       if (body.familyName !== undefined) patch.familyName = body.familyName;
       if (body.policyNo !== undefined) patch.policyNo = body.policyNo.trim();
       if (body.insurer !== undefined) patch.insurer = body.insurer.trim();
@@ -220,6 +254,16 @@ export async function handleOfficeToolsRoutes(
       if (body.status !== undefined) patch.status = body.status as 'active' | 'lapsed' | 'terminated' | 'pending';
       if (body.beneficiary !== undefined) patch.beneficiary = body.beneficiary;
       if (body.remarks !== undefined) patch.remarks = body.remarks;
+      if (body.insuranceType !== undefined) patch.insuranceType = body.insuranceType as PolicyRecord['insuranceType'];
+      if (body.policyHolder !== undefined) patch.policyHolder = body.policyHolder;
+      if (body.insuredPerson !== undefined) patch.insuredPerson = body.insuredPerson;
+      if (body.relationship !== undefined) patch.relationship = body.relationship as PolicyRecord['relationship'];
+      if (body.paymentAccount !== undefined) patch.paymentAccount = body.paymentAccount;
+      if (body.purchasePlatform !== undefined) patch.purchasePlatform = body.purchasePlatform;
+      if (body.paymentFrequency !== undefined) patch.paymentFrequency = body.paymentFrequency as PolicyRecord['paymentFrequency'];
+      if (body.thisYearRenewed !== undefined) patch.thisYearRenewed = body.thisYearRenewed;
+      if (body.followUpRecord !== undefined) patch.followUpRecord = body.followUpRecord;
+      if (body.statusTag !== undefined) patch.statusTag = body.statusTag;
 
       const policy = await updatePolicy(id, patch);
       if (!policy) {

@@ -20,17 +20,17 @@ import {
   type Relationship,
   type PaymentFrequency,
   type RenewalStatus,
-} from '../constants';
-import type { PolicyRecord } from '../types';
+} from '../../../src/modules/office-tools/constants';
+import type { PolicyRecord } from '../../../src/modules/office-tools/types';
 
 // ─── parseCSV ─────────────────────────────────────────────────────
 
 /**
  * Parse CSV text into an array of row objects keyed by header.
- * Handles quoted fields, escaped quotes (""), both \\n and \\r\\n.
+ * Handles quoted fields, escaped quotes (""), both \n and \r\n.
  */
 export function parseCSV(text: string): Record<string, string>[] {
-  // Step 1: Split text into rows respecting quoted fields
+  // Split text into rows respecting quoted fields
   const rows: string[][] = [];
   let currentField = '';
   let inQuotes = false;
