@@ -37,7 +37,8 @@ export interface PolicyRecord {
   paymentAccount?: string;
   purchasePlatform?: string;
   paymentFrequency?: PaymentFrequency;
-  thisYearRenewed: boolean;
+  /** 最近一次实际缴费日期——续期追踪的单一真相源 */
+  lastRenewalDate?: string;
   followUpRecord?: string;
   statusTag?: string;
   renewalStatus?: RenewalStatus;

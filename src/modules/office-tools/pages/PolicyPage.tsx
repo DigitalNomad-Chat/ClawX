@@ -3,16 +3,18 @@
  * Dashboard + Family/Policy list + Forms
  */
 import { useEffect, useState } from 'react';
-import { Shield, ArrowLeft, Users } from 'lucide-react';
+import { Shield, ArrowLeft, Users, Upload, Download, Plus, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { usePolicyStore } from '../stores/policyStore';
 import { PolicyDashboard } from '../components/PolicyDashboard';
 import { PolicyList } from '../components/PolicyList';
 import { PolicyForm } from '../components/PolicyForm';
 import { FamilyForm } from '../components/FamilyForm';
+import { PolicyImportDialog } from '../components/PolicyImportDialog';
 import type { PolicyRecord, PolicyFamily } from '../types';
 
 export function PolicyPage() {
@@ -27,7 +29,13 @@ export function PolicyPage() {
   const createPolicy = usePolicyStore((s) => s.createPolicy);
   const updatePolicy = usePolicyStore((s) => s.updatePolicy);
   const deletePolicy = usePolicyStore((s) => s.deletePolicy);
+  const importPolicies = usePolicyStore((s) => s.importPolicies);
+  const exportPolicies = usePolicyStore((s) => s.exportPolicies);
+  const downloadImportTemplate = usePolicyStore((s) => s.downloadImportTemplate);
+  const markPaid = usePolicyStore((s) => s.markPaid);
   const clearError = usePolicyStore((s) => s.clearError);
+
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const [familyFormOpen, setFamilyFormOpen] = useState(false);
   const [policyFormOpen, setPolicyFormOpen] = useState(false);
@@ -38,6 +46,7 @@ export function PolicyPage() {
 
   const [familyToDelete, setFamilyToDelete] = useState<PolicyFamily | null>(null);
   const [policyToDelete, setPolicyToDelete] = useState<PolicyRecord | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     void fetchFamilies();
@@ -61,9 +70,17 @@ export function PolicyPage() {
     }
   };
 
-  const handleAddPolicy = (familyId: string, familyName: string) => {
-    setSelectedFamilyId(familyId);
-    setSelectedFamilyName(familyName);
+  const openCreatePolicy = async () => {
+    // Always refresh families right before opening the form to avoid stale state
+    await fetchFamilies();
+    const latestFamilies = usePolicyStore.getState().families;
+    if (latestFamilies.length === 0) {
+      toast.info('请先添加一个家庭');
+      return;
+    }
+    const family = latestFamilies.find((f) => f.id === selectedFamilyId) ?? latestFamilies[0];
+    setSelectedFamilyId(family.id);
+    setSelectedFamilyName(family.name);
     setEditingPolicy(null);
     setPolicyFormMode('create');
     setPolicyFormOpen(true);
@@ -114,10 +131,48 @@ export function PolicyPage() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      await exportPolicies();
+      toast.success('CSV 导出已开始');
+    } catch {
+      // error handled by store
+    }
+  };
+
+  const handleImport = async (file: File, familyId: string) => {
+    const text = await file.text();
+    const result = await importPolicies(text, familyId);
+    if (result.errors.length === 0) {
+      toast.success(`成功导入 ${result.created} 条保单`);
+    } else {
+      toast.warning(`导入 ${result.created} 条，存在 ${result.errors.length} 个错误`);
+    }
+    return result;
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      await downloadImportTemplate();
+      toast.success('导入模板下载已开始');
+    } catch {
+      // error handled by store
+    }
+  };
+
+  const handleMarkPaid = async (policy: PolicyRecord) => {
+    try {
+      await markPaid(policy.id);
+      toast.success(`"${policy.productName || policy.policyNo}" 已标记为已缴费`);
+    } catch {
+      // error handled by store
+    }
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b bg-card/50 px-6 py-4">
+      <div className="flex items-center gap-3 border-b bg-card/50 px-4 sm:px-6 lg:px-8 py-4">
         <Button
           variant="ghost"
           size="icon"
@@ -143,17 +198,54 @@ export function PolicyPage() {
         </Button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto max-w-4xl space-y-5">
-          <PolicyDashboard stats={stats} />
-          <PolicyList
-            families={families}
-            onAddPolicy={handleAddPolicy}
-            onEditPolicy={handleEditPolicy}
-            onDeletePolicy={(policy) => setPolicyToDelete(policy)}
-            onDeleteFamily={(family) => setFamilyToDelete(family)}
-          />
+      {/* Content — fluid responsive container */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="dashboard">续期看板</TabsTrigger>
+              <TabsTrigger value="list">保单列表</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard" className="space-y-4">
+              <PolicyDashboard stats={stats} />
+              <div className="flex justify-end">
+                <Button size="sm" className="gap-1.5" onClick={openCreatePolicy}>
+                  <Plus className="h-3.5 w-3.5" />
+                  新增保单
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="list" className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button size="sm" className="gap-1.5" onClick={openCreatePolicy}>
+                    <Plus className="h-3.5 w-3.5" />
+                    新增保单
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportDialogOpen(true)}>
+                    <Upload className="h-3.5 w-3.5" />
+                    导入 CSV
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadTemplate}>
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    下载模板
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport}>
+                    <Download className="h-3.5 w-3.5" />
+                    导出 CSV
+                  </Button>
+                </div>
+              </div>
+
+              <PolicyList
+                onEditPolicy={handleEditPolicy}
+                onDeletePolicy={(policy) => setPolicyToDelete(policy)}
+                onMarkPaid={handleMarkPaid}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 
@@ -168,11 +260,19 @@ export function PolicyPage() {
       <PolicyForm
         open={policyFormOpen}
         mode={policyFormMode}
+        families={families}
         familyId={selectedFamilyId}
         familyName={selectedFamilyName}
         initial={editingPolicy}
         onSubmit={handlePolicySubmit}
         onClose={() => setPolicyFormOpen(false)}
+      />
+
+      <PolicyImportDialog
+        open={importDialogOpen}
+        families={families}
+        onImport={handleImport}
+        onClose={() => setImportDialogOpen(false)}
       />
 
       {/* Confirm dialogs */}

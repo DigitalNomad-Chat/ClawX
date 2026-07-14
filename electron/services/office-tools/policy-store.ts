@@ -6,6 +6,7 @@
 import type { PolicyRecord, PolicyFamily, OfficeToolsStats } from '../../../src/modules/office-tools/types';
 import {
   INSURANCE_TYPE_LABELS,
+  type PaymentFrequency,
   type RenewalStatus,
 } from '../../../src/modules/office-tools/constants';
 import { parseCSV, mapCsvRowToPolicy, policiesToCsv } from './csv';
@@ -45,59 +46,217 @@ function nowIso(): string {
 // Renewal calculation
 // ---------------------------------------------------------------------------
 
+/** Add months to a date without mutating the original. */
+function addMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  const day = next.getDate();
+  next.setMonth(next.getMonth() + months);
+  // Handle month-end overflow (e.g. Jan 31 + 1 month -> Feb 28)
+  if (next.getDate() < day) {
+    next.setDate(0);
+  }
+  return next;
+}
+
+/** Map payment frequency to the number of months in one cycle. 0 = one_time. */
+function cycleMonths(paymentFrequency?: PaymentFrequency): number {
+  switch (paymentFrequency) {
+    case 'monthly': return 1;
+    case 'quarterly': return 3;
+    case 'semi_annual': return 6;
+    case 'annual': return 12;
+    case 'one_time': return 0;
+    default: return 12; // unknown -> assume annual
+  }
+}
+
 /**
- * Calculate renewal status from effective date and this-year renewal flag.
- * Pure function — does not depend on storage.
+ * "Already renewed" buffer threshold, proportional to the cycle length
+ * (~1/6 of the cycle). A policy whose coverage extends further than this
+ * buffer past today is considered comfortably paid-up ("renewed"); otherwise
+ * it is "due soon" ("normal").
  */
-export function calculateRenewalStatus(
+function renewedBufferDays(paymentFrequency?: PaymentFrequency): number {
+  switch (paymentFrequency) {
+    case 'monthly': return 5;
+    case 'quarterly': return 15;
+    case 'semi_annual': return 30;
+    case 'annual': return 60;
+    case 'one_time': return Number.MAX_SAFE_INTEGER;
+    default: return 60;
+  }
+}
+
+/** Grace period (days) after the coverage end date before a policy lapses. */
+const GRACE_DAYS = 60;
+
+/**
+ * Paid-through-based renewal calculation.
+ *
+ * Single source of truth: `lastRenewalDate` (the last time a premium was
+ * actually paid). If absent, we fall back to `effectiveDate` (treat the first
+ * premium as paid on the effective date).
+ *
+ * Coverage extends one full cycle past the anchor:
+ *   paidThrough = anchor + paymentFrequency cycles
+ *   daysToRenewal = paidThrough - today   (positive = still covered,
+ *                                          negative = overdue)
+ *
+ * Status:
+ *   terminated / expired            -> lapsed
+ *   one_time premium                -> renewed (no further cycle)
+ *   daysToRenewal > buffer          -> renewed (comfortably paid up)
+ *   daysToRenewal >= 0              -> normal  (due within the buffer window)
+ *   daysToRenewal >= -GRACE_DAYS    -> grace
+ *   otherwise                       -> lapsed
+ */
+
+/**
+ * Compute the next scheduled due date based on effectiveDate and frequency.
+ * This is the contractual renewal date -- NOT influenced by payment history.
+ * Returns { recentDue: Date, nextDue: Date, daysToRenewal: number }.
+ */
+function computeNextScheduledDue(
   effectiveDate: string,
-  thisYearRenewed: boolean,
-): {
+  paymentFrequency?: PaymentFrequency,
+  todayArg?: Date,
+) {
+  const now = todayArg ?? new Date();
+  now.setHours(0, 0, 0, 0);
+  const eff = new Date(effectiveDate);
+  eff.setHours(0, 0, 0, 0);
+  const months = cycleMonths(paymentFrequency);
+
+  // Walk forward from eff in whole cycles to find the most recent due <= today.
+  let recentDue = new Date(eff);
+  const limit = 120;
+  for (let i = 0; i < limit; i++) {
+    const next = addMonths(recentDue, months);
+    if (next.getTime() > now.getTime()) break;
+    recentDue = next;
+  }
+  recentDue.setHours(0, 0, 0, 0);
+
+  // Next scheduled due = one full cycle after recentDue.
+  const nextDue = addMonths(recentDue, months);
+  nextDue.setHours(0, 0, 0, 0);
+
+  const daysToRenewal = Math.round(
+    (nextDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  return { recentDue, nextDue, daysToRenewal };
+}
+
+export function calculateRenewalStatus(policy: {
+  effectiveDate: string;
+  lastRenewalDate?: string;
+  paymentFrequency?: PaymentFrequency;
+  status?: string;
+  expiryDate?: string;
+}): {
   renewalDate: string;
   renewalStatus: RenewalStatus;
   daysToRenewal: number;
 } {
-  const effDate = new Date(effectiveDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Next renewal date falls on the same month/day as effective date,
-  // in the current or next year.
-  const renewalDate = new Date(effDate);
-  renewalDate.setFullYear(today.getFullYear());
-  renewalDate.setHours(0, 0, 0, 0);
-  if (renewalDate < today) {
-    renewalDate.setFullYear(today.getFullYear() + 1);
+  // Terminated, lapsed, or expired policies do not renew.
+  if (policy.status === 'terminated' || policy.status === 'lapsed') {
+    return { renewalDate: '', renewalStatus: 'lapsed', daysToRenewal: 99999 };
+  }
+  if (policy.expiryDate) {
+    const exp = new Date(policy.expiryDate);
+    exp.setHours(0, 0, 0, 0);
+    if (exp < today) {
+      return { renewalDate: '', renewalStatus: 'lapsed', daysToRenewal: 99999 };
+    }
   }
 
-  const daysToRenewal = Math.ceil(
-    (renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  // One-time premium has no renewal cycle.
+  if (policy.paymentFrequency === 'one_time') {
+    return { renewalDate: '', renewalStatus: 'renewed', daysToRenewal: 99999 };
+  }
+
+  // --- Days to renewal: always from contract (effectiveDate + frequency) ---
+  const schedule = computeNextScheduledDue(
+    policy.effectiveDate,
+    policy.paymentFrequency,
   );
 
+  // --- Status: derived from payment history (lastRenewalDate) ---
+  const anchorRaw = policy.lastRenewalDate || policy.effectiveDate;
+  if (!anchorRaw || isNaN(new Date(anchorRaw).getTime())) {
+    // No valid anchor -> status falls through to "normal"
+    return { renewalDate: schedule.nextDue.toISOString(), renewalStatus: 'normal', daysToRenewal: schedule.daysToRenewal };
+  }
+  const anchor = new Date(anchorRaw);
+  anchor.setHours(0, 0, 0, 0);
+  const months = cycleMonths(policy.paymentFrequency);
+
+  // Coverage end date = anchor + one cycle.
+  const paidThrough = addMonths(anchor, months);
+  paidThrough.setHours(0, 0, 0, 0);
+
+  const daysSinceCoverageEnd = Math.round(
+    (today.getTime() - paidThrough.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  const buffer = renewedBufferDays(policy.paymentFrequency);
+
   let renewalStatus: RenewalStatus;
-  if (thisYearRenewed) {
-    renewalStatus = 'renewed';
-  } else if (daysToRenewal >= 0) {
-    renewalStatus = 'normal';
-  } else if (daysToRenewal >= -60) {
+  if (daysSinceCoverageEnd <= 0) {
+    // Still covered by the last payment.
+    if (schedule.daysToRenewal > buffer) {
+      renewalStatus = 'renewed';
+    } else {
+      renewalStatus = 'normal';
+    }
+  } else if (daysSinceCoverageEnd <= GRACE_DAYS) {
     renewalStatus = 'grace';
   } else {
     renewalStatus = 'lapsed';
   }
 
   return {
-    renewalDate: renewalDate.toISOString(),
+    renewalDate: schedule.nextDue.toISOString(),
     renewalStatus,
-    daysToRenewal,
+    daysToRenewal: schedule.daysToRenewal,
   };
+}
+
+export function computeDefaultLastRenewalDate(
+  effectiveDate: string,
+  paymentFrequency?: PaymentFrequency,
+): string | undefined {
+  if (!effectiveDate || isNaN(new Date(effectiveDate).getTime())) return undefined;
+  if (paymentFrequency === 'one_time') return undefined;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eff = new Date(effectiveDate);
+  eff.setHours(0, 0, 0, 0);
+
+  const months = cycleMonths(paymentFrequency);
+  let recent = new Date(eff);
+  const limit = 120;
+  let i = 0;
+  while (i < limit) {
+    const next = addMonths(recent, months);
+    if (next.getTime() > today.getTime()) break;
+    recent = next;
+    i++;
+  }
+  recent.setHours(0, 0, 0, 0);
+  return recent.toISOString();
 }
 
 /**
  * Enrich a policy object with computed renewal fields.
  */
 export function enrichPolicyWithRenewal(policy: PolicyRecord): PolicyRecord {
-  const effectiveDate = policy.effectiveDate || new Date().toISOString();
-  const calc = calculateRenewalStatus(effectiveDate, policy.thisYearRenewed ?? false);
+  const calc = calculateRenewalStatus(policy);
 
   return {
     ...policy,
@@ -284,6 +443,7 @@ export async function importPolicies(
         expiryDate: '',
         status: 'active',
         beneficiary: '',
+        remarks: '',
         ...policyData,
       };
 
@@ -343,14 +503,14 @@ export async function getDashboardStats(): Promise<OfficeToolsStats> {
       statusDistribution[status as keyof typeof statusDistribution]++;
     }
 
-    // Only count not-yet-renewed policies as "upcoming" renewals.
+    // Upcoming reminders: daysToRenewal counts down to the next scheduled due
+    // date (by contract). Count policies whose next due date is within the
+    // rolling reminder window. Already-paid policies are excluded.
     if (status !== 'renewed') {
       const days = p.daysToRenewal;
-      if (days !== undefined && days >= 0) {
-        if (days <= 7) upcomingRenewals.within7Days++;
-        if (days <= 30) upcomingRenewals.within30Days++;
-        if (days <= 60) upcomingRenewals.within60Days++;
-      }
+      if (days !== undefined && days <= 7) upcomingRenewals.within7Days++;
+      if (days !== undefined && days <= 30) upcomingRenewals.within30Days++;
+      if (days !== undefined && days <= 60) upcomingRenewals.within60Days++;
     }
 
     const type = p.insuranceType;

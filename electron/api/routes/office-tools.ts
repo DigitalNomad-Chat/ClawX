@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import type { HostApiContext } from '../context';
-import type { DocumentSession } from '../../../src/modules/office-tools/types';
-import { parseJsonBody, sendJson } from '../route-utils';
+import type { DocumentSession, PolicyRecord } from '../../../src/modules/office-tools/types';
+import { sendJson, parseJsonBody } from '../route-utils';
+import { importTemplateToCsv } from '../../services/office-tools/csv';
 import {
   listFamilies,
   getFamily,
@@ -13,7 +14,9 @@ import {
   createPolicy,
   updatePolicy,
   deletePolicy,
-  getOfficeToolsStats,
+  getDashboardStats,
+  importPolicies,
+  exportPoliciesToCsv,
 } from '../../services/office-tools/policy-store';
 import { refineText } from '../services/ai-refine';
 import {
@@ -34,7 +37,7 @@ export async function handleOfficeToolsRoutes(
   // ── Stats ────────────────────────────────────────────────────────────────
   if (url.pathname === '/api/office-tools/stats' && req.method === 'GET') {
     try {
-      const stats = await getOfficeToolsStats();
+      const stats = await getDashboardStats();
       sendJson(res, 200, { success: true, stats });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
@@ -119,10 +122,137 @@ export async function handleOfficeToolsRoutes(
   }
 
   // ── Policies ─────────────────────────────────────────────────────────────
+
+  // GET /policies — list with optional filtering / sorting / pagination
   if (url.pathname === '/api/office-tools/policies' && req.method === 'GET') {
     try {
-      const policies = await listPolicies();
-      sendJson(res, 200, { success: true, policies });
+      const familyId = url.searchParams.get('familyId') ?? undefined;
+      const insuranceType = url.searchParams.get('insuranceType') ?? undefined;
+      const renewalStatus = url.searchParams.get('renewalStatus') ?? undefined;
+      const search = url.searchParams.get('search') ?? undefined;
+      const sortBy = url.searchParams.get('sortBy') ?? 'daysToRenewal';
+      const sortOrder = url.searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+      const pageNum = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
+      const pageSizeNum = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') ?? '20', 10) || 20));
+
+      let policies = await listPolicies();
+
+      // Filtering
+      if (familyId) policies = policies.filter((p) => p.familyId === familyId);
+      if (insuranceType) policies = policies.filter((p) => p.insuranceType === insuranceType);
+      if (renewalStatus) policies = policies.filter((p) => p.renewalStatus === renewalStatus);
+      if (search) {
+        const kw = search.toLowerCase();
+        policies = policies.filter(
+          (p) =>
+            (p.productName || '').toLowerCase().includes(kw) ||
+            (p.policyHolder || '').toLowerCase().includes(kw) ||
+            (p.insuredPerson || '').toLowerCase().includes(kw) ||
+            (p.insurer || '').toLowerCase().includes(kw),
+        );
+      }
+
+      // Sorting
+      const dir = sortOrder === 'desc' ? -1 : 1;
+      policies.sort((a, b) => {
+        if (sortBy === 'daysToRenewal') {
+          return ((a.daysToRenewal ?? 99999) - (b.daysToRenewal ?? 99999)) * dir;
+        }
+        if (sortBy === 'premium') {
+          return ((a.premium ?? 0) - (b.premium ?? 0)) * dir;
+        }
+        // productName (default text sort)
+        return (a.productName || '').localeCompare(b.productName || '') * dir;
+      });
+
+      // Pagination
+      const total = policies.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSizeNum));
+      const items = policies.slice((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum);
+
+      sendJson(res, 200, {
+        success: true,
+        items,
+        total,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        totalPages,
+      });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  // GET /policies/import-template/csv — download empty CSV import template
+  if (url.pathname === '/api/office-tools/policies/import-template/csv' && req.method === 'GET') {
+    try {
+      const csv = importTemplateToCsv();
+      const today = new Date().toISOString().split('T')[0];
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="policy_import_template_${today}.csv"`,
+      });
+      res.end(csv);
+    } catch (error) {
+      if (!res.headersSent) {
+        sendJson(res, 500, { success: false, error: String(error) });
+      } else {
+        res.end();
+      }
+    }
+    return true;
+  }
+
+  // POST /policies/import — bulk import from CSV text
+  // (must precede the /policies/:id route so "import" is not treated as an id)
+  if (url.pathname === '/api/office-tools/policies/import' && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody<{ csvText?: unknown; familyId?: unknown }>(req);
+      if (
+        typeof body.csvText !== 'string' ||
+        typeof body.familyId !== 'string' ||
+        !body.csvText ||
+        !body.familyId
+      ) {
+        sendJson(res, 400, { success: false, error: 'csvText and familyId are required and must be strings' });
+        return true;
+      }
+      const result = await importPolicies(body.csvText, body.familyId);
+      sendJson(res, 200, { success: true, ...result });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  // GET /policies/export/csv — download CSV (optionally filtered by family)
+  if (url.pathname === '/api/office-tools/policies/export/csv' && req.method === 'GET') {
+    try {
+      const familyId = url.searchParams.get('familyId') ?? undefined;
+      const csv = await exportPoliciesToCsv(familyId);
+      const today = new Date().toISOString().split('T')[0];
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="policies_${today}.csv"`,
+      });
+      res.end(csv);
+    } catch (error) {
+      // 响应头已发送（如流式写入中途出错）时无法再回写 JSON，直接终止流
+      if (!res.headersSent) {
+        sendJson(res, 500, { success: false, error: String(error) });
+      } else {
+        res.end();
+      }
+    }
+    return true;
+  }
+
+  // GET /policies/dashboard/stats — advanced dashboard statistics
+  if (url.pathname === '/api/office-tools/policies/dashboard/stats' && req.method === 'GET') {
+    try {
+      const stats = await getDashboardStats();
+      sendJson(res, 200, { success: true, stats });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
     }
@@ -151,7 +281,7 @@ export async function handleOfficeToolsRoutes(
         paymentAccount?: string;
         purchasePlatform?: string;
         paymentFrequency?: string;
-        thisYearRenewed?: boolean;
+        lastRenewalDate?: string;
         followUpRecord?: string;
         statusTag?: string;
       }>(req);
@@ -181,7 +311,7 @@ export async function handleOfficeToolsRoutes(
         paymentAccount: body.paymentAccount || '',
         purchasePlatform: body.purchasePlatform || '',
         paymentFrequency: body.paymentFrequency as PolicyRecord['paymentFrequency'],
-        thisYearRenewed: body.thisYearRenewed ?? false,
+        lastRenewalDate: body.lastRenewalDate,
         followUpRecord: body.followUpRecord || '',
         statusTag: body.statusTag || '',
       });
@@ -237,7 +367,7 @@ export async function handleOfficeToolsRoutes(
         paymentAccount: string;
         purchasePlatform: string;
         paymentFrequency: string;
-        thisYearRenewed: boolean;
+        lastRenewalDate: string;
         followUpRecord: string;
         statusTag: string;
       }>>(req);
@@ -261,7 +391,7 @@ export async function handleOfficeToolsRoutes(
       if (body.paymentAccount !== undefined) patch.paymentAccount = body.paymentAccount;
       if (body.purchasePlatform !== undefined) patch.purchasePlatform = body.purchasePlatform;
       if (body.paymentFrequency !== undefined) patch.paymentFrequency = body.paymentFrequency as PolicyRecord['paymentFrequency'];
-      if (body.thisYearRenewed !== undefined) patch.thisYearRenewed = body.thisYearRenewed;
+      if (body.lastRenewalDate !== undefined) patch.lastRenewalDate = body.lastRenewalDate;
       if (body.followUpRecord !== undefined) patch.followUpRecord = body.followUpRecord;
       if (body.statusTag !== undefined) patch.statusTag = body.statusTag;
 
@@ -290,6 +420,28 @@ export async function handleOfficeToolsRoutes(
         return true;
       }
       sendJson(res, 200, { success: true });
+    } catch (error) {
+      sendJson(res, 500, { success: false, error: String(error) });
+    }
+    return true;
+  }
+
+  // POST /policies/:id/mark-paid — mark the current cycle as paid
+  if (url.pathname.startsWith('/api/office-tools/policies/') && url.pathname.endsWith('/mark-paid') && req.method === 'POST') {
+    const idStr = url.pathname.slice('/api/office-tools/policies/'.length, -'/mark-paid'.length);
+    const id = Number(idStr);
+    if (!Number.isFinite(id)) {
+      sendJson(res, 400, { success: false, error: 'Invalid policy id' });
+      return true;
+    }
+    try {
+      const today = new Date().toISOString();
+      const policy = await updatePolicy(id, { lastRenewalDate: today } as Partial<Omit<PolicyRecord, 'id' | 'createdAt'>>);
+      if (!policy) {
+        sendJson(res, 404, { success: false, error: 'Policy not found' });
+        return true;
+      }
+      sendJson(res, 200, { success: true, policy });
     } catch (error) {
       sendJson(res, 500, { success: false, error: String(error) });
     }

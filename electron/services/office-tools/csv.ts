@@ -148,7 +148,7 @@ export function mapCsvRowToPolicy(
   const rawPremium = get('premium', '保费');
   const rawEffectiveDate = get('effectiveDate', '生效日期');
   const rawPaymentFrequency = get('paymentFrequency', '缴费频率');
-  const rawThisYearRenewed = get('thisYearRenewed', '今年已续');
+  const rawLastRenewalDate = get('lastRenewalDate', '最近缴费日期');
   const rawPaymentAccount = get('paymentAccount', '缴费账户');
   const rawPurchasePlatform = get('purchasePlatform', '购买平台');
   const rawFollowUpRecord = get('followUpRecord', '跟进记录');
@@ -166,8 +166,8 @@ export function mapCsvRowToPolicy(
   // effectiveDate: validate and normalize to YYYY-MM-DD
   const effectiveDate = parseEffectiveDate(rawEffectiveDate);
 
-  // thisYearRenewed: boolean
-  const thisYearRenewed = parseBooleanFlag(rawThisYearRenewed);
+  // lastRenewalDate: validate and normalize to YYYY-MM-DD
+  const lastRenewalDate = parseEffectiveDate(rawLastRenewalDate);
 
   return {
     familyId,
@@ -180,7 +180,7 @@ export function mapCsvRowToPolicy(
     premium,
     effectiveDate,
     paymentFrequency,
-    thisYearRenewed,
+    lastRenewalDate,
     paymentAccount: rawPaymentAccount,
     purchasePlatform: rawPurchasePlatform,
     followUpRecord: rawFollowUpRecord,
@@ -246,6 +246,59 @@ function parseBooleanFlag(raw: string): boolean | undefined {
   return lower === '1' || lower === '是' || lower === 'true' || lower === 'yes';
 }
 
+// ─── importTemplateToCsv ──────────────────────────────────────────
+
+/** Headers required for CSV import (Chinese labels matching mapCsvRowToPolicy). */
+const IMPORT_TEMPLATE_HEADERS = [
+  '产品名称',
+  '险种',
+  '家庭',
+  '投保人',
+  '被保人',
+  '关系',
+  '保费',
+  '生效日期',
+  '缴费频率',
+  '最近缴费日期',
+  '缴费账户',
+  '购买平台',
+  '跟进记录',
+  '状态标记',
+  '备注',
+];
+
+/** A sample row that demonstrates valid values for each column. */
+const IMPORT_TEMPLATE_SAMPLE = [
+  '平安福终身寿险',
+  '寿险',
+  '张三家庭',
+  '张三',
+  '李四',
+  '配偶',
+  '5000.00',
+  '2024-01-15',
+  '年缴',
+  '2025-01-15',
+  '6222 **** **** 1234',
+  '支付宝',
+  '2024年底已提醒续期',
+  '重点客户',
+  '通过代理人购买',
+];
+
+/**
+ * Generate an import-template CSV string.
+ * Includes UTF-8 BOM for Excel compatibility.
+ */
+export function importTemplateToCsv(): string {
+  const bom = '﻿';
+  const lines = [
+    IMPORT_TEMPLATE_HEADERS.join(','),
+    IMPORT_TEMPLATE_SAMPLE.join(','),
+  ];
+  return bom + lines.join('\n');
+}
+
 // ─── policiesToCsv ────────────────────────────────────────────────
 
 /** Export columns in Chinese order for CSV output */
@@ -260,7 +313,7 @@ const EXPORT_HEADERS: Array<{ key: keyof PolicyRecord; label: string }> = [
   { key: 'effectiveDate', label: '生效日期' },
   { key: 'renewalStatus', label: '续期状态' },
   { key: 'daysToRenewal', label: '距离续期(天)' },
-  { key: 'thisYearRenewed', label: '今年已续' },
+  { key: 'lastRenewalDate', label: '最近缴费日期' },
   { key: 'followUpRecord', label: '跟进记录' },
   { key: 'statusTag', label: '状态标记' },
   { key: 'remarks', label: '备注' },
@@ -310,11 +363,9 @@ function formatCellValue(key: string, value: unknown): string {
       return typeof value === 'number' ? value.toFixed(2) : String(value);
     }
     case 'effectiveDate':
+    case 'lastRenewalDate':
     case 'renewalDate': {
       return formatDate(value as string);
-    }
-    case 'thisYearRenewed': {
-      return value === true ? '是' : '否';
     }
     case 'paymentFrequency': {
       const v = value as PaymentFrequency;
