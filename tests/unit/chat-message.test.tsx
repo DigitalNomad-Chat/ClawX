@@ -407,6 +407,53 @@ describe('ChatMessage word wrapping', () => {
   });
 });
 
+describe('ChatMessage image preview placeholder', () => {
+  it('shows an explicit loading state for image artifacts before preview hydration finishes', () => {
+    const message: RawMessage = {
+      role: 'assistant',
+      content: 'Image generated.',
+      _attachedFiles: [
+        {
+          fileName: 'generated.png',
+          mimeType: 'image/png',
+          fileSize: 0,
+          preview: null,
+          gatewayUrl: '/api/chat/media/outgoing/agent%3Amain%3As-1/generated/full',
+          source: 'gateway-media',
+        },
+      ],
+    };
+
+    render(<ChatMessage message={message} />);
+
+    expect(screen.getByTestId('image-preview-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('image-preview-unavailable')).not.toBeInTheDocument();
+  });
+
+  it('shows an unavailable state after image preview hydration gives up', () => {
+    const message: RawMessage = {
+      role: 'assistant',
+      content: 'Image generated.',
+      _attachedFiles: [
+        {
+          fileName: 'generated.png',
+          mimeType: 'image/png',
+          fileSize: 0,
+          preview: null,
+          previewStatus: 'unavailable',
+          gatewayUrl: '/api/chat/media/outgoing/agent%3Amain%3As-1/generated/full',
+          source: 'gateway-media',
+        },
+      ],
+    };
+
+    render(<ChatMessage message={message} />);
+
+    expect(screen.getByTestId('image-preview-unavailable')).toBeInTheDocument();
+    expect(screen.queryByTestId('image-preview-loading')).not.toBeInTheDocument();
+  });
+});
+
 describe('ChatMessage reply styling', () => {
   it('renders assistant replies as plain Markdown without a rounded bubble wrapper', () => {
     const message: RawMessage = {

@@ -375,6 +375,12 @@ export function Chat() {
   const hasRunningStreamToolStatus = streamingTools.some((tool) => tool.status === 'running');
   const shouldRenderStreaming = sending && (hasStreamText || hasStreamTools || hasStreamImages || hasStreamToolStatus);
   const hasAnyStreamContent = hasStreamText || hasStreamThinking || hasStreamTools || hasStreamImages || hasStreamToolStatus;
+  // Thinking-only stale stream content must not keep image-generation runs open
+  // after history already contains the final media (#1080).
+  const hasHistoryCompletionBlockingStream = hasStreamText
+    || hasStreamImages
+    || hasRunningStreamToolStatus
+    || streamTools.length > 0;
 
   // Progressive status label shown while waiting for the first response.
   // New sessions can take ~150s to initialize, so we give the user explicit
@@ -450,10 +456,12 @@ export function Chat() {
     // History may already contain the final answer while lifecycle flags are
     // still armed (missing Gateway terminal phase, blocked chat.send RPC, etc.).
     // Treat the run as closed for graph/input UI when the transcript is done
-    // and nothing is actively streaming. Require prior tool activity so an early
-    // narration-only history snapshot does not collapse the graph mid-chain.
+    // and no user-visible reply/tool stream is active. Require prior tool activity
+    // so an early narration-only history snapshot does not collapse the graph
+    // mid-chain. Thinking-only stale stream content should not keep image
+    // generation runs open after history already contains the final media.
     const runCompletedInHistory = hasFinalReply
-      && !hasAnyStreamContent
+      && !hasHistoryCompletionBlockingStream
       && (hasToolActivity || !sending);
     const isLatestOpenRun = isLatestRunSegment
       && !runError
@@ -654,7 +662,7 @@ export function Chat() {
     }];
   });
     return { userRunCards, foldedNarrationIndices };
-  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError, isRunTrigger]);
+  }, [messages, subagentCompletionInfos, currentSessionKey, streamingMessage, streamingTools, pendingFinal, sending, hasAnyStreamContent, hasStreamText, hasStreamImages, streamText, streamTools, hasRunningStreamToolStatus, hasHistoryCompletionBlockingStream, childTranscripts, currentAgentId, agents, sessionLabels, graphStepCache, runError, isRunTrigger]);
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
   let latestRunSegmentCompletion = { hasFinalReply: false, hasToolActivity: false };
   let hasDeliveredImageReply = false;
@@ -675,7 +683,7 @@ export function Chat() {
     break;
   }
   const runSettledInHistory = (latestRunSegmentCompletion.hasFinalReply || hasDeliveredImageReply)
-    && !hasAnyStreamContent
+    && !hasHistoryCompletionBlockingStream
     && (latestRunSegmentCompletion.hasToolActivity || !sending);
   const inputRunActive = (sending || hasActiveExecutionGraph) && !runSettledInHistory;
   const replyTextOverrides = useMemo(() => {

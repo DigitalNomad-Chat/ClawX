@@ -1,4 +1,4 @@
-import { extractText, extractTextSegments, extractThinkingSegments, extractToolUse } from './message-utils';
+import { extractImages, extractText, extractTextSegments, extractThinkingSegments, extractToolUse } from './message-utils';
 import type { RawMessage, ToolStatus } from '@/stores/chat';
 
 export type TaskStepStatus = 'running' | 'completed' | 'error';
@@ -37,10 +37,18 @@ export function findReplyMessageIndex(messages: RawMessage[], hasStreamingReply:
   for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
     const message = messages[idx];
     if (!message || message.role !== 'assistant') continue;
+    if (messageHasUserVisibleImage(message)) return idx;
     if (extractText(message).trim().length === 0) continue;
     return idx;
   }
   return -1;
+}
+
+function messageHasUserVisibleImage(message: RawMessage): boolean {
+  if ((message._attachedFiles ?? []).some((file) => file.mimeType.startsWith('image/'))) {
+    return true;
+  }
+  return extractImages(message).length > 0;
 }
 
 /**
@@ -135,6 +143,7 @@ export function segmentHasFinalReply(segmentMessages: RawMessage[]): boolean {
   return segmentMessages.some((message, index) => {
     if (index <= lastToolUseOffset) return false;
     if (message.role !== 'assistant') return false;
+    if (messageHasUserVisibleImage(message)) return true;
     if (extractText(message).trim().length === 0) return false;
     const content = message.content;
     if (!Array.isArray(content)) return true;
