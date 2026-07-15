@@ -506,4 +506,178 @@ test.describe('ClawX chat run state events', () => {
       await closeElectronApp(app);
     }
   });
+
+  test('preserves running state when creating a new chat and switching back', async ({ launchElectronApp }) => {
+    const app = await launchElectronApp({ skipSetup: true });
+    // Unique prompt becomes the sidebar session label for non-main sessions
+    // (first user message), giving a stable user-visible locator for switch-back.
+    const prompt = 'keep running while new chat';
+    const seedHistory = [
+      {
+        role: 'user',
+        id: 'seed-user',
+        timestamp: Date.now() / 1000,
+        content: 'seed conversation for new-chat guard',
+      },
+    ];
+
+    try {
+      await installIpcMocks(app, {
+        gatewayStatus: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+        gatewayRpc: {
+          [stableStringify(['sessions.list', { includeDerivedTitles: true, includeLastMessage: true }])]: {
+            success: true,
+            result: {
+              sessions: [{ key: MAIN_SESSION_KEY, displayName: 'main' }],
+            },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200 }])]: {
+            success: true,
+            result: { messages: seedHistory },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200, maxChars: 500000 }])]: {
+            success: true,
+            result: { messages: seedHistory },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 1000 }])]: {
+            success: true,
+            result: { messages: seedHistory },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 1000, maxChars: 500000 }])]: {
+            success: true,
+            result: { messages: seedHistory },
+          },
+          // Default empty history for newly created local sessions.
+          [stableStringify(['chat.history', null])]: {
+            success: true,
+            result: { messages: [] },
+          },
+        },
+        hostApi: {
+          [stableStringify(['/api/gateway/status', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+            },
+          },
+          [stableStringify(['/api/agents', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { success: true, agents: [{ id: 'main', name: 'Main' }] },
+            },
+          },
+        },
+      });
+
+      const page = await getStableWindow(app);
+      try {
+        await page.reload();
+      } catch (error) {
+        if (!String(error).includes('ERR_FILE_NOT_FOUND')) {
+          throw error;
+        }
+      }
+
+      await expect(page.getByTestId('chat-composer-input')).toBeEnabled({ timeout: 30_000 });
+      await expect(page.getByText('seed conversation for new-chat guard')).toBeVisible({ timeout: 15_000 });
+
+      // Leave main for a fresh non-main session so the first user prompt becomes
+      // that session's sidebar label.
+      await page.getByTestId('sidebar-new-chat').click();
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Send|发送)$/, {
+        timeout: 15_000,
+      });
+
+      // Keep this session's chat.send pending so the run stays active across
+      // the next New Chat without #1094 runtime events.
+      await app.evaluate(() => {
+        const { ipcMain } = process.mainModule!.require('electron') as typeof import('electron');
+        const globalProcess = process as NodeJS.Process & {
+          __clawdockChatSendQueue?: Array<(value: { success: boolean; result?: { runId?: string }; error?: string }) => void>;
+        };
+        globalProcess.__clawdockChatSendQueue = [];
+        ipcMain.removeHandler('gateway:rpc');
+        ipcMain.handle('gateway:rpc', async (_event: unknown, method: string, payload: unknown) => {
+          if (method === 'chat.send') {
+            return await new Promise<{ success: boolean; result?: { runId?: string }; error?: string }>((resolve) => {
+              globalProcess.__clawdockChatSendQueue!.push(resolve);
+            });
+          }
+          if (method === 'chat.history') {
+            const sessionKey = payload && typeof payload === 'object'
+              ? String((payload as { sessionKey?: unknown }).sessionKey ?? '')
+              : '';
+            if (sessionKey === 'agent:main:main') {
+              return {
+                success: true,
+                result: {
+                  messages: [{
+                    role: 'user',
+                    id: 'seed-user',
+                    timestamp: Date.now() / 1000,
+                    content: 'seed conversation for new-chat guard',
+                  }],
+                },
+              };
+            }
+            return { success: true, result: { messages: [] } };
+          }
+          if (method === 'sessions.list') {
+            return {
+              success: true,
+              result: {
+                sessions: [{ key: 'agent:main:main', displayName: 'main' }],
+              },
+            };
+          }
+          if (method === 'chat.abort') {
+            return { success: true, result: {} };
+          }
+          return { success: true, result: {} };
+        });
+      });
+
+      await page.getByTestId('chat-composer-input').fill(prompt);
+      await page.getByTestId('chat-composer-send').click();
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Stop|停止)$/);
+      await expect(page.getByText(prompt).first()).toBeVisible();
+
+      // Expand agent group so the labeled source session stays clickable.
+      const agentGroup = page.getByTestId('agent-group-main');
+      await expect(agentGroup).toBeVisible({ timeout: 10_000 });
+      if ((await agentGroup.locator('[data-session-item]').count()) === 0) {
+        await agentGroup.locator('button').first().click();
+      }
+
+      // New Chat parks the running labeled session and opens an idle one.
+      await page.getByTestId('sidebar-new-chat').click();
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Send|发送)$/, {
+        timeout: 15_000,
+      });
+
+      if ((await agentGroup.locator('[data-session-item]').count()) === 0) {
+        await agentGroup.locator('button').first().click();
+      }
+
+      // User-visible session label = first user prompt on the running session.
+      await page
+        .locator('[data-session-item]')
+        .filter({ hasText: 'keep running' })
+        .first()
+        .click();
+
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Stop|停止)$/, {
+        timeout: 15_000,
+      });
+      await expect(page.getByTestId('chat-typing-indicator')).toHaveCount(0);
+      await expect(page.getByTestId('chat-activity-indicator')).toHaveCount(0);
+      await expect(page.getByText(prompt).first()).toBeVisible();
+    } finally {
+      await closeElectronApp(app);
+    }
+  });
 });

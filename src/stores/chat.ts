@@ -2539,42 +2539,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // NOTE: We intentionally do NOT call sessions.reset on the old session.
     // sessions.reset archives (renames) the session JSONL file, making old
     // conversation history inaccessible when the user switches back to it.
-    const { currentSessionKey, messages, sessions, sessionLastActivity, sessionLabels } = get();
-    // Only treat sessions with no history records and no activity timestamp as empty
-    const leavingEmpty = !currentSessionKey.endsWith(':main')
-      && messages.length === 0
-      && !sessionLastActivity[currentSessionKey]
-      && !sessionLabels[currentSessionKey];
+    //
+    // Use the same switch patch as explicit sidebar switching so a running
+    // source session keeps its cached lifecycle. Without this, New Chat clears
+    // the active run globally; switching back to the still-running session then
+    // shows only the local transcript snapshot and loses the live execution UI.
+    const { currentSessionKey, sessions } = get();
     const prefix = getCanonicalPrefixFromSessionKey(currentSessionKey)
       ?? getCanonicalPrefixFromSessions(sessions)
       ?? DEFAULT_CANONICAL_PREFIX;
     const newKey = `${prefix}:session-${Date.now()}`;
-    const newSessionEntry: ChatSession = { key: newKey, displayName: newKey };
-    set((s) => ({
-      currentSessionKey: newKey,
-      currentAgentId: getAgentIdFromSessionKey(newKey),
-      sessions: [
-        ...(leavingEmpty ? s.sessions.filter((sess) => sess.key !== currentSessionKey) : s.sessions),
-        newSessionEntry,
-      ],
-      sessionLabels: leavingEmpty
-        ? Object.fromEntries(Object.entries(s.sessionLabels).filter(([k]) => k !== currentSessionKey))
-        : s.sessionLabels,
-      sessionLastActivity: leavingEmpty
-        ? Object.fromEntries(Object.entries(s.sessionLastActivity).filter(([k]) => k !== currentSessionKey))
-        : s.sessionLastActivity,
-      messages: [],
-      streamingText: '',
-      streamingMessage: null,
-      streamingTools: [],
-      activeRunId: null,
-      error: null,
-      runError: null,
-      pendingFinal: false,
-      lastUserMessageAt: null,
-      pendingToolImages: [],
-      rwWorkDir: s.agentRwWorkDirs[getAgentIdFromSessionKey(newKey)] ?? null,
-    }));
+
+    clearHistoryPoll();
+    clearBaselines();
+    set((s) => buildSessionSwitchPatch(s, newKey));
   },
 
   // ── Rename session ──
