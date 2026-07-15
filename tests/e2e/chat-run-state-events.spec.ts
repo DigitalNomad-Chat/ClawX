@@ -344,4 +344,166 @@ test.describe('ClawX chat run state events', () => {
       await closeElectronApp(app);
     }
   });
+
+  test('ignores a late first chat.send result after a newer send is running', async ({ launchElectronApp }) => {
+    const app = await launchElectronApp({ skipSetup: true });
+
+    try {
+      await installIpcMocks(app, {
+        gatewayStatus: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+        gatewayRpc: {
+          [stableStringify(['sessions.list', { includeDerivedTitles: true, includeLastMessage: true }])]: {
+            success: true,
+            result: {
+              sessions: [{ key: MAIN_SESSION_KEY, displayName: 'main' }],
+            },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200, maxChars: 500000 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 1000 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 1000, maxChars: 500000 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+        },
+        hostApi: {
+          [stableStringify(['/api/gateway/status', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+            },
+          },
+          [stableStringify(['/api/agents', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { success: true, agents: [{ id: 'main', name: 'Main' }] },
+            },
+          },
+        },
+      });
+
+      // Queue deferred chat.send acks so the first response can arrive after
+      // a second user turn has already started (stale-generation regression).
+      await app.evaluate(({ }, sessionKey) => {
+        const { ipcMain } = process.mainModule!.require('electron') as typeof import('electron');
+        const globalProcess = process as NodeJS.Process & {
+          __clawdockChatSendQueue?: Array<(value: { success: boolean; result?: { runId?: string }; error?: string }) => void>;
+        };
+        globalProcess.__clawdockChatSendQueue = [];
+
+        const previous = ipcMain.listeners('gateway:rpc');
+        void previous;
+        ipcMain.removeHandler('gateway:rpc');
+        ipcMain.handle('gateway:rpc', async (_event: unknown, method: string, payload: unknown) => {
+          if (method === 'chat.send') {
+            return await new Promise<{ success: boolean; result?: { runId?: string }; error?: string }>((resolve) => {
+              globalProcess.__clawdockChatSendQueue!.push(resolve);
+            });
+          }
+          if (method === 'chat.history') {
+            return { success: true, result: { messages: [] } };
+          }
+          if (method === 'sessions.list') {
+            return {
+              success: true,
+              result: {
+                sessions: [{ key: sessionKey, displayName: 'main' }],
+              },
+            };
+          }
+          if (method === 'chat.abort') {
+            return { success: true, result: {} };
+          }
+          return { success: true, result: payload ?? {} };
+        });
+      }, MAIN_SESSION_KEY);
+
+      const page = await getStableWindow(app);
+      try {
+        await page.reload();
+      } catch (error) {
+        if (!String(error).includes('ERR_FILE_NOT_FOUND')) {
+          throw error;
+        }
+      }
+
+      await expect(page.getByTestId('chat-composer-input')).toBeEnabled({ timeout: 30_000 });
+
+      // First send starts and stays pending at the RPC layer.
+      await page.getByTestId('chat-composer-input').fill('first delayed send');
+      await page.getByTestId('chat-composer-send').click();
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Stop|停止)$/);
+
+      // Simulate the first run finishing in the UI (history/media settle) while
+      // its chat.send RPC is still in flight.
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send('gateway:notification', {
+          method: 'agent',
+          params: {
+            runId: 'run-first-stale',
+            sessionKey: 'agent:main:main',
+            data: { phase: 'completed' },
+          },
+        });
+      });
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Send|发送)$/, {
+        timeout: 15_000,
+      });
+
+      // Second send becomes the active generation.
+      await page.getByTestId('chat-composer-input').fill('second active send');
+      await page.getByTestId('chat-composer-send').click();
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Stop|停止)$/);
+
+      // Late first RPC success must not tear down the second run's UI.
+      await app.evaluate(() => {
+        const globalProcess = process as NodeJS.Process & {
+          __clawdockChatSendQueue?: Array<(value: { success: boolean; result?: { runId?: string }; error?: string }) => void>;
+        };
+        const resolve = globalProcess.__clawdockChatSendQueue?.shift();
+        resolve?.({ success: true, result: { runId: 'run-first-stale' } });
+      });
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Stop|停止)$/);
+      await expect(page.getByTestId('chat-run-error')).toHaveCount(0);
+
+      // Completing the second run returns the composer to idle.
+      await app.evaluate(() => {
+        const globalProcess = process as NodeJS.Process & {
+          __clawdockChatSendQueue?: Array<(value: { success: boolean; result?: { runId?: string }; error?: string }) => void>;
+        };
+        const resolve = globalProcess.__clawdockChatSendQueue?.shift();
+        resolve?.({ success: true, result: { runId: 'run-second-active' } });
+      });
+      await app.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send('gateway:notification', {
+          method: 'agent',
+          params: {
+            runId: 'run-second-active',
+            sessionKey: 'agent:main:main',
+            data: { phase: 'completed' },
+          },
+        });
+      });
+      await expect(page.getByTestId('chat-composer-send')).toHaveAttribute('title', /^(Send|发送)$/, {
+        timeout: 15_000,
+      });
+      await expect(page.getByTestId('chat-typing-indicator')).toHaveCount(0);
+      await expect(page.getByTestId('chat-activity-indicator')).toHaveCount(0);
+    } finally {
+      await closeElectronApp(app);
+    }
+  });
 });
