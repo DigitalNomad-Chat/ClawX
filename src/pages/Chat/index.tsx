@@ -21,6 +21,10 @@ import { ExecutionGraphCard } from './ExecutionGraphCard';
 import { ChatToolbar } from './ChatToolbar';
 import { extractImages, extractText, extractThinking, extractToolUse, normalizeMessageRole, stripProcessMessagePrefix } from './message-utils';
 import { buildRunSegmentMessageIndices, deriveTaskSteps, findReplyMessageIndex, getRunSegmentMessages, getPostTriggerSegmentMessages, segmentHasFinalReply, parseSubagentCompletionInfo, type TaskStep } from './task-visualization';
+import {
+  hasDeliveredImageGenerationResult,
+  isImageGenerationPending,
+} from './image-generation-status';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useMinLoading } from '@/hooks/use-min-loading';
@@ -441,10 +445,13 @@ export function Chat() {
     //  - segment has tool calls but no pure-text final reply yet (server-side
     //    tool execution — Gateway fires phase "end" per tool round which
     //    briefly clears sending, but the run is still in progress)
-    const hasToolActivity = segmentMessages.some((m) =>
+    // Lifecycle checks use post-trigger messages only so paginated orphan
+    // assistants from a prior turn cannot mark the current run complete/pending.
+    const postTriggerMessages = getPostTriggerSegmentMessages(messages, idx, nextUserIndex);
+    const hasToolActivity = postTriggerMessages.some((m) =>
       m.role === 'assistant' && extractToolUse(m).length > 0,
     );
-    const hasFinalReply = segmentHasFinalReply(segmentMessages);
+    const hasFinalReply = segmentHasFinalReply(postTriggerMessages);
     const runStillExecutingTools = hasToolActivity && !hasFinalReply;
     // runStillExecutingTools bridges the brief gap between tool rounds when
     // Gateway temporarily clears sending.  However, after an explicit abort
@@ -453,6 +460,13 @@ export function Chat() {
     // terminal model error has been surfaced so the run doesn't appear active.
     // userAbortedRun provides an additional safety net for abort detection.
     const isLatestRunSegment = nextUserIndex === -1;
+    // History-only image generation settle (#1098 subset): delivered media /
+    // toolresult attachments clear pending without requiring ChatRuntimeEvent.
+    const pendingImageGeneration = isLatestRunSegment
+      && isImageGenerationPending(postTriggerMessages, streamingTools);
+    const imageGenerationSettledInHistory = isLatestRunSegment
+      && hasDeliveredImageGenerationResult(postTriggerMessages)
+      && !pendingImageGeneration;
     // History may already contain the final answer while lifecycle flags are
     // still armed (missing Gateway terminal phase, blocked chat.send RPC, etc.).
     // Treat the run as closed for graph/input UI when the transcript is done
@@ -460,14 +474,17 @@ export function Chat() {
     // so an early narration-only history snapshot does not collapse the graph
     // mid-chain. Thinking-only stale stream content should not keep image
     // generation runs open after history already contains the final media.
-    const runCompletedInHistory = hasFinalReply
-      && !hasHistoryCompletionBlockingStream
-      && (hasToolActivity || !sending);
+    const streamBlocksHistoryCompletion = hasHistoryCompletionBlockingStream
+      && !imageGenerationSettledInHistory;
+    const runCompletedInHistory = imageGenerationSettledInHistory || (hasFinalReply
+      && !pendingImageGeneration
+      && !streamBlocksHistoryCompletion
+      && (hasToolActivity || !sending));
     const isLatestOpenRun = isLatestRunSegment
       && !runError
       && !userAbortedRun
       && !runCompletedInHistory
-      && (sending || pendingFinal || hasAnyStreamContent || (runStillExecutingTools && !!activeRunId));
+      && (sending || pendingFinal || pendingImageGeneration || hasAnyStreamContent || (runStillExecutingTools && !!activeRunId));
     const replyIndexOffset = findReplyMessageIndex(segmentMessages, isLatestOpenRun);
     const replyIndex = replyIndexOffset === -1 ? null : idx + 1 + replyIndexOffset;
 
@@ -666,6 +683,8 @@ export function Chat() {
   const hasActiveExecutionGraph = userRunCards.some((card) => card.active);
   let latestRunSegmentCompletion = { hasFinalReply: false, hasToolActivity: false };
   let hasDeliveredImageReply = false;
+  let pendingImageGeneration = false;
+  let imageGenerationSettledInHistory = false;
   for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
     if (!isRealUserMessage(messages[idx]) || subagentCompletionInfos[idx]) continue;
     const nextUserIndex = nextUserMessageIndexes[idx];
@@ -679,13 +698,25 @@ export function Chat() {
     hasDeliveredImageReply = postTrigger.some((m) =>
       m.role === 'assistant'
       && (m._attachedFiles ?? []).some((f) => f.mimeType.startsWith('image/')),
-    );
+    ) || hasDeliveredImageGenerationResult(postTrigger);
+    pendingImageGeneration = isImageGenerationPending(postTrigger, streamingTools);
+    imageGenerationSettledInHistory = hasDeliveredImageGenerationResult(postTrigger)
+      && !pendingImageGeneration;
     break;
   }
-  const runSettledInHistory = (latestRunSegmentCompletion.hasFinalReply || hasDeliveredImageReply)
-    && !hasHistoryCompletionBlockingStream
-    && (latestRunSegmentCompletion.hasToolActivity || !sending);
-  const inputRunActive = (sending || hasActiveExecutionGraph) && !runSettledInHistory;
+  const streamBlocksHistoryCompletion = hasHistoryCompletionBlockingStream
+    && !imageGenerationSettledInHistory;
+  const runSettledInHistory = imageGenerationSettledInHistory || ((latestRunSegmentCompletion.hasFinalReply || hasDeliveredImageReply)
+    && !pendingImageGeneration
+    && !streamBlocksHistoryCompletion
+    && (latestRunSegmentCompletion.hasToolActivity || !sending));
+  // History-only: keep input armed for pending image gen even if `sending`
+  // briefly drops between tool rounds, but still collapse once history settle
+  // is true (avoids stuck typing when sending remains true after final reply).
+  // Full #1096 useEffect that clears store lifecycle needs runtimeRuns/#1094.
+  const inputRunActive = (
+    sending || pendingImageGeneration || hasActiveExecutionGraph
+  ) && !runSettledInHistory;
   const replyTextOverrides = useMemo(() => {
     const map = new Map<number, string>();
     for (const card of userRunCards) {
