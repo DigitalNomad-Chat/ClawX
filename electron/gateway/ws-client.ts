@@ -159,7 +159,10 @@ export function buildGatewayConnectFrame(options: {
         auth: {
           token: options.token,
         },
-        caps: [],
+        // OpenClaw 2026.5.x declares GATEWAY_CLIENT_CAPS.TOOL_EVENTS="tool-events".
+        // Declaring this cap opts the Main WS client into streamed tool lifecycle
+        // events; unknown caps are ignored (hasGatewayClientCap gate), not rejected.
+        caps: ['tool-events'],
         role,
         scopes,
         device,

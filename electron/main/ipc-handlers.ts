@@ -1502,6 +1502,14 @@ function registerGatewayHandlers(
     }
   });
 
+  // M0 skeleton: IPC channel for chat:runtime-event.
+  // Preload whitelist + host-events subscribe is M1; renderer does not consume yet.
+  gatewayManager.on('chat:runtime-event', (data) => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('chat:runtime-event', data);
+    }
+  });
+
   gatewayManager.on('exit', (code) => {
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send('gateway:exit', code);

@@ -506,6 +506,12 @@ async function startMainApp(): Promise<void> {
     hostEventBus.emit('gateway:chat-message', data);
   });
 
+  // M0 skeleton: forward normalized runtime events on hostEventBus.
+  // Renderer subscription / host-events mapping is M1.
+  gatewayManager.on('chat:runtime-event', (data) => {
+    hostEventBus.emit('chat:runtime-event', data);
+  });
+
   gatewayManager.on('channel:status', (data) => {
     hostEventBus.emit('gateway:channel-status', data);
   });
