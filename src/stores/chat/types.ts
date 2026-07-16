@@ -1,3 +1,5 @@
+import type { ChatRuntimeEvent } from '../../../shared/chat-runtime-events';
+
 /** Metadata for locally-attached files (not from Gateway) */
 export interface AttachedFileMeta {
   fileName: string;
@@ -98,6 +100,18 @@ export interface ToolStatus {
   updatedAt: number;
 }
 
+/** Per-run accumulator for Main-normalized ChatRuntimeEvent (M2 dual-track). */
+export interface ChatRuntimeRunState {
+  runId: string;
+  sessionKey?: string;
+  status: 'running' | 'completed' | 'error' | 'aborted';
+  startedAt?: number;
+  endedAt?: number;
+  assistantText: string;
+  thinkingText: string;
+  events: ChatRuntimeEvent[];
+}
+
 export interface ChatState {
   // Messages
   messages: RawMessage[];
@@ -115,6 +129,11 @@ export interface ChatState {
   lastUserMessageAt: number | null;
   /** Images collected from tool results, attached to the next assistant message */
   pendingToolImages: AttachedFileMeta[];
+  /**
+   * Runtime graph accumulator from chat:runtime-event (M2).
+   * UI still prefers legacy paths until M3; this is dual-track state only.
+   */
+  runtimeRuns: Record<string, ChatRuntimeRunState>;
 
   // Abort
   /** Set to true when user explicitly aborts a run; used to force-close stale execution graphs */
@@ -169,6 +188,8 @@ export interface ChatState {
   ) => Promise<void>;
   abortRun: () => Promise<void>;
   handleChatEvent: (event: Record<string, unknown>) => void;
+  /** Apply Main-normalized ChatRuntimeEvent into runtimeRuns (and selective UI flags). */
+  handleRuntimeEvent: (event: ChatRuntimeEvent) => void;
   refresh: () => Promise<void>;
   clearError: () => void;
 }

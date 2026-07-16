@@ -7,6 +7,7 @@ import { hostApiFetch } from '@/lib/host-api';
 import { invokeIpc } from '@/lib/api-client';
 import { subscribeHostEvent } from '@/lib/host-events';
 import type { GatewayHealth, GatewayStatus } from '../types/gateway';
+import type { ChatRuntimeEvent } from '../../shared/chat-runtime-events';
 
 let gatewayInitPromise: Promise<void> | null = null;
 let gatewayEventUnsubscribers: Array<() => void> | null = null;
@@ -164,6 +165,53 @@ function touchSessionActivity(sessionKey: string | null | undefined, activityMs 
           [sessionKey]: Math.max(state.sessionLastActivity[sessionKey] ?? 0, activityMs),
         },
       }));
+    })
+    .catch(() => {});
+}
+
+/**
+ * Dual-track: Main-normalized chat:runtime-event → chat.handleRuntimeEvent.
+ * Does NOT replace agent notification handling; phase=end protection stays there.
+ */
+function handleChatRuntimeEvent(event: ChatRuntimeEvent): void {
+  const resolvedSessionKey = event.sessionKey ?? null;
+  if (resolvedSessionKey) {
+    touchSessionActivity(resolvedSessionKey, typeof event.ts === 'number' ? event.ts : Date.now());
+  }
+
+  import('./chat')
+    .then(({ useChatStore, syncCachedSessionRunIdle }) => {
+      const state = useChatStore.getState();
+      state.handleRuntimeEvent(event);
+
+      const shouldRefreshSessions = resolvedSessionKey != null && (
+        resolvedSessionKey !== state.currentSessionKey
+        || !state.sessions.some((session) => session.key === resolvedSessionKey)
+      );
+
+      if (event.type === 'run.started') {
+        if (shouldRefreshSessions) {
+          maybeLoadSessions(state, true);
+        }
+        return;
+      }
+
+      if (event.type !== 'run.ended') {
+        return;
+      }
+
+      if (shouldRefreshSessions) {
+        maybeLoadSessions(state, true);
+      }
+
+      const matchesCurrentSession = resolvedSessionKey != null && resolvedSessionKey === state.currentSessionKey;
+      const matchesActiveRun = state.activeRunId != null && event.runId === state.activeRunId;
+      if (matchesCurrentSession || matchesActiveRun) {
+        maybeLoadHistory(state, true);
+      }
+      if (resolvedSessionKey && !matchesCurrentSession) {
+        syncCachedSessionRunIdle(resolvedSessionKey);
+      }
     })
     .catch(() => {});
 }
@@ -373,6 +421,9 @@ export const useGatewayStore = create<GatewayState>((set, get) => ({
           }));
           unsubscribers.push(subscribeHostEvent('gateway:chat-message', (payload) => {
             handleGatewayChatMessage(payload);
+          }));
+          unsubscribers.push(subscribeHostEvent<ChatRuntimeEvent>('chat:runtime-event', (payload) => {
+            handleChatRuntimeEvent(payload);
           }));
           unsubscribers.push(subscribeHostEvent<{ channelId?: string; status?: string }>(
             'gateway:channel-status',

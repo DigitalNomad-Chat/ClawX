@@ -46,6 +46,7 @@ import {
   hasPendingToolUse,
   mergePendingOptimisticUserMessages,
 } from './chat/helpers';
+import { createHandleRuntimeEvent } from './chat/runtime-pipeline';
 import {
   isGeneratingStatusNarration,
   isInternalAssistantReplyText,
@@ -2204,6 +2205,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   pendingFinal: false,
   lastUserMessageAt: null,
   pendingToolImages: [],
+  runtimeRuns: {},
   userAbortedRun: false,
 
   sessions: [],
@@ -4004,6 +4006,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
   },
+
+  // ── Handle Main-normalized chat:runtime-event (M2 dual-track) ──
+  // Keeps runtimeRuns for future Execution Graph (M3). Does not replace
+  // handleChatEvent / history poll; legacy notification path remains primary
+  // for streaming message UI until M3/M4.
+
+  handleRuntimeEvent: createHandleRuntimeEvent(set, get, {
+    shouldTrackInboundRunLifecycle,
+    touchLastChatEventAt: () => {
+      _lastChatEventAt = Date.now();
+    },
+  }),
 
   // ── Refresh: reload history + sessions ──
 

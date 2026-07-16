@@ -40,6 +40,7 @@ describe('gateway store event wiring', () => {
     expect(subscribeHostEventMock).toHaveBeenCalledWith('gateway:health', expect.any(Function));
     expect(subscribeHostEventMock).toHaveBeenCalledWith('gateway:presence', expect.any(Function));
     expect(subscribeHostEventMock).toHaveBeenCalledWith('gateway:chat-message', expect.any(Function));
+    expect(subscribeHostEventMock).toHaveBeenCalledWith('chat:runtime-event', expect.any(Function));
     expect(subscribeHostEventMock).toHaveBeenCalledWith('gateway:channel-status', expect.any(Function));
 
     handlers.get('gateway:status')?.({ state: 'stopped', port: 18789 });
@@ -290,5 +291,84 @@ describe('gateway store event wiring', () => {
     await flushAsyncImports();
 
     expect(handleChatEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('dual-track: chat:runtime-event updates runtimeRuns without dropping notification path', async () => {
+    const handlers = new Map<string, (payload: unknown) => void>();
+    subscribeHostEventMock.mockImplementation((eventName: string, handler: (payload: unknown) => void) => {
+      handlers.set(eventName, handler);
+      return () => {};
+    });
+
+    const { useChatStore } = await import('@/stores/chat');
+    useChatStore.setState({
+      currentSessionKey: 'agent:main:main',
+      sessions: [{ key: 'agent:main:main' }],
+      sending: true,
+      activeRunId: 'run-rt-1',
+      pendingFinal: false,
+      lastUserMessageAt: Date.now(),
+      runtimeRuns: {},
+      loadHistory: vi.fn(async () => {}),
+    });
+
+    const { useGatewayStore } = await import('@/stores/gateway');
+    await useGatewayStore.getState().init();
+
+    handlers.get('chat:runtime-event')?.({
+      type: 'tool.started',
+      runId: 'run-rt-1',
+      sessionKey: 'agent:main:main',
+      seq: 3,
+      toolCallId: 'c1',
+      name: 'read',
+      args: { path: '/tmp/x' },
+    });
+    await flushAsyncImports();
+
+    const run = useChatStore.getState().runtimeRuns['run-rt-1'];
+    expect(run).toBeDefined();
+    expect(run.events).toHaveLength(1);
+    expect(run.events[0]).toMatchObject({ type: 'tool.started', toolCallId: 'c1' });
+    // dual-track: still sending; notification path not required for this assert
+    expect(useChatStore.getState().sending).toBe(true);
+    expect(useChatStore.getState().activeRunId).toBe('run-rt-1');
+  });
+
+  it('does not let run.ended for a foreign run clear the active send', async () => {
+    const handlers = new Map<string, (payload: unknown) => void>();
+    subscribeHostEventMock.mockImplementation((eventName: string, handler: (payload: unknown) => void) => {
+      handlers.set(eventName, handler);
+      return () => {};
+    });
+
+    const { useChatStore } = await import('@/stores/chat');
+    useChatStore.setState({
+      currentSessionKey: 'agent:main:main',
+      sessions: [{ key: 'agent:main:main' }],
+      sending: true,
+      activeRunId: 'run-active',
+      pendingFinal: true,
+      lastUserMessageAt: Date.now(),
+      runtimeRuns: {},
+      loadHistory: vi.fn(async () => {}),
+    });
+
+    const { useGatewayStore } = await import('@/stores/gateway');
+    await useGatewayStore.getState().init();
+
+    handlers.get('chat:runtime-event')?.({
+      type: 'run.ended',
+      runId: 'run-other',
+      sessionKey: 'agent:main:other',
+      seq: 9,
+      status: 'completed',
+      endedAt: Date.now(),
+    });
+    await flushAsyncImports();
+
+    expect(useChatStore.getState().sending).toBe(true);
+    expect(useChatStore.getState().activeRunId).toBe('run-active');
+    expect(useChatStore.getState().runtimeRuns['run-other']).toBeUndefined();
   });
 });

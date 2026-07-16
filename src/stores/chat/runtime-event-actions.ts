@@ -8,9 +8,16 @@ import {
 } from './helpers';
 import type { ChatGet, ChatSet, RuntimeActions } from './store-api';
 import { handleRuntimeEventState } from './runtime-event-handlers';
+import { createHandleRuntimeEvent } from './runtime-pipeline';
 
-export function createRuntimeEventActions(set: ChatSet, get: ChatGet): Pick<RuntimeActions, 'handleChatEvent'> {
+export function createRuntimeEventActions(set: ChatSet, get: ChatGet): Pick<RuntimeActions, 'handleChatEvent' | 'handleRuntimeEvent'> {
   return {
+    handleRuntimeEvent: createHandleRuntimeEvent(set, get, {
+      shouldTrackInboundRunLifecycle: (state) => Boolean(
+        state.sending || state.activeRunId != null || state.pendingFinal || state.lastUserMessageAt,
+      ),
+      touchLastChatEventAt: () => setLastChatEventAt(Date.now()),
+    }),
     handleChatEvent: (event: Record<string, unknown>) => {
       const runId = String(event.runId || '');
       const eventState = String(event.state || '');
