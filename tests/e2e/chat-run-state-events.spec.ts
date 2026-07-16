@@ -207,6 +207,131 @@ test.describe('ClawX chat run state events', () => {
     }
   });
 
+  test('settles unfinished command.output steps after runtime run.ended', async ({ launchElectronApp }) => {
+    const app = await launchElectronApp({ skipSetup: true });
+
+    try {
+      await installIpcMocks(app, {
+        gatewayStatus: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+        gatewayRpc: {
+          [stableStringify(['sessions.list', { includeDerivedTitles: true, includeLastMessage: true }])]: {
+            success: true,
+            result: {
+              sessions: [{ key: MAIN_SESSION_KEY, displayName: 'main' }],
+            },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+          [stableStringify(['chat.send', null])]: {
+            success: true,
+            result: { runId: 'run-e2e-settle' },
+          },
+        },
+        hostApi: {
+          [stableStringify(['/api/gateway/status', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+            },
+          },
+          [stableStringify(['/api/agents', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { success: true, agents: [{ id: 'main', name: 'Main' }] },
+            },
+          },
+        },
+      });
+
+      const page = await getStableWindow(app);
+      try {
+        await page.reload();
+      } catch (error) {
+        if (!String(error).includes('ERR_FILE_NOT_FOUND')) {
+          throw error;
+        }
+      }
+
+      const sendButton = page.getByTestId('chat-composer-send');
+      await expect(page.getByTestId('chat-composer-input')).toBeEnabled({ timeout: 30_000 });
+      await page.getByTestId('chat-composer-input').fill('run with command output');
+      await sendButton.click();
+      await expect(sendButton).toHaveAttribute('title', /Stop|停止/);
+
+      await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send('chat:runtime-event', {
+            type: 'tool.started',
+            runId: 'run-e2e-settle',
+            sessionKey: 'agent:main:main',
+            toolCallId: 'call-exec',
+            name: 'exec',
+            args: { command: 'ls' },
+          });
+          win.webContents.send('chat:runtime-event', {
+            type: 'command.output',
+            runId: 'run-e2e-settle',
+            sessionKey: 'agent:main:main',
+            toolCallId: 'call-exec',
+            itemId: 'cmd-open',
+            title: 'exec output',
+            output: 'partial log line',
+            status: 'running',
+            phase: 'update',
+          });
+        }
+      });
+
+      await expect(page.getByTestId('chat-execution-graph')).toBeVisible({ timeout: 15_000 });
+      // message-kind steps show detail (not title) until expanded.
+      await expect(page.getByText('partial log line')).toBeVisible();
+      await expect(page.getByText('exec')).toBeVisible();
+
+      await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send('chat:runtime-event', {
+            type: 'tool.completed',
+            runId: 'run-e2e-settle',
+            sessionKey: 'agent:main:main',
+            toolCallId: 'call-exec',
+            name: 'exec',
+            result: { summary: 'done' },
+            isError: false,
+          });
+          win.webContents.send('chat:runtime-event', {
+            type: 'run.ended',
+            runId: 'run-e2e-settle',
+            sessionKey: 'agent:main:main',
+            status: 'completed',
+            endedAt: Date.now(),
+          });
+        }
+      });
+
+      await expect(sendButton).toHaveAttribute('title', /Send|发送/);
+      // After terminal settle, command.output must not stay "running".
+      // Expand collapsed completed graph if needed; then expand the message
+      // step so its status badge is rendered (narration hides status until expand).
+      const graph = page.getByTestId('chat-execution-graph');
+      if ((await graph.getAttribute('data-collapsed')) === 'true') {
+        await graph.click();
+      }
+      const outputRow = page.locator('[data-testid="chat-execution-step"]').filter({ hasText: 'partial log line' }).first();
+      await expect(outputRow).toBeVisible();
+      await outputRow.locator('button').first().click();
+      await expect(outputRow.getByText(/completed|已完成|完成/i)).toBeVisible({ timeout: 5_000 });
+      await expect(outputRow.getByText(/running|运行中/i)).toHaveCount(0);
+    } finally {
+      await closeElectronApp(app);
+    }
+  });
+
   test('shows clear image preview states for generated media while hydration retries', async ({ launchElectronApp }) => {
     const app = await launchElectronApp({ skipSetup: true });
     const gatewayUrl = '/api/chat/media/outgoing/agent%3Amain%3Aimage-preview/image-1/full';

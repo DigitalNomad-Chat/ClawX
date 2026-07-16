@@ -14,9 +14,10 @@ touchedAreas:
   - tests/e2e/chat-run-state-events.spec.ts
 expectedUserBehavior:
   - Active run with runtime tool events shows those tools inside the Execution Graph card.
-  - Foreign/stale runtime runIds never appear in the active graph.
+  - Foreign/stale runtime runIds never appear in the active graph (sessionKey consistency guard).
+  - Preferring runtime graph merges history subagent branches (completionInfos/childTranscripts) instead of full replace.
   - Historical sessions without runtimeRuns continue to show history-derived tool graphs.
-  - run.ended / completed tools do not leave forever-loading tool steps.
+  - run.ended / completed tools do not leave forever-loading tool steps; unsettled command.output / approval settle when run is terminal.
   - Legacy notification phase=end stop-control behavior remains covered by existing E2E.
 requiredProfiles:
   - fast

@@ -356,6 +356,71 @@ describe('Chat execution graph lifecycle', () => {
     });
   });
 
+  it('ignores activeRuntimeRun when sessionKey mismatches the current session', async () => {
+    const { useChatStore } = await import('@/stores/chat');
+    useChatStore.setState({
+      messages: [
+        {
+          role: 'user',
+          content: 'Check the page',
+        },
+        {
+          role: 'assistant',
+          id: 'history-tool',
+          content: [
+            { type: 'tool_use', id: 'browser-1', name: 'browser', input: { action: 'open' } },
+          ],
+        },
+      ],
+      loading: false,
+      error: null,
+      runError: null,
+      sending: true,
+      activeRunId: 'run-wrong-session',
+      streamingText: '',
+      streamingMessage: null,
+      streamingTools: [],
+      runtimeRuns: {
+        'run-wrong-session': {
+          runId: 'run-wrong-session',
+          sessionKey: 'agent:main:other-session',
+          status: 'running',
+          assistantText: '',
+          thinkingText: '',
+          events: [
+            {
+              type: 'tool.started',
+              runId: 'run-wrong-session',
+              sessionKey: 'agent:main:other-session',
+              toolCallId: 'wrong-1',
+              name: 'exec',
+              args: {},
+            },
+          ],
+        },
+      },
+      pendingFinal: false,
+      lastUserMessageAt: Date.now(),
+      pendingToolImages: [],
+      sessions: [{ key: 'agent:main:main' }],
+      currentSessionKey: 'agent:main:main',
+      currentAgentId: 'main',
+      sessionLabels: {},
+      sessionLastActivity: {},
+      thinkingLevel: null,
+    });
+
+    const { Chat } = await import('@/pages/Chat/index');
+    render(<Chat />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-execution-graph')).toBeInTheDocument();
+      // History path still shows browser; mismatched runtime tool must not win.
+      expect(screen.getByText('browser')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('exec')).not.toBeInTheDocument();
+  });
+
   it('renders the execution graph immediately for an active run before any stream content arrives', async () => {
     const { useChatStore } = await import('@/stores/chat');
     useChatStore.setState({

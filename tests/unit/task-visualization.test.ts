@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendSubagentBranchSteps,
   deriveRuntimeTaskSteps,
   deriveTaskSteps,
   findReplyMessageIndex,
@@ -95,13 +96,209 @@ describe('deriveRuntimeTaskSteps', () => {
     expect(runtimeRunHasToolActivity(run)).toBe(true);
     expect(runtimeRunHasRunningTool(run)).toBe(false);
     expect(run.status).toBe('completed');
-    expect(deriveRuntimeTaskSteps(run).every((s) => s.status !== 'running' || s.kind !== 'tool')).toBe(true);
+    expect(deriveRuntimeTaskSteps(run).every((s) => s.status !== 'running')).toBe(true);
+  });
+
+  it('settles unfinished command.output and approval steps when run is terminal', () => {
+    const steps = deriveRuntimeTaskSteps({
+      runId: 'run-terminal',
+      sessionKey: 'agent:main:main',
+      status: 'completed',
+      assistantText: '',
+      thinkingText: '',
+      events: [
+        {
+          type: 'tool.started',
+          runId: 'run-terminal',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          name: 'exec',
+          args: { command: 'ls' },
+        },
+        {
+          type: 'command.output',
+          runId: 'run-terminal',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          itemId: 'cmd-open',
+          title: 'exec output',
+          output: 'partial log',
+          status: 'running',
+          phase: 'update',
+        },
+        {
+          type: 'approval.updated',
+          runId: 'run-terminal',
+          sessionKey: 'agent:main:main',
+          itemId: 'appr-1',
+          title: 'Allow shell',
+          status: 'pending',
+          phase: 'requested',
+          message: 'Awaiting approval',
+        },
+        {
+          type: 'tool.completed',
+          runId: 'run-terminal',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          name: 'exec',
+          result: { summary: 'done' },
+          isError: false,
+        },
+      ],
+    });
+
+    expect(steps.find((s) => s.id === 'cmd-open')).toEqual(expect.objectContaining({
+      status: 'completed',
+      kind: 'message',
+    }));
+    expect(steps.find((s) => s.id === 'appr-1')).toEqual(expect.objectContaining({
+      status: 'completed',
+      kind: 'system',
+    }));
+    expect(steps.every((s) => s.status !== 'running')).toBe(true);
+  });
+
+  it('marks unfinished steps as error when terminal status is error', () => {
+    const steps = deriveRuntimeTaskSteps({
+      runId: 'run-err',
+      status: 'error',
+      assistantText: '',
+      thinkingText: '',
+      events: [
+        {
+          type: 'command.output',
+          runId: 'run-err',
+          itemId: 'cmd-fail',
+          title: 'exec output',
+          output: 'still going',
+          status: 'running',
+          phase: 'update',
+        },
+      ],
+    });
+
+    expect(steps).toEqual([
+      expect.objectContaining({
+        id: 'cmd-fail',
+        status: 'error',
+      }),
+    ]);
   });
 
   it('returns empty steps when runtime state is missing (history fallback path)', () => {
     expect(deriveRuntimeTaskSteps(null)).toEqual([]);
     expect(deriveRuntimeTaskSteps(undefined)).toEqual([]);
     expect(runtimeRunHasToolActivity(null)).toBe(false);
+  });
+});
+
+describe('appendSubagentBranchSteps', () => {
+  it('merges completionInfos/childTranscripts branches onto runtime-derived steps', () => {
+    const runtimeSteps = deriveRuntimeTaskSteps({
+      runId: 'run-1',
+      sessionKey: 'agent:main:main',
+      status: 'running',
+      assistantText: '',
+      thinkingText: '',
+      events: [
+        {
+          type: 'tool.started',
+          runId: 'run-1',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'parent-read',
+          name: 'read',
+          args: { path: '/tmp/a.md' },
+        },
+        {
+          type: 'tool.completed',
+          runId: 'run-1',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'parent-read',
+          name: 'read',
+          result: 'ok',
+          isError: false,
+        },
+      ],
+    });
+
+    const merged = appendSubagentBranchSteps(
+      runtimeSteps,
+      [{
+        sessionKey: 'agent:coder:subagent:child-123',
+        sessionId: 'child-session-id',
+        agentId: 'coder',
+      }],
+      {
+        'child-session-id': [
+          {
+            role: 'assistant',
+            id: 'child-assistant',
+            content: [
+              { type: 'tool_use', id: 'child-tool', name: 'grep', input: { pattern: 'TODO' } },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(merged).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'parent-read', label: 'read' }),
+      expect.objectContaining({
+        id: 'subagent:child-session-id',
+        label: 'coder subagent',
+        kind: 'system',
+        parentId: 'agent-run',
+      }),
+      expect.objectContaining({
+        id: 'child-session-id:child-tool',
+        label: 'grep',
+        parentId: 'subagent:child-session-id',
+      }),
+    ]));
+  });
+
+  it('does not duplicate an already-merged subagent branch root', () => {
+    const once = appendSubagentBranchSteps(
+      [],
+      [{
+        sessionKey: 'agent:coder:subagent:child-123',
+        sessionId: 'child-session-id',
+        agentId: 'coder',
+      }],
+      {
+        'child-session-id': [
+          {
+            role: 'assistant',
+            id: 'child-assistant',
+            content: [
+              { type: 'tool_use', id: 'child-tool', name: 'grep', input: { pattern: 'TODO' } },
+            ],
+          },
+        ],
+      },
+    );
+    const twice = appendSubagentBranchSteps(
+      once,
+      [{
+        sessionKey: 'agent:coder:subagent:child-123',
+        sessionId: 'child-session-id',
+        agentId: 'coder',
+      }],
+      {
+        'child-session-id': [
+          {
+            role: 'assistant',
+            id: 'child-assistant',
+            content: [
+              { type: 'tool_use', id: 'child-tool', name: 'grep', input: { pattern: 'TODO' } },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(twice.filter((s) => s.id === 'subagent:child-session-id')).toHaveLength(1);
   });
 });
 

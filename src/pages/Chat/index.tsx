@@ -21,6 +21,7 @@ import { ExecutionGraphCard } from './ExecutionGraphCard';
 import { ChatToolbar } from './ChatToolbar';
 import { extractImages, extractText, extractThinking, extractToolUse, normalizeMessageRole, stripProcessMessagePrefix } from './message-utils';
 import {
+  appendSubagentBranchSteps,
   buildRunSegmentMessageIndices,
   deriveRuntimeTaskSteps,
   deriveTaskSteps,
@@ -462,13 +463,42 @@ export function Chat() {
     // assistants from a prior turn cannot mark the current run complete/pending.
     const postTriggerMessages = getPostTriggerSegmentMessages(messages, idx, nextUserIndex);
     const isLatestRunSegment = nextUserIndex === -1;
-    // Prefer runtimeRuns only for the latest open segment matching activeRunId.
-    const activeRuntimeRun = isLatestRunSegment && activeRunId ? runtimeRuns[activeRunId] ?? null : null;
-    const runtimeHasToolActivity = runtimeRunHasToolActivity(activeRuntimeRun);
-    const runtimeHasRunningTool = runtimeRunHasRunningTool(activeRuntimeRun);
-    const hasToolActivity = runtimeHasToolActivity || postTriggerMessages.some((m) =>
+    const historyHasToolActivity = postTriggerMessages.some((m) =>
       m.role === 'assistant' && extractToolUse(m).length > 0,
     );
+    // Prefer runtimeRuns for the latest segment when:
+    //  1) activeRunId matches a session-scoped run, or
+    //  2) residual: activeRunId already cleared after run.ended but history
+    //     has not yet produced tools — still project the latest matching run
+    //     so terminal settle can clear unfinished command.output/approval.
+    // SessionKey consistency guard rejects foreign-session runs.
+    const sessionScopedRuntimeRun = (run: (typeof runtimeRuns)[string] | null | undefined) => {
+      if (!run) return null;
+      if (run.sessionKey && run.sessionKey !== currentSessionKey) return null;
+      return run;
+    };
+    let candidateRuntimeRun = isLatestRunSegment && activeRunId
+      ? sessionScopedRuntimeRun(runtimeRuns[activeRunId])
+      : null;
+    if (!candidateRuntimeRun && isLatestRunSegment && !activeRunId && !historyHasToolActivity) {
+      let best: (typeof runtimeRuns)[string] | null = null;
+      for (const run of Object.values(runtimeRuns)) {
+        if (!sessionScopedRuntimeRun(run)) continue;
+        if (!runtimeRunHasToolActivity(run)) continue;
+        if (!best) {
+          best = run;
+          continue;
+        }
+        const bestTs = best.endedAt ?? best.startedAt ?? 0;
+        const runTs = run.endedAt ?? run.startedAt ?? 0;
+        if (runTs >= bestTs) best = run;
+      }
+      candidateRuntimeRun = best;
+    }
+    const activeRuntimeRun = candidateRuntimeRun;
+    const runtimeHasToolActivity = runtimeRunHasToolActivity(activeRuntimeRun);
+    const runtimeHasRunningTool = runtimeRunHasRunningTool(activeRuntimeRun);
+    const hasToolActivity = runtimeHasToolActivity || historyHasToolActivity;
     const hasFinalReply = segmentHasFinalReply(postTriggerMessages);
     const runStillExecutingTools = hasToolActivity && !hasFinalReply;
     // runStillExecutingTools bridges the brief gap between tool rounds when
@@ -506,44 +536,13 @@ export function Chat() {
     const replyIndex = replyIndexOffset === -1 ? null : idx + 1 + replyIndexOffset;
 
     const buildSteps = (omitLastStreamingMessageSegment: boolean): TaskStep[] => {
-      let builtSteps = deriveTaskSteps({
+      const builtSteps = deriveTaskSteps({
         messages: segmentMessages,
         streamingMessage: isLatestOpenRun ? streamingMessage : null,
         streamingTools: isLatestOpenRun ? streamingTools : [],
         omitLastStreamingMessageSegment: isLatestOpenRun ? omitLastStreamingMessageSegment : false,
       });
-
-      for (const completion of completionInfos) {
-        const childMessages = childTranscripts[completion.sessionId];
-        if (!childMessages || childMessages.length === 0) continue;
-        const branchRootId = `subagent:${completion.sessionId}`;
-        const childSteps = deriveTaskSteps({
-          messages: childMessages,
-          streamingMessage: null,
-          streamingTools: [],
-        }).map((step) => ({
-          ...step,
-          id: `${completion.sessionId}:${step.id}`,
-          depth: step.depth + 1,
-          parentId: branchRootId,
-        }));
-
-        builtSteps = [
-          ...builtSteps,
-          {
-            id: branchRootId,
-            label: `${completion.agentId} subagent`,
-            status: 'completed',
-            kind: 'system' as const,
-            detail: completion.sessionKey,
-            depth: 1,
-            parentId: 'agent-run',
-          },
-          ...childSteps,
-        ];
-      }
-
-      return builtSteps;
+      return appendSubagentBranchSteps(builtSteps, completionInfos, childTranscripts);
     };
 
     // Show the streaming response as a separate bubble (not inside the
@@ -583,9 +582,16 @@ export function Chat() {
       && !runtimeHasRunningTool;
 
     // Active runtime tool stream wins for the latest segment; history fallback otherwise.
+    // When runtime is preferred, merge (do not replace) history subagent branches so
+    // completionInfos/childTranscripts remain visible in the Execution Graph.
     const preferRuntimeSteps = Boolean(activeRuntimeRun && runtimeHasToolActivity);
+    const buildPreferredRuntimeSteps = (): TaskStep[] => appendSubagentBranchSteps(
+      deriveRuntimeTaskSteps(activeRuntimeRun),
+      completionInfos,
+      childTranscripts,
+    );
     let steps = preferRuntimeSteps
-      ? deriveRuntimeTaskSteps(activeRuntimeRun)
+      ? buildPreferredRuntimeSteps()
       : buildSteps(rawStreamingReplyCandidate);
     let streamingReplyText: string | null = null;
     if (rawStreamingReplyCandidate) {
@@ -595,7 +601,7 @@ export function Chat() {
         streamingReplyText = trimmedReplyText;
       } else {
         steps = preferRuntimeSteps
-          ? deriveRuntimeTaskSteps(activeRuntimeRun)
+          ? buildPreferredRuntimeSteps()
           : buildSteps(false);
       }
     }

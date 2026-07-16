@@ -335,6 +335,76 @@ function runtimeDetail(value: unknown): string | undefined {
 }
 
 /**
+ * Append history-sourced subagent branch steps (completionInfos + child transcripts)
+ * onto an existing step list. Used by both history-derived and runtime-preferred
+ * paths so preferring runtimeRuns does not drop subagent branches.
+ */
+export function appendSubagentBranchSteps(
+  steps: TaskStep[],
+  completions: SubagentCompletionInfo[],
+  childTranscripts: Record<string, RawMessage[]>,
+): TaskStep[] {
+  if (!completions.length) return steps;
+
+  let result = steps;
+  for (const completion of completions) {
+    const childMessages = childTranscripts[completion.sessionId];
+    if (!childMessages || childMessages.length === 0) continue;
+    const branchRootId = `subagent:${completion.sessionId}`;
+    // Keep first branch for a sessionId when already merged (no duplicate roots).
+    if (result.some((step) => step.id === branchRootId)) continue;
+
+    const childSteps = deriveTaskSteps({
+      messages: childMessages,
+      streamingMessage: null,
+      streamingTools: [],
+    }).map((step) => ({
+      ...step,
+      id: `${completion.sessionId}:${step.id}`,
+      depth: step.depth + 1,
+      parentId: branchRootId,
+    }));
+
+    result = [
+      ...result,
+      {
+        id: branchRootId,
+        label: `${completion.agentId} subagent`,
+        status: 'completed' as const,
+        kind: 'system' as const,
+        detail: completion.sessionKey,
+        depth: 1,
+        parentId: 'agent-run',
+      },
+      ...childSteps,
+    ];
+  }
+  return result;
+}
+
+function isTerminalRunStatus(status: ChatRuntimeRunState['status'] | undefined): boolean {
+  return status === 'completed' || status === 'error' || status === 'aborted';
+}
+
+/**
+ * When the run is already terminal, force unsettled command.output / approval
+ * (and any other still-running projected steps) off `running` so the graph
+ * never forever-spins after run.ended.
+ */
+function settleRunningStepsForTerminalRun(
+  steps: TaskStep[],
+  runStatus: ChatRuntimeRunState['status'],
+): TaskStep[] {
+  if (!isTerminalRunStatus(runStatus)) return steps;
+  const settledStatus: TaskStepStatus = runStatus === 'completed' ? 'completed' : 'error';
+  return steps.map((step) => (
+    step.status === 'running'
+      ? { ...step, status: settledStatus }
+      : step
+  ));
+}
+
+/**
  * Project Main-normalized ChatRuntimeEvent stream into Execution Graph steps.
  * Used only for the active session/run when runtimeRuns has tool activity;
  * otherwise the history-derived deriveTaskSteps path remains the source.
@@ -447,7 +517,10 @@ export function deriveRuntimeTaskSteps(runState: ChatRuntimeRunState | null | un
     }
   }
 
-  return attachTopology(steps);
+  // Terminal run: settle unfinished command.output / approval (and any other
+  // still-running projected steps) so the graph never forever-spins.
+  const settled = settleRunningStepsForTerminalRun(steps, runState.status);
+  return attachTopology(settled);
 }
 
 /** True when runtime run has tool/process activity suitable for graph priority. */
