@@ -1,12 +1,109 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deriveRuntimeTaskSteps,
   deriveTaskSteps,
   findReplyMessageIndex,
   parseSubagentCompletionInfo,
+  runtimeRunHasRunningTool,
+  runtimeRunHasToolActivity,
   segmentHasFinalReply,
 } from '@/pages/Chat/task-visualization';
 import { stripProcessMessagePrefix } from '@/pages/Chat/message-utils';
+import { applyRuntimeEventToRuns } from '@/stores/chat/runtime-graph';
 import type { RawMessage, ToolStatus } from '@/stores/chat';
+
+describe('deriveRuntimeTaskSteps', () => {
+  it('projects runtime tool events into execution graph steps with stable ids', () => {
+    const steps = deriveRuntimeTaskSteps({
+      runId: 'run-1',
+      status: 'running',
+      assistantText: '',
+      thinkingText: '',
+      events: [
+        { type: 'run.started', runId: 'run-1', sessionKey: 'agent:main:main' },
+        {
+          type: 'tool.started',
+          runId: 'run-1',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          name: 'read',
+          args: { filePath: '/tmp/demo.md' },
+        },
+        {
+          type: 'command.output',
+          runId: 'run-1',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          itemId: 'cmd-1',
+          title: 'exec output',
+          output: 'Scanning workspace',
+          status: 'running',
+          phase: 'update',
+        },
+        {
+          type: 'tool.completed',
+          runId: 'run-1',
+          sessionKey: 'agent:main:main',
+          toolCallId: 'call-1',
+          name: 'read',
+          result: { summary: 'Done' },
+          isError: false,
+        },
+      ],
+    });
+
+    expect(steps).toEqual([
+      expect.objectContaining({
+        id: 'call-1',
+        label: 'read',
+        status: 'completed',
+        kind: 'tool',
+      }),
+      expect.objectContaining({
+        id: 'cmd-1',
+        label: 'exec output',
+        status: 'running',
+        kind: 'message',
+        detail: 'Scanning workspace',
+      }),
+    ]);
+  });
+
+  it('marks completed tools so the graph is not forever loading after run.ended', () => {
+    let runs = applyRuntimeEventToRuns({}, {
+      type: 'tool.started',
+      runId: 'run-1',
+      toolCallId: 'c1',
+      name: 'read',
+    });
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      toolCallId: 'c1',
+      name: 'read',
+      result: 'ok',
+      isError: false,
+    });
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'run.ended',
+      runId: 'run-1',
+      status: 'completed',
+      endedAt: 10,
+    });
+
+    const run = runs['run-1'];
+    expect(runtimeRunHasToolActivity(run)).toBe(true);
+    expect(runtimeRunHasRunningTool(run)).toBe(false);
+    expect(run.status).toBe('completed');
+    expect(deriveRuntimeTaskSteps(run).every((s) => s.status !== 'running' || s.kind !== 'tool')).toBe(true);
+  });
+
+  it('returns empty steps when runtime state is missing (history fallback path)', () => {
+    expect(deriveRuntimeTaskSteps(null)).toEqual([]);
+    expect(deriveRuntimeTaskSteps(undefined)).toEqual([]);
+    expect(runtimeRunHasToolActivity(null)).toBe(false);
+  });
+});
 
 describe('deriveTaskSteps', () => {
   it('builds running steps from streaming thinking and tool status', () => {

@@ -230,6 +230,132 @@ describe('Chat execution graph lifecycle', () => {
     expect(screen.queryByText('Checked X. Here is the summary.')).not.toBeInTheDocument();
   });
 
+  it('keeps runtime tool status inside the execution graph while a tool is running', async () => {
+    const { useChatStore } = await import('@/stores/chat');
+    useChatStore.setState({
+      messages: [
+        {
+          role: 'user',
+          content: 'Read the file and summarize it',
+        },
+      ],
+      loading: false,
+      error: null,
+      runError: null,
+      sending: true,
+      activeRunId: 'run-tool-stream',
+      streamingText: '',
+      streamingMessage: {
+        role: 'assistant',
+        id: 'tool-narration-stream',
+        content: [{ type: 'text', text: 'I will read the file first.' }],
+      },
+      streamingTools: [],
+      runtimeRuns: {
+        'run-tool-stream': {
+          runId: 'run-tool-stream',
+          sessionKey: 'agent:main:main',
+          status: 'running',
+          assistantText: '',
+          thinkingText: '',
+          events: [
+            {
+              type: 'tool.started',
+              runId: 'run-tool-stream',
+              sessionKey: 'agent:main:main',
+              toolCallId: 'read-1',
+              name: 'read',
+              args: { path: '/tmp/demo.md' },
+            },
+          ],
+        },
+        // Foreign run must not leak into active graph
+        'run-foreign': {
+          runId: 'run-foreign',
+          sessionKey: 'agent:main:other',
+          status: 'running',
+          assistantText: '',
+          thinkingText: '',
+          events: [
+            {
+              type: 'tool.started',
+              runId: 'run-foreign',
+              toolCallId: 'foreign-1',
+              name: 'exec',
+              args: {},
+            },
+          ],
+        },
+      },
+      pendingFinal: false,
+      lastUserMessageAt: Date.now(),
+      pendingToolImages: [],
+      sessions: [{ key: 'agent:main:main' }],
+      currentSessionKey: 'agent:main:main',
+      currentAgentId: 'main',
+      sessionLabels: {},
+      sessionLastActivity: {},
+      thinkingLevel: null,
+    });
+
+    const { Chat } = await import('@/pages/Chat/index');
+
+    render(<Chat />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-execution-graph')).toHaveAttribute('data-collapsed', 'false');
+      expect(screen.getByText('read')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('exec')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-streaming-tool-status-bar')).not.toBeInTheDocument();
+  });
+
+  it('falls back to history-derived steps when runtimeRuns has no tool activity', async () => {
+    const { useChatStore } = await import('@/stores/chat');
+    useChatStore.setState({
+      messages: [
+        {
+          role: 'user',
+          content: 'Check the page',
+        },
+        {
+          role: 'assistant',
+          id: 'history-tool',
+          content: [
+            { type: 'tool_use', id: 'browser-1', name: 'browser', input: { action: 'open' } },
+          ],
+        },
+      ],
+      loading: false,
+      error: null,
+      runError: null,
+      sending: false,
+      activeRunId: null,
+      streamingText: '',
+      streamingMessage: null,
+      streamingTools: [],
+      runtimeRuns: {},
+      pendingFinal: false,
+      lastUserMessageAt: Date.now() - 60_000,
+      pendingToolImages: [],
+      sessions: [{ key: 'agent:main:main' }],
+      currentSessionKey: 'agent:main:main',
+      currentAgentId: 'main',
+      sessionLabels: {},
+      sessionLastActivity: {},
+      thinkingLevel: null,
+    });
+
+    const { Chat } = await import('@/pages/Chat/index');
+    render(<Chat />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-execution-graph')).toBeInTheDocument();
+      expect(screen.getByText('browser')).toBeInTheDocument();
+    });
+  });
+
   it('renders the execution graph immediately for an active run before any stream content arrives', async () => {
     const { useChatStore } = await import('@/stores/chat');
     useChatStore.setState({
