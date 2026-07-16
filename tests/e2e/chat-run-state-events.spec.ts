@@ -12,7 +12,8 @@ function stableStringify(value: unknown): string {
 }
 
 test.describe('ClawX chat run state events', () => {
-  // M4.1 regression lock: evidence scaffold must not change phase=end non-terminal
+  // M4.1 regression lock: evidence scaffold (incl. review fixes for run-scoped
+  // freshness / live-evidence hard gate) must not change phase=end non-terminal
   // stop-control semantics or happy-path history poll behavior.
   test('keeps stop control active across non-terminal gateway phase end', async ({ launchElectronApp }) => {
     const app = await launchElectronApp({ skipSetup: true });

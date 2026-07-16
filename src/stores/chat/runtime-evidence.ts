@@ -9,6 +9,9 @@
  * Default behavior is M3-equivalent: poll skip is always disabled until
  * POLL_CONVERGENCE_ENABLED is deliberately turned on after lead approval and
  * live provider tool-chain evidence.
+ *
+ * Single authority for per-run last-activity wall clocks lives in this module
+ * (not duplicated in chat.ts / helpers.ts).
  */
 import type { ChatRuntimeEvent } from '../../../shared/chat-runtime-events';
 import type { ChatRuntimeRunState } from './types';
@@ -25,8 +28,23 @@ export const RUNTIME_FRESHNESS_WINDOW_MS = 5_000;
 export const POLL_CONVERGENCE_ENABLED = false;
 
 /**
- * Documented M4.2 convergence thresholds (not enforced while flag is off).
- * Lead may revise; code comments + harness acceptance reference these keys.
+ * Process-wide live-provider tool-chain evidence latch.
+ * Defaults false; only flipped after verified live tool+thinking+assistant evidence.
+ * Hard requirement for any future skip-allowed decision.
+ */
+let liveProviderToolChainEvidence = false;
+
+export function setLiveProviderToolChainEvidence(value: boolean): void {
+  liveProviderToolChainEvidence = value;
+}
+
+export function getLiveProviderToolChainEvidence(): boolean {
+  return liveProviderToolChainEvidence;
+}
+
+/**
+ * Documented M4.2 convergence thresholds.
+ * `requireLiveProviderToolChainEvidence` is enforced in {@link evaluateRuntimePollGate}.
  */
 export const M4_POLL_CONVERGENCE_THRESHOLDS = {
   /** Runtime tool/process events required before any poll skip candidate. */
@@ -37,7 +55,7 @@ export const M4_POLL_CONVERGENCE_THRESHOLDS = {
   requireSessionKeyMatch: true,
   /** Active runId required — residual terminal runs never suppress poll. */
   requireActiveRunId: true,
-  /** Live provider evidence required before enabling POLL_CONVERGENCE_ENABLED. */
+  /** Live provider evidence required before skip-allowed (hard gate). */
   requireLiveProviderToolChainEvidence: true,
 } as const;
 
@@ -59,11 +77,14 @@ export type RuntimePollGateInput = {
   activeRunId: string | null | undefined;
   currentSessionKey: string | null | undefined;
   nowMs: number;
-  /** Optional module-level last runtime event wall clock (Main dual-emit). */
-  lastRuntimeEventAtMs?: number | null;
   freshnessWindowMs?: number;
   /** Override for tests only — production uses POLL_CONVERGENCE_ENABLED. */
   convergenceEnabled?: boolean;
+  /**
+   * Override for tests only — production uses {@link getLiveProviderToolChainEvidence}.
+   * Hard requirement: skip-allowed is impossible when this is false.
+   */
+  hasLiveProviderToolChainEvidence?: boolean;
 };
 
 export type RuntimePollGateDecision = {
@@ -71,6 +92,7 @@ export type RuntimePollGateDecision = {
   hasToolActivity: boolean;
   isFresh: boolean;
   sessionKeyMatches: boolean;
+  hasLiveProviderEvidence: boolean;
   lastActivityMs: number | null;
   /** True only when every documented gate passes AND convergence is enabled. */
   maySkipHistoryPoll: boolean;
@@ -95,6 +117,27 @@ const counters: RuntimeEvidenceCounters = {
   runtimeEventsSeen: 0,
 };
 
+/**
+ * Single authority: last observed activity wall clock per runId.
+ * Optionally carries sessionKey so foreign-session lookups cannot reuse it.
+ */
+type RunActivityStamp = {
+  runId: string;
+  sessionKey?: string;
+  atMs: number;
+};
+
+const lastActivityByRunId = new Map<string, RunActivityStamp>();
+
+/**
+ * Normalize Gateway timestamps to milliseconds.
+ * Values &lt; 1e12 are treated as seconds (pre-~2033); otherwise milliseconds.
+ */
+export function normalizeTimestampMs(ts: number): number | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null;
+  return ts < 1e12 ? ts * 1000 : ts;
+}
+
 export function getRuntimeEvidenceCounters(): Readonly<RuntimeEvidenceCounters> {
   return { ...counters };
 }
@@ -107,6 +150,67 @@ export function resetRuntimeEvidenceCounters(): void {
   counters.runtimeEventsSeen = 0;
 }
 
+/** Clear per-run activity stamps (tests / optional session teardown). */
+export function resetRuntimeActivityStamps(): void {
+  lastActivityByRunId.clear();
+}
+
+/**
+ * Record that a Main-normalized runtime event was applied for a specific run.
+ * This is the sole authority for run-scoped wall-clock freshness — not a
+ * process-global clock that foreign sessions can satisfy.
+ */
+export function noteRuntimeEventActivity(params: {
+  runId: string;
+  sessionKey?: string | null;
+  /** Event payload timestamp (seconds or ms). */
+  eventTs?: number | null;
+  /** Receive wall clock (ms). Defaults to Date.now(). */
+  receivedAtMs?: number;
+}): void {
+  if (!params.runId) return;
+  const fromEvent = typeof params.eventTs === 'number'
+    ? normalizeTimestampMs(params.eventTs)
+    : null;
+  const received = typeof params.receivedAtMs === 'number' && Number.isFinite(params.receivedAtMs)
+    ? params.receivedAtMs
+    : Date.now();
+  // Wall clock for "fresh relative to nowMs"; include normalized event ts when present.
+  const atMs = fromEvent != null ? Math.max(received, fromEvent) : received;
+  const sessionKey = params.sessionKey != null && params.sessionKey !== ''
+    ? params.sessionKey
+    : undefined;
+  const existing = lastActivityByRunId.get(params.runId);
+  lastActivityByRunId.set(params.runId, {
+    runId: params.runId,
+    sessionKey: sessionKey ?? existing?.sessionKey,
+    atMs: existing && existing.atMs > atMs ? existing.atMs : atMs,
+  });
+  counters.runtimeEventsSeen += 1;
+}
+
+/**
+ * Lookup last activity for a run. Returns null when sessionKey is provided and
+ * does not match the stamp (foreign session isolation).
+ */
+export function getRunScopedActivityMs(
+  runId: string | null | undefined,
+  sessionKey?: string | null,
+): number | null {
+  if (!runId) return null;
+  const stamp = lastActivityByRunId.get(runId);
+  if (!stamp) return null;
+  if (
+    sessionKey
+    && stamp.sessionKey
+    && stamp.sessionKey !== sessionKey
+  ) {
+    return null;
+  }
+  return stamp.atMs;
+}
+
+/** @deprecated Use noteRuntimeEventActivity — kept as alias for counter-only tests. */
 export function noteRuntimeEventSeen(): void {
   counters.runtimeEventsSeen += 1;
 }
@@ -132,8 +236,8 @@ function isToolLikeRuntimeEvent(event: ChatRuntimeEvent): boolean {
 }
 
 /**
- * Latest activity timestamp for a runtime run (event.ts, endedAt, startedAt).
- * Returns null when no usable timestamps exist.
+ * Latest activity timestamp for a runtime run (event.ts, endedAt, startedAt),
+ * always normalized to milliseconds.
  */
 export function getRuntimeRunLastActivityMs(
   runState: ChatRuntimeRunState | null | undefined,
@@ -141,8 +245,10 @@ export function getRuntimeRunLastActivityMs(
   if (!runState) return null;
   let last: number | null = null;
   const consider = (value: number | undefined): void => {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return;
-    if (last == null || value > last) last = value;
+    if (typeof value !== 'number') return;
+    const ms = normalizeTimestampMs(value);
+    if (ms == null) return;
+    if (last == null || ms > last) last = ms;
   };
   consider(runState.startedAt);
   consider(runState.endedAt);
@@ -153,21 +259,28 @@ export function getRuntimeRunLastActivityMs(
 }
 
 /**
- * True when the run's last activity (or lastRuntimeEventAtMs) is within the
- * freshness window of nowMs.
+ * True when the run's own activity is within the freshness window of nowMs.
+ *
+ * Only run-local timestamps count:
+ *  - normalized startedAt/endedAt/event.ts on the run state
+ *  - optional run-scoped wall clock from {@link getRunScopedActivityMs} / noteRuntimeEventActivity
+ *
+ * A bare process-global wall clock is intentionally not accepted — foreign
+ * sessions cannot satisfy freshness for the active run.
  */
 export function isRuntimeRunFresh(
   runState: ChatRuntimeRunState | null | undefined,
   nowMs: number,
   options?: {
     windowMs?: number;
-    lastRuntimeEventAtMs?: number | null;
+    /** Wall-clock activity for THIS run only (must already be run-scoped). */
+    runScopedActivityMs?: number | null;
   },
 ): boolean {
   const windowMs = options?.windowMs ?? RUNTIME_FRESHNESS_WINDOW_MS;
   const fromRun = getRuntimeRunLastActivityMs(runState);
-  const fromModule = options?.lastRuntimeEventAtMs;
-  const candidates = [fromRun, fromModule].filter(
+  const fromScoped = options?.runScopedActivityMs;
+  const candidates = [fromRun, fromScoped].filter(
     (value): value is number => typeof value === 'number' && Number.isFinite(value),
   );
   if (candidates.length === 0) return false;
@@ -188,7 +301,8 @@ function sessionKeyMatchesRun(
 /**
  * Evaluate whether runtime evidence *could* cover the active run for poll
  * purposes. Does not mutate state. maySkipHistoryPoll is false unless the
- * explicit convergence flag is enabled and all gates pass.
+ * explicit convergence flag is enabled, live provider evidence is present,
+ * and all structural gates pass.
  */
 export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePollGateDecision {
   const {
@@ -196,84 +310,61 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
     activeRunId,
     currentSessionKey,
     nowMs,
-    lastRuntimeEventAtMs = null,
     freshnessWindowMs = RUNTIME_FRESHNESS_WINDOW_MS,
     convergenceEnabled = POLL_CONVERGENCE_ENABLED,
+    hasLiveProviderToolChainEvidence = getLiveProviderToolChainEvidence(),
   } = input;
 
   const hasActiveRunId = Boolean(activeRunId && run && run.runId === activeRunId);
   const hasToolActivity = runtimeEvidenceHasToolActivity(run);
+  const sessionOk = sessionKeyMatchesRun(run, currentSessionKey);
+  // Run-scoped only: never pass a process-global last-event wall clock.
+  const runScopedActivityMs = hasActiveRunId && activeRunId
+    ? getRunScopedActivityMs(activeRunId, currentSessionKey)
+    : null;
   const isFresh = isRuntimeRunFresh(run, nowMs, {
     windowMs: freshnessWindowMs,
-    lastRuntimeEventAtMs,
+    runScopedActivityMs,
   });
-  const sessionOk = sessionKeyMatchesRun(run, currentSessionKey);
-  const lastActivityMs = getRuntimeRunLastActivityMs(run);
+  const lastActivityMs = getRuntimeRunLastActivityMs(run) ?? runScopedActivityMs;
+  const hasLiveProviderEvidence = hasLiveProviderToolChainEvidence === true;
+
+  const base = {
+    hasActiveRunId,
+    hasToolActivity,
+    isFresh,
+    sessionKeyMatches: sessionOk,
+    hasLiveProviderEvidence,
+    lastActivityMs,
+  };
 
   if (!hasActiveRunId) {
-    return {
-      hasActiveRunId: false,
-      hasToolActivity,
-      isFresh,
-      sessionKeyMatches: sessionOk,
-      lastActivityMs,
-      maySkipHistoryPoll: false,
-      reason: 'no-active-run',
-    };
+    return { ...base, hasActiveRunId: false, maySkipHistoryPoll: false, reason: 'no-active-run' };
   }
   if (!sessionOk) {
-    return {
-      hasActiveRunId: true,
-      hasToolActivity,
-      isFresh,
-      sessionKeyMatches: false,
-      lastActivityMs,
-      maySkipHistoryPoll: false,
-      reason: 'session-mismatch',
-    };
+    return { ...base, sessionKeyMatches: false, maySkipHistoryPoll: false, reason: 'session-mismatch' };
   }
   if (!hasToolActivity) {
-    return {
-      hasActiveRunId: true,
-      hasToolActivity: false,
-      isFresh,
-      sessionKeyMatches: true,
-      lastActivityMs,
-      maySkipHistoryPoll: false,
-      reason: 'no-tool-activity',
-    };
+    return { ...base, hasToolActivity: false, maySkipHistoryPoll: false, reason: 'no-tool-activity' };
   }
   if (!isFresh) {
+    return { ...base, isFresh: false, maySkipHistoryPoll: false, reason: 'stale-runtime' };
+  }
+  // Hard condition: live provider tool-chain evidence is mandatory for skip.
+  if (!hasLiveProviderEvidence) {
     return {
-      hasActiveRunId: true,
-      hasToolActivity: true,
-      isFresh: false,
-      sessionKeyMatches: true,
-      lastActivityMs,
+      ...base,
+      hasLiveProviderEvidence: false,
       maySkipHistoryPoll: false,
-      reason: 'stale-runtime',
+      reason: 'no-live-provider-evidence',
     };
   }
-
-  // Candidate: all evidence gates pass. Still blocked unless flag enabled.
   if (!convergenceEnabled) {
-    return {
-      hasActiveRunId: true,
-      hasToolActivity: true,
-      isFresh: true,
-      sessionKeyMatches: true,
-      lastActivityMs,
-      maySkipHistoryPoll: false,
-      reason: 'gates-pass-flag-disabled',
-    };
+    return { ...base, maySkipHistoryPoll: false, reason: 'gates-pass-flag-disabled' };
   }
 
   return {
-    hasActiveRunId: true,
-    hasToolActivity: true,
-    isFresh: true,
-    sessionKeyMatches: true,
-    lastActivityMs,
+    ...base,
     maySkipHistoryPoll: true,
     reason: 'skip-allowed',
   };
@@ -303,6 +394,7 @@ export function recordRuntimePollObservation(
     && decision.isFresh
     && decision.hasActiveRunId
     && decision.sessionKeyMatches
+    && decision.hasLiveProviderEvidence
   ) {
     counters.pollSkipCandidates += 1;
   }

@@ -1,5 +1,6 @@
 import type { ChatRuntimeEvent } from '../../../shared/chat-runtime-events';
 import { applyRuntimeEventToRuns, extractToolCompletedFiles } from './runtime-graph';
+import { noteRuntimeEventActivity } from './runtime-evidence';
 import type { AttachedFileMeta, ChatState, ToolStatus } from './types';
 import type { ChatGet, ChatSet } from './store-api';
 
@@ -83,6 +84,13 @@ export function createHandleRuntimeEvent(
     }
 
     touchLastChatEventAt?.();
+    // Single-authority run-scoped activity stamp (not a process-global clock).
+    noteRuntimeEventActivity({
+      runId: event.runId,
+      sessionKey: event.sessionKey,
+      eventTs: event.ts,
+      receivedAtMs: Date.now(),
+    });
 
     const runtimeRuns = applyRuntimeEventToRuns(initialState.runtimeRuns, event);
     const nextPatch: Partial<ChatState> = { runtimeRuns };

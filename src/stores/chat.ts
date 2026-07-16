@@ -49,7 +49,6 @@ import {
 import { createHandleRuntimeEvent } from './chat/runtime-pipeline';
 import {
   evaluateRuntimePollGate,
-  noteRuntimeEventSeen,
   recordRuntimePollObservation,
   shouldSkipHistoryPollForRuntimeEvidence,
 } from './chat/runtime-evidence';
@@ -73,8 +72,7 @@ export type {
 // during tool-use conversations where streamingMessage is temporarily cleared
 // between tool-result finals and the next delta.
 let _lastChatEventAt = 0;
-// Last Main-normalized chat:runtime-event wall clock (M4.1 evidence scaffold).
-let _lastRuntimeEventAt = 0;
+// Runtime per-run activity clocks: single authority in runtime-evidence.ts.
 
 /** Normalize a timestamp to milliseconds. Handles both seconds and ms. */
 function toMs(ts: number): number {
@@ -3371,7 +3369,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return;
       }
       // M4.1 scaffold: evaluate runtime coverage for metrics / future gates.
-      // Default POLL_CONVERGENCE_ENABLED=false → never skip; cadence stays M3.
+      // Default POLL_CONVERGENCE_ENABLED=false + no live evidence → never skip.
       const activeRun = state.activeRunId
         ? state.runtimeRuns[state.activeRunId] ?? null
         : null;
@@ -3380,7 +3378,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeRunId: state.activeRunId,
         currentSessionKey: state.currentSessionKey,
         nowMs: Date.now(),
-        lastRuntimeEventAtMs: _lastRuntimeEventAt || null,
       });
       if (shouldSkipHistoryPollForRuntimeEvidence(gate)) {
         // Unreachable under M4.1 defaults; retained as the M4.2 integration point.
@@ -4042,10 +4039,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   handleRuntimeEvent: createHandleRuntimeEvent(set, get, {
     shouldTrackInboundRunLifecycle,
     touchLastChatEventAt: () => {
-      const now = Date.now();
-      _lastChatEventAt = now;
-      _lastRuntimeEventAt = now;
-      noteRuntimeEventSeen();
+      // Silence/poll safety still uses shared chat-event wall clock.
+      // Per-run runtime freshness is recorded inside the pipeline via
+      // noteRuntimeEventActivity (single authority in runtime-evidence).
+      _lastChatEventAt = Date.now();
     },
   }),
 
