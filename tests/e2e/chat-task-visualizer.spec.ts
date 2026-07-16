@@ -209,6 +209,12 @@ test.describe('ClawDock chat execution graph', () => {
               messages: seededHistory,
             },
           },
+          [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 200, maxChars: 500000 }])]: {
+            success: true,
+            result: {
+              messages: seededHistory,
+            },
+          },
           [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 1000 }])]: {
             success: true,
             result: {
@@ -236,6 +242,29 @@ test.describe('ClawDock chat execution graph', () => {
                   { id: 'main', name: 'main' },
                   { id: 'coder', name: 'coder' },
                 ],
+              },
+            },
+          },
+          [stableStringify(['/api/sessions/list', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                sessions: [{ key: PROJECT_MANAGER_SESSION_KEY, displayName: 'main' }],
+              },
+            },
+          },
+          [stableStringify([`/api/sessions/history?sessionKey=${encodeURIComponent(PROJECT_MANAGER_SESSION_KEY)}&limit=200`, 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                messages: seededHistory,
+                totalMessages: seededHistory.length,
               },
             },
           },
@@ -305,6 +334,12 @@ test.describe('ClawDock chat execution graph', () => {
               messages: longRunHistory,
             },
           },
+          [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 200, maxChars: 500000 }])]: {
+            success: true,
+            result: {
+              messages: longRunHistory,
+            },
+          },
           [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 1000 }])]: {
             success: true,
             result: {
@@ -332,6 +367,29 @@ test.describe('ClawDock chat execution graph', () => {
               },
             },
           },
+          [stableStringify(['/api/sessions/list', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                sessions: [{ key: PROJECT_MANAGER_SESSION_KEY, displayName: 'main' }],
+              },
+            },
+          },
+          [stableStringify([`/api/sessions/history?sessionKey=${encodeURIComponent(PROJECT_MANAGER_SESSION_KEY)}&limit=200`, 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                messages: longRunHistory,
+                totalMessages: longRunHistory.length,
+              },
+            },
+          },
         },
       });
 
@@ -347,8 +405,8 @@ test.describe('ClawDock chat execution graph', () => {
       await expect(page.getByTestId('main-layout')).toBeVisible();
       await expect(page.getByTestId('chat-execution-graph')).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId('chat-execution-graph')).toHaveAttribute('data-collapsed', 'true');
-      await expect(page.getByTestId('chat-execution-graph')).toContainText('0 tool calls');
-      await expect(page.getByTestId('chat-execution-graph')).toContainText('9 process messages');
+      await expect(page.getByTestId('chat-execution-graph')).toContainText(/0\s+(tool calls|个工具调用)/);
+      await expect(page.getByTestId('chat-execution-graph')).toContainText(/9\s+(process messages|条过程消息)/);
       await expect(page.getByText(longRunSummary, { exact: true })).toBeVisible();
       await expect(page.getByText(longRunReplyText, { exact: true })).toHaveCount(0);
     } finally {
@@ -370,6 +428,12 @@ test.describe('ClawDock chat execution graph', () => {
             },
           },
           [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 200 }])]: {
+            success: true,
+            result: {
+              messages: errorRunHistory,
+            },
+          },
+          [stableStringify(['chat.history', { sessionKey: PROJECT_MANAGER_SESSION_KEY, limit: 200, maxChars: 500000 }])]: {
             success: true,
             result: {
               messages: errorRunHistory,
@@ -399,6 +463,29 @@ test.describe('ClawDock chat execution graph', () => {
               json: {
                 success: true,
                 agents: [{ id: 'main', name: 'main' }],
+              },
+            },
+          },
+          [stableStringify(['/api/sessions/list', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                sessions: [{ key: PROJECT_MANAGER_SESSION_KEY, displayName: 'main' }],
+              },
+            },
+          },
+          [stableStringify([`/api/sessions/history?sessionKey=${encodeURIComponent(PROJECT_MANAGER_SESSION_KEY)}&limit=200`, 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: {
+                success: true,
+                messages: errorRunHistory,
+                totalMessages: errorRunHistory.length,
               },
             },
           },

@@ -55,6 +55,7 @@ import {
 
 export type {
   AttachedFileMeta,
+  ChatRuntimeRunState,
   ChatSession,
   ContentBlock,
   RawMessage,
@@ -4008,9 +4009,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // ── Handle Main-normalized chat:runtime-event (M2 dual-track) ──
-  // Keeps runtimeRuns for future Execution Graph (M3). Does not replace
-  // handleChatEvent / history poll; legacy notification path remains primary
-  // for streaming message UI until M3/M4.
+  // M3 Execution Graph may prefer runtimeRuns for the active run; legacy
+  // handleChatEvent / history poll remain dual-track for messages & settle.
 
   handleRuntimeEvent: createHandleRuntimeEvent(set, get, {
     shouldTrackInboundRunLifecycle,
