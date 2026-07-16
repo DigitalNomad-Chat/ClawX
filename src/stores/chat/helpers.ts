@@ -12,6 +12,11 @@ import type { AttachedFileMeta, ChatSession, ContentBlock, RawMessage, ToolStatu
 // between tool-result finals and the next delta.
 let _lastChatEventAt = 0;
 
+// Last Main-normalized chat:runtime-event wall clock (M4.1 evidence scaffold).
+// Distinct from _lastChatEventAt so future poll gates can require runtime freshness
+// without conflating legacy notification traffic.
+let _lastRuntimeEventAt = 0;
+
 /** Normalize a timestamp to milliseconds. Handles both seconds and ms. */
 function toMs(ts: number): number {
   // Timestamps < 1e12 are in seconds (before ~2033); >= 1e12 are milliseconds
@@ -1656,6 +1661,14 @@ function getLastChatEventAt(): number {
   return _lastChatEventAt;
 }
 
+function setLastRuntimeEventAt(value: number): void {
+  _lastRuntimeEventAt = value;
+}
+
+function getLastRuntimeEventAt(): number {
+  return _lastRuntimeEventAt;
+}
+
 function setLastAbortedRunId(id: string | null): void {
   _lastAbortedRunId = id;
 }
@@ -1752,6 +1765,8 @@ export {
   setErrorRecoveryTimer,
   setLastChatEventAt,
   getLastChatEventAt,
+  setLastRuntimeEventAt,
+  getLastRuntimeEventAt,
   setLastAbortedRunId,
   getLastAbortedRunId,
   queueBlockedRunEvent,

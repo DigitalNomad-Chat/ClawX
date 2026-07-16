@@ -48,6 +48,12 @@ import {
 } from './chat/helpers';
 import { createHandleRuntimeEvent } from './chat/runtime-pipeline';
 import {
+  evaluateRuntimePollGate,
+  noteRuntimeEventSeen,
+  recordRuntimePollObservation,
+  shouldSkipHistoryPollForRuntimeEvidence,
+} from './chat/runtime-evidence';
+import {
   isGeneratingStatusNarration,
   isInternalAssistantReplyText,
   isOpenClawRuntimeEventPrompt,
@@ -67,6 +73,8 @@ export type {
 // during tool-use conversations where streamingMessage is temporarily cleared
 // between tool-result finals and the next delta.
 let _lastChatEventAt = 0;
+// Last Main-normalized chat:runtime-event wall clock (M4.1 evidence scaffold).
+let _lastRuntimeEventAt = 0;
 
 /** Normalize a timestamp to milliseconds. Handles both seconds and ms. */
 function toMs(ts: number): number {
@@ -3362,6 +3370,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
         return;
       }
+      // M4.1 scaffold: evaluate runtime coverage for metrics / future gates.
+      // Default POLL_CONVERGENCE_ENABLED=false → never skip; cadence stays M3.
+      const activeRun = state.activeRunId
+        ? state.runtimeRuns[state.activeRunId] ?? null
+        : null;
+      const gate = evaluateRuntimePollGate({
+        run: activeRun,
+        activeRunId: state.activeRunId,
+        currentSessionKey: state.currentSessionKey,
+        nowMs: Date.now(),
+        lastRuntimeEventAtMs: _lastRuntimeEventAt || null,
+      });
+      if (shouldSkipHistoryPollForRuntimeEvidence(gate)) {
+        // Unreachable under M4.1 defaults; retained as the M4.2 integration point.
+        recordRuntimePollObservation(gate, { appliedSkip: true });
+        _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
+        return;
+      }
+      recordRuntimePollObservation(gate, { performedLoad: true });
       state.loadHistory(true);
       _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
     };
@@ -4015,7 +4042,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   handleRuntimeEvent: createHandleRuntimeEvent(set, get, {
     shouldTrackInboundRunLifecycle,
     touchLastChatEventAt: () => {
-      _lastChatEventAt = Date.now();
+      const now = Date.now();
+      _lastChatEventAt = now;
+      _lastRuntimeEventAt = now;
+      noteRuntimeEventSeen();
     },
   }),
 

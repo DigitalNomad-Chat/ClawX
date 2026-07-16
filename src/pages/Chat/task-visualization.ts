@@ -1,5 +1,6 @@
 import { extractImages, extractText, extractTextSegments, extractThinkingSegments, extractToolUse } from './message-utils';
 import type { RawMessage, ToolStatus } from '@/stores/chat';
+import { runtimeEvidenceHasToolActivity } from '@/stores/chat/runtime-evidence';
 import type { ChatRuntimeRunState } from '@/stores/chat/types';
 
 export type TaskStepStatus = 'running' | 'completed' | 'error';
@@ -525,15 +526,8 @@ export function deriveRuntimeTaskSteps(runState: ChatRuntimeRunState | null | un
 
 /** True when runtime run has tool/process activity suitable for graph priority. */
 export function runtimeRunHasToolActivity(runState: ChatRuntimeRunState | null | undefined): boolean {
-  if (!runState) return false;
-  return runState.events.some((event) =>
-    event.type === 'tool.started'
-    || event.type === 'tool.updated'
-    || event.type === 'tool.completed'
-    || event.type === 'command.output'
-    || event.type === 'patch.completed'
-    || event.type === 'approval.updated',
-  );
+  // Shared predicate with M4.1 runtime-evidence (single definition of "tool activity").
+  return runtimeEvidenceHasToolActivity(runState);
 }
 
 export function runtimeRunHasRunningTool(runState: ChatRuntimeRunState | null | undefined): boolean {
