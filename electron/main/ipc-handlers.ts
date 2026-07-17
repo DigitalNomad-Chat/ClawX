@@ -75,6 +75,7 @@ import { HostApiRegistry, registerHostInvokeHandler } from './ipc/host-invoke';
 import { registerAuthIpcHandlers } from './ipc/auth-handlers';
 import { createAppApi } from '../services/app-api';
 import { createOpenClawApi } from '../services/openclaw-api';
+import { createUsageApi } from '../services/usage-api';
 import { MemberModule } from '../services/member';
 import {
   isLaunchAtStartupKey,
@@ -101,11 +102,12 @@ export function registerIpcHandlers(
   // Host API proxy handlers (ClawDock HTTP proxy path — keep for dual-track)
   registerHostApiProxyHandlers();
 
-  // P2: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
+  // P2/P3a: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
   const hostApiRegistry = new HostApiRegistry();
   hostApiRegistry.registerCoreServices({
     app: createAppApi(),
     openclaw: createOpenClawApi(),
+    usage: createUsageApi(),
   });
   registerHostInvokeHandler(hostApiRegistry);
 
@@ -1567,37 +1569,32 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
     gatewayManager.debouncedReload(150);
   };
 
-  // Get OpenClaw package status
+  // P3a: openclaw status/skills/cli delegated to createOpenClawApi (host:invoke shares same service)
+  const openclawApi = createOpenClawApi();
+
   ipcMain.handle('openclaw:status', () => {
-    const status = getOpenClawStatus();
+    const status = openclawApi.status() as ReturnType<typeof getOpenClawStatus>;
     logger.info('openclaw:status IPC called', status);
     return status;
   });
 
-  // Check if OpenClaw is ready (package present)
   ipcMain.handle('openclaw:isReady', () => {
-    const status = getOpenClawStatus();
+    const status = openclawApi.status() as ReturnType<typeof getOpenClawStatus>;
     return status.packageExists;
   });
 
-  // Get the resolved OpenClaw directory path (for diagnostics)
   ipcMain.handle('openclaw:getDir', () => {
     return getOpenClawDir();
   });
 
-  // Get the OpenClaw config directory (~/.openclaw)
   ipcMain.handle('openclaw:getConfigDir', () => {
     return getOpenClawConfigDir();
   });
 
-  // Get the OpenClaw skills directory (~/.openclaw/skills)
   ipcMain.handle('openclaw:getSkillsDir', () => {
-    const dir = getOpenClawSkillsDir();
-    ensureDir(dir);
-    return dir;
+    return openclawApi.getSkillsDir();
   });
 
-  // Get the ClawDock skills directory (~/.clawdock/skills)
   ipcMain.handle('clawdock:getSkillsDir', () => {
     const { getClawDockSkillsDir } = require('../utils/paths');
     const dir = getClawDockSkillsDir();
@@ -1605,17 +1602,9 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
     return dir;
   });
 
-  // Get a shell command to run OpenClaw CLI without modifying PATH
   ipcMain.handle('openclaw:getCliCommand', () => {
     try {
-      const status = getOpenClawStatus();
-      if (!status.packageExists) {
-        return { success: false, error: `OpenClaw package not found at: ${status.dir}` };
-      }
-      if (!existsSync(status.entryPath)) {
-        return { success: false, error: `OpenClaw entry script not found at: ${status.entryPath}` };
-      }
-      return { success: true, command: getOpenClawCliCommand() };
+      return openclawApi.getCliCommand();
     } catch (error) {
       return { success: false, error: String(error) };
     }
@@ -2425,11 +2414,10 @@ function registerSettingsHandlers(gatewayManager: GatewayManager): void {
   });
 }
 function registerUsageHandlers(): void {
+  // P3a: thin wrapper over createUsageApi (shared with HTTP route + host:invoke)
+  const usageApi = createUsageApi();
   ipcMain.handle('usage:recentTokenHistory', async (_, limit?: number) => {
-    const safeLimit = typeof limit === 'number' && Number.isFinite(limit)
-      ? Math.max(Math.floor(limit), 1)
-      : undefined;
-    return await getRecentTokenUsageHistory(safeLimit);
+    return await usageApi.recentTokenHistory(limit);
   });
 }
 /**

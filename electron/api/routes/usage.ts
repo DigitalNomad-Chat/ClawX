@@ -1,7 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { getRecentTokenUsageHistory } from '../../utils/token-usage';
 import type { HostApiContext } from '../context';
 import { sendJson } from '../route-utils';
+import { createUsageApi } from '../../services/usage-api';
+
+const usageApi = createUsageApi();
 
 export async function handleUsageRoutes(
   req: IncomingMessage,
@@ -9,16 +11,10 @@ export async function handleUsageRoutes(
   url: URL,
   _ctx: HostApiContext,
 ): Promise<boolean> {
+  // P3a: thin delegate to createUsageApi (shared with usage:recentTokenHistory IPC + host:invoke)
   if (url.pathname === '/api/usage/recent-token-history' && req.method === 'GET') {
     const rawLimit = url.searchParams.get('limit');
-    let limit: number | undefined;
-    if (rawLimit != null && rawLimit.trim() !== '') {
-      const parsedLimit = Number(rawLimit);
-      if (Number.isFinite(parsedLimit)) {
-        limit = Math.max(Math.floor(parsedLimit), 1);
-      }
-    }
-    sendJson(res, 200, await getRecentTokenUsageHistory(limit));
+    sendJson(res, 200, await usageApi.recentTokenHistory({ limit: rawLimit }));
     return true;
   }
 

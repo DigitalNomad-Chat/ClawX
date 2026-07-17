@@ -1,6 +1,6 @@
 /**
- * Minimal openclaw Host API surface for P2 dual-path proof.
- * Behavior mirrors existing openclaw:* IPC handlers in ipc-handlers.ts.
+ * OpenClaw Host API surface (P3a thin service).
+ * Shared by legacy openclaw:* IPC handlers and host:invoke openclaw.*.
  */
 import { existsSync } from 'node:fs';
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
