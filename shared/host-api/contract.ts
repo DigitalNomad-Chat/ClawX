@@ -83,6 +83,7 @@ export type HostApiContract = {
     listConfigured: () => unknown;
     getConfig: (payload?: unknown) => unknown;
     saveConfig: (payload?: unknown) => unknown;
+    setEnabled: (payload?: unknown) => unknown;
   };
   agents: {
     list: () => unknown;
@@ -93,6 +94,8 @@ export type HostApiContract = {
   providers: {
     list: () => unknown;
     listAccounts: () => unknown;
+    listVendors: () => unknown;
+    hasApiKey: (payload?: unknown) => unknown;
   };
   files: {
     listDir: (payload?: unknown) => unknown;
@@ -114,9 +117,13 @@ export type HostApiContract = {
     create: (payload?: unknown) => unknown;
     update: (payload?: unknown) => unknown;
     delete: (payload?: unknown) => unknown;
+    toggle: (payload?: unknown) => unknown;
+    trigger: (payload?: unknown) => unknown;
   };
   skills: {
     status: () => unknown;
+    getConfig: (payload?: unknown) => unknown;
+    getAllConfigs: () => unknown;
     updateConfig: (payload?: unknown) => unknown;
   };
   usage: {
