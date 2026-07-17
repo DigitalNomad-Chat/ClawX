@@ -24,10 +24,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@electron/*": ["electron/*"]
+      "@electron/*": ["electron/*"],
+      "@shared/*": ["shared/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "shared"],
   "exclude": ["node_modules"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

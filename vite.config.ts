@@ -32,7 +32,7 @@ const extensionPackages = getExtensionPackages();
 function isMainProcessExternal(id: string): boolean {
   if (!id || id.startsWith('\0')) return false;
   if (id.startsWith('.') || id.startsWith('/') || /^[A-Za-z]:[\\/]/.test(id)) return false;
-  if (id.startsWith('@/') || id.startsWith('@electron/')) return false;
+  if (id.startsWith('@/') || id.startsWith('@electron/') || id.startsWith('@shared/')) return false;
   for (const pkg of extensionPackages) {
     if (id === pkg || id.startsWith(pkg + '/')) return false;
   }
@@ -86,6 +86,7 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       '@electron': resolve(__dirname, 'electron'),
+      '@shared': resolve(__dirname, 'shared'),
     },
     dedupe: ['react', 'react-dom', 'react-i18next', 'zustand', 'sonner', 'lucide-react'],
   },

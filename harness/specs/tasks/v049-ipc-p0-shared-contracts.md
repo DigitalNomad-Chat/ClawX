@@ -57,6 +57,7 @@ docs:
 
 - **In:** type-only shared contracts, path aliases, harness task, contract smoke unit test.
 - **Out:** hostInvoke, host-api-proxy changes, AgentChat, chat store/runtime, routes→services, v0.4.10, skills marketplace.
+- **Note:** P0 does **not** introduce `tsconfig.web.json`; `@shared/*` is added to existing `tsconfig.json` / `tsconfig.node.json` only.
 
 ## Baseline freeze notes (inventory snapshot)
 
