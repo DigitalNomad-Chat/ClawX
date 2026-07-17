@@ -22,6 +22,8 @@ export type HostApiContract = {
   };
   openclaw: {
     status: () => unknown;
+    getDir: () => unknown;
+    getConfigDir: () => unknown;
     getSkillsDir: () => unknown;
     getCliCommand: () => unknown;
   };
@@ -32,10 +34,15 @@ export type HostApiContract = {
   };
   dialog: {
     open: (payload?: unknown) => unknown;
+    save: (payload?: unknown) => unknown;
     message: (payload?: unknown) => unknown;
   };
   window: {
     syncTrafficLightPosition: (payload?: unknown) => unknown;
+    minimize: () => unknown;
+    maximize: () => unknown;
+    close: () => unknown;
+    isMaximized: () => unknown;
   };
   updates: {
     getStatus: () => unknown;
@@ -53,6 +60,7 @@ export type HostApiContract = {
     getAll: () => unknown;
     get: (payload?: unknown) => unknown;
     set: (payload?: unknown) => unknown;
+    setMany: (payload?: unknown) => unknown;
     reset: () => unknown;
   };
   gateway: {
