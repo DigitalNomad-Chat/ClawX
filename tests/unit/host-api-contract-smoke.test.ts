@@ -51,6 +51,10 @@ describe('HostEventContract scaffold', () => {
     expect(HOST_EVENT_CHANNELS.gateway.notification).toBe('gateway:notification');
   });
 
+  it('includes kernel.event for AgentChat stream', () => {
+    expect(HOST_EVENT_CHANNELS.kernel.event).toBe('kernel:event');
+  });
+
   it('types HostEventContract chat.runtimeEvent as a key path', () => {
     type ChatRuntimeHandler = HostEventContract['chat']['runtimeEvent'];
     const _assert: ChatRuntimeHandler = (_payload) => undefined;

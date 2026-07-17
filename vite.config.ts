@@ -56,6 +56,13 @@ export default defineConfig({
           options.startup();
         },
         vite: {
+          resolve: {
+            alias: {
+              '@': resolve(__dirname, 'src'),
+              '@electron': resolve(__dirname, 'electron'),
+              '@shared': resolve(__dirname, 'shared'),
+            },
+          },
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
@@ -71,6 +78,13 @@ export default defineConfig({
           options.reload();
         },
         vite: {
+          resolve: {
+            alias: {
+              '@': resolve(__dirname, 'src'),
+              '@electron': resolve(__dirname, 'electron'),
+              '@shared': resolve(__dirname, 'shared'),
+            },
+          },
           build: {
             outDir: 'dist-electron/preload',
             rollupOptions: {

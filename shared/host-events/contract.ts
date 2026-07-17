@@ -1,26 +1,32 @@
 /**
- * v0.4.9 P0 — Host events contract scaffold (types + channel map only).
+ * v0.4.9 — Host events contract aligned to ClawDock preload + host-events.
  *
- * Preserves #1094 M1 mapping: chat.runtimeEvent → 'chat:runtime-event'.
- * Does not change src/lib/host-events.ts runtime mapping in this phase.
+ * Authority: electron/preload validChannels (on/once) and
+ * src/lib/host-events.ts HOST_EVENT_TO_IPC_CHANNEL keys/values.
+ * Do not invent channel names from upstream HOST_EVENT_CHANNELS alone.
  */
 import type { ChatRuntimeEvent } from '../chat-runtime-events';
 
+/**
+ * Logical event groups for typing. Subscribe keys used by subscribeHostEvent
+ * are listed in HOST_EVENT_SUBSCRIBE_KEYS; IPC wire names in HOST_EVENT_CHANNELS.
+ */
 export type HostEventContract = {
   gateway: {
-    statusChanged: (payload: unknown) => void;
-    message: (payload: unknown) => void;
+    status: (payload: unknown) => void;
+    error: (payload: unknown) => void;
     notification: (payload: unknown) => void;
-    healthChanged: (payload: unknown) => void;
-    presenceChanged: (payload: unknown) => void;
+    health: (payload: unknown) => void;
+    presence: (payload: unknown) => void;
     chatMessage: (payload: unknown) => void;
     channelStatus: (payload: unknown) => void;
     exit: (payload: unknown) => void;
-    error: (payload: unknown) => void;
   };
   chat: {
-    /** M1 dual-emit channel — payload is shared ChatRuntimeEvent. */
     runtimeEvent: (payload: ChatRuntimeEvent) => void;
+  };
+  kernel: {
+    event: (payload: unknown) => void;
   };
   oauth: {
     code: (payload: unknown) => void;
@@ -28,9 +34,12 @@ export type HostEventContract = {
     error: (payload: unknown) => void;
   };
   channel: {
-    qr: (payload: unknown) => void;
-    success: (payload: unknown) => void;
-    error: (payload: unknown) => void;
+    whatsappQr: (payload: unknown) => void;
+    whatsappSuccess: (payload: unknown) => void;
+    whatsappError: (payload: unknown) => void;
+    wechatQr: (payload: unknown) => void;
+    wechatSuccess: (payload: unknown) => void;
+    wechatError: (payload: unknown) => void;
   };
   updates: {
     statusChanged: (payload: unknown) => void;
@@ -55,23 +64,25 @@ export type HostEventArgs<
 > = HostEventHandler<M, E> extends (...args: infer Args) => void ? Args : never;
 
 /**
- * Canonical IPC channel strings for host events.
- * Must stay consistent with electron/preload validChannels + src/lib/host-events.ts.
+ * IPC wire channel strings (preload on/once allowlist).
+ * Values must match what Main webContents.send uses.
  */
 export const HOST_EVENT_CHANNELS = {
   gateway: {
-    statusChanged: 'gateway:status-changed',
-    message: 'gateway:message',
+    status: 'gateway:status-changed',
+    error: 'gateway:error',
     notification: 'gateway:notification',
-    healthChanged: 'gateway:health-changed',
-    presenceChanged: 'gateway:presence-changed',
+    health: 'gateway:health-changed',
+    presence: 'gateway:presence-changed',
     chatMessage: 'gateway:chat-message',
     channelStatus: 'gateway:channel-status',
     exit: 'gateway:exit',
-    error: 'gateway:error',
   },
   chat: {
     runtimeEvent: 'chat:runtime-event',
+  },
+  kernel: {
+    event: 'kernel:event',
   },
   oauth: {
     code: 'oauth:code',
@@ -79,9 +90,12 @@ export const HOST_EVENT_CHANNELS = {
     error: 'oauth:error',
   },
   channel: {
-    qr: 'channel:qr',
-    success: 'channel:success',
-    error: 'channel:error',
+    whatsappQr: 'channel:whatsapp-qr',
+    whatsappSuccess: 'channel:whatsapp-success',
+    whatsappError: 'channel:whatsapp-error',
+    wechatQr: 'channel:wechat-qr',
+    wechatSuccess: 'channel:wechat-success',
+    wechatError: 'channel:wechat-error',
   },
   updates: {
     statusChanged: 'update:status-changed',
@@ -97,3 +111,39 @@ export const HOST_EVENT_CHANNELS = {
     [E in HostEventName<M>]: string;
   };
 };
+
+/**
+ * Keys accepted by subscribeHostEvent (left side of HOST_EVENT_TO_IPC_CHANNEL).
+ * Several gateway keys differ from IPC wire names (e.g. gateway:status → gateway:status-changed).
+ */
+export const HOST_EVENT_SUBSCRIBE_KEYS = {
+  gateway: {
+    status: 'gateway:status',
+    error: 'gateway:error',
+    notification: 'gateway:notification',
+    health: 'gateway:health',
+    presence: 'gateway:presence',
+    chatMessage: 'gateway:chat-message',
+    channelStatus: 'gateway:channel-status',
+    exit: 'gateway:exit',
+  },
+  chat: {
+    runtimeEvent: 'chat:runtime-event',
+  },
+  kernel: {
+    event: 'kernel:event',
+  },
+  oauth: {
+    code: 'oauth:code',
+    success: 'oauth:success',
+    error: 'oauth:error',
+  },
+  channel: {
+    whatsappQr: 'channel:whatsapp-qr',
+    whatsappSuccess: 'channel:whatsapp-success',
+    whatsappError: 'channel:whatsapp-error',
+    wechatQr: 'channel:wechat-qr',
+    wechatSuccess: 'channel:wechat-success',
+    wechatError: 'channel:wechat-error',
+  },
+} as const;
