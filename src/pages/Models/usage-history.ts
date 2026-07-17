@@ -1,3 +1,5 @@
+import { normalizeUsageHistoryEntries as normalizeUnknownList } from '@/lib/usage-history-entries';
+
 export type UsageHistoryEntry = {
   timestamp: string;
   sessionId: string;
@@ -13,6 +15,10 @@ export type UsageHistoryEntry = {
   totalTokens: number;
   costUsd?: number;
 };
+
+export function normalizeUsageHistoryEntries(value: unknown): UsageHistoryEntry[] {
+  return normalizeUnknownList<UsageHistoryEntry>(value);
+}
 
 export type UsageWindow = '7d' | '30d' | 'all';
 export type UsageGroupBy = 'model' | 'day';
@@ -31,11 +37,13 @@ export function resolveStableUsageHistory(
   nextEntries: UsageHistoryEntry[],
   options: { preservePreviousOnEmpty?: boolean } = {},
 ): UsageHistoryEntry[] {
-  if (nextEntries.length > 0) {
-    return nextEntries;
+  const previous = normalizeUsageHistoryEntries(previousStableEntries);
+  const next = normalizeUsageHistoryEntries(nextEntries);
+  if (next.length > 0) {
+    return next;
   }
 
-  return options.preservePreviousOnEmpty ? previousStableEntries : [];
+  return options.preservePreviousOnEmpty ? previous : [];
 }
 
 export function resolveVisibleUsageHistory(
@@ -43,11 +51,13 @@ export function resolveVisibleUsageHistory(
   stableEntries: UsageHistoryEntry[],
   options: { preferStableOnEmpty?: boolean } = {},
 ): UsageHistoryEntry[] {
-  if (options.preferStableOnEmpty && currentEntries.length === 0) {
-    return stableEntries;
+  const current = normalizeUsageHistoryEntries(currentEntries);
+  const stable = normalizeUsageHistoryEntries(stableEntries);
+  if (options.preferStableOnEmpty && current.length === 0) {
+    return stable;
   }
 
-  return currentEntries;
+  return current;
 }
 
 export function formatUsageDay(timestamp: string): string {
@@ -70,9 +80,10 @@ export function groupUsageHistory(
   entries: UsageHistoryEntry[],
   groupBy: UsageGroupBy,
 ): UsageGroup[] {
+  const list = normalizeUsageHistoryEntries(entries);
   const grouped = new Map<string, UsageGroup>();
 
-  for (const entry of entries) {
+  for (const entry of list) {
     const label = groupBy === 'model'
       ? (entry.model || 'Unknown')
       : formatUsageDay(entry.timestamp);
@@ -106,12 +117,13 @@ export function filterUsageHistoryByWindow(
   window: UsageWindow,
   now = Date.now(),
 ): UsageHistoryEntry[] {
-  if (window === 'all') return entries;
+  const list = normalizeUsageHistoryEntries(entries);
+  if (window === 'all') return list;
 
   const days = window === '7d' ? 7 : 30;
   const cutoff = now - days * 24 * 60 * 60 * 1000;
 
-  return entries.filter((entry) => {
+  return list.filter((entry) => {
     const timestamp = Date.parse(entry.timestamp);
     return Number.isFinite(timestamp) && timestamp >= cutoff;
   });

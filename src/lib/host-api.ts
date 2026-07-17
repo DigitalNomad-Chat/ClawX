@@ -2,7 +2,7 @@ import { invokeIpc } from '@/lib/api-client';
 import { trackUiEvent } from './telemetry';
 import { normalizeAppError } from './error-model';
 import { invokeHost } from './host-api-client';
-
+import { normalizeUsageHistoryEntries } from './usage-history-entries';
 const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
@@ -20,12 +20,19 @@ export const hostApi = {
     status: () => invokeHost('openclaw', 'status'),
   },
   usage: {
-    recentTokenHistory: (limit?: number) =>
-      invokeHost(
+    /**
+     * Always returns an array. Host/HTTP payloads that wrap entries under
+     * `{ entries|items|data|... }` are unwrapped; non-list values become [].
+     * Prevents Models page `.map` crashes (TypeError: a.map is not a function).
+     */
+    recentTokenHistory: async (limit?: number) => {
+      const raw = await invokeHost(
         'usage',
         'recentTokenHistory',
         limit !== undefined ? { limit } : undefined,
-      ),
+      );
+      return normalizeUsageHistoryEntries(raw);
+    },
   },
 };
 

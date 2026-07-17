@@ -19,6 +19,7 @@ import { FeedbackState } from '@/components/common/FeedbackState';
 import {
   filterUsageHistoryByWindow,
   groupUsageHistory,
+  normalizeUsageHistoryEntries,
   resolveStableUsageHistory,
   resolveVisibleUsageHistory,
   type UsageGroupBy,
@@ -42,7 +43,16 @@ export function Models() {
   const { t } = useTranslation(['dashboard', 'settings']);
   const gatewayStatus = useGatewayStore((state) => state.status);
   const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
-  const isGatewayRunning = gatewayStatus.state === 'running';
+  // E2E-only opt-in: allow Models usage fetch without a live Gateway process.
+  // Production never sets this key; dual-path hostApi.usage is still exercised.
+  const e2eForceGatewayRunning = (() => {
+    try {
+      return window.localStorage.getItem('clawdock:e2e-force-gateway-running') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  const isGatewayRunning = gatewayStatus.state === 'running' || e2eForceGatewayRunning;
   const usageFetchMaxAttempts = window.electron.platform === 'win32'
     ? WINDOWS_USAGE_FETCH_MAX_ATTEMPTS
     : DEFAULT_USAGE_FETCH_MAX_ATTEMPTS;
@@ -184,11 +194,12 @@ export function Models() {
         restartMarker,
       });
       try {
-        // P4a: prefer host:invoke usage.recentTokenHistory; falls back to hostApiFetch
-        const entries = await hostApi.usage.recentTokenHistory() as UsageHistoryEntry[];
+        // P4a: prefer host:invoke usage.recentTokenHistory; falls back to hostApiFetch.
+        // Always coerce to array — host/HTTP may wrap or return non-list shapes.
+        const entries = normalizeUsageHistoryEntries(await hostApi.usage.recentTokenHistory());
         if (usageFetchGenerationRef.current !== generation) return;
 
-        const normalized = Array.isArray(entries) ? entries : [];
+        const normalized = entries;
         setUsagePage(1);
         trackUiEvent('models.token_usage_fetch_succeeded', {
           generation,
@@ -260,10 +271,10 @@ export function Models() {
   }, [isGatewayRunning, gatewayStatus.connectedAt, gatewayStatus.pid, usageFetchMaxAttempts, usageRefreshNonce]);
 
   const usageHistory = isGatewayRunning
-    ? fetchState.data.filter((entry) => !shouldHideUsageEntry(entry))
+    ? normalizeUsageHistoryEntries(fetchState.data).filter((entry) => !shouldHideUsageEntry(entry))
     : [];
   const stableUsageHistory = isGatewayRunning
-    ? fetchState.stableData.filter((entry) => !shouldHideUsageEntry(entry))
+    ? normalizeUsageHistoryEntries(fetchState.stableData).filter((entry) => !shouldHideUsageEntry(entry))
     : [];
   const visibleUsageHistory = resolveVisibleUsageHistory(usageHistory, stableUsageHistory, {
     preferStableOnEmpty: isGatewayRunning && fetchState.status === 'loading',
@@ -273,7 +284,10 @@ export function Models() {
   const usagePageSize = 5;
   const usageTotalPages = Math.max(1, Math.ceil(filteredUsageHistory.length / usagePageSize));
   const safeUsagePage = Math.min(usagePage, usageTotalPages);
-  const pagedUsageHistory = filteredUsageHistory.slice((safeUsagePage - 1) * usagePageSize, safeUsagePage * usagePageSize);
+  const pagedUsageHistory = normalizeUsageHistoryEntries(filteredUsageHistory).slice(
+    (safeUsagePage - 1) * usagePageSize,
+    safeUsagePage * usagePageSize,
+  );
   const usageLoading = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length === 0;
   const usageRefreshing = isGatewayRunning && fetchState.status === 'loading' && visibleUsageHistory.length > 0;
 
@@ -579,7 +593,8 @@ function UsageBarChart({
   outputLabel: string;
   cacheLabel: string;
 }) {
-  if (groups.length === 0) {
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  if (safeGroups.length === 0) {
     return (
       <div className="rounded-xl border border-dashed p-8 text-center text-sm font-medium text-muted-foreground">
         {emptyLabel}
@@ -587,7 +602,7 @@ function UsageBarChart({
     );
   }
 
-  const maxTokens = Math.max(...groups.map((group) => group.totalTokens), 1);
+  const maxTokens = Math.max(...safeGroups.map((group) => group.totalTokens), 1);
 
   return (
     <div className="space-y-4 bg-card p-5 rounded-xl border">
@@ -606,7 +621,7 @@ function UsageBarChart({
           {cacheLabel}
         </span>
       </div>
-      {groups.map((group) => (
+      {safeGroups.map((group) => (
         <div key={group.label} className="space-y-1.5">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="truncate font-semibold text-foreground">{group.label}</span>

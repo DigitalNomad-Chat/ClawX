@@ -1,5 +1,6 @@
 /**
  * P4a: typed hostApi facade over hostInvoke + fetch/IPC fallback.
+ * Transport fallback uses explicit error codes only (never message heuristics).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +46,25 @@ describe('hostApi facade (P4a low-risk)', () => {
     );
   });
 
+  it('normalizes non-array host usage payloads to an array (map-crash guard)', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: true,
+      data: { entries: [{ model: 'wrapped', totalTokens: 3 }] },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.usage.recentTokenHistory()).resolves.toEqual([
+      { model: 'wrapped', totalTokens: 3 },
+    ]);
+
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req2',
+      ok: true,
+      data: { success: true, count: 1 },
+    });
+    await expect(hostApi.usage.recentTokenHistory()).resolves.toEqual([]);
+  });
+
   it('calls openclaw.status and app.openClawDoctor through hostInvoke', async () => {
     hostInvoke
       .mockResolvedValueOnce({ id: '1', ok: true, data: { packageExists: true } })
@@ -68,7 +88,7 @@ describe('hostApi facade (P4a low-risk)', () => {
     );
   });
 
-  it('throws non-UNSUPPORTED host errors', async () => {
+  it('throws non-UNSUPPORTED host errors without fallback', async () => {
     hostInvoke.mockResolvedValueOnce({
       id: 'req',
       ok: false,
@@ -76,9 +96,21 @@ describe('hostApi facade (P4a low-risk)', () => {
     });
     const { hostApi } = await import('@/lib/host-api');
     await expect(hostApi.usage.recentTokenHistory()).rejects.toThrow('disk failed');
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to hostApiFetch when hostInvoke returns UNSUPPORTED', async () => {
+  it('does not fallback when business error message contains "channel"', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'INTERNAL', message: 'Channel is required for delivery' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.usage.recentTokenHistory()).rejects.toThrow(/Channel is required/);
+    expect(invokeIpcMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to hostApiFetch when hostInvoke returns UNSUPPORTED code', async () => {
     hostInvoke.mockResolvedValueOnce({
       id: 'req',
       ok: false,
@@ -95,6 +127,19 @@ describe('hostApi facade (P4a low-risk)', () => {
       'hostapi:fetch',
       expect.objectContaining({ path: '/api/usage/recent-token-history', method: 'GET' }),
     );
+  });
+
+  it('falls back when bridge throws HostTransportError with CHANNEL_UNAVAILABLE', async () => {
+    const { HostTransportError } = await import('@/lib/host-api-client');
+    hostInvoke.mockRejectedValueOnce(
+      new HostTransportError('CHANNEL_UNAVAILABLE', 'Invalid IPC channel: host:invoke'),
+    );
+    invokeIpcMock.mockResolvedValueOnce({
+      ok: true,
+      data: { status: 200, ok: true, json: [{ model: 'from-fetch' }] },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.usage.recentTokenHistory()).resolves.toEqual([{ model: 'from-fetch' }]);
   });
 
   it('falls back to openclaw:status IPC when hostInvoke bridge missing', async () => {
