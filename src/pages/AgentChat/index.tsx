@@ -27,6 +27,8 @@ import rehypeKatex from 'rehype-katex';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kernelClient, type KernelEvent } from '@/lib/kernel-client';
+import { kernelBridge } from '@/lib/kernel-bridge';
+import { subscribeHostEvent } from '@/lib/host-events';
 import { repairMarkdown } from '@/lib/markdown-repair';
 import { useGoClawStore } from '@/modules/goclaw/store';
 
@@ -800,14 +802,14 @@ export function AgentChat() {
       }
     };
 
-    const unsubscribe = window.electron.ipcRenderer.on('kernel:event', handler as (...args: unknown[]) => void);
-    window.electron.ipcRenderer.invoke('kernel:subscribe', sessionId).catch(console.error);
+    const unsubscribe = subscribeHostEvent('kernel:event', handler as (payload: unknown) => void);
+    kernelBridge.subscribe(sessionId).catch(console.error);
     setSessionReady(true);
     setInitPhase('ready');
 
     return () => {
-      (unsubscribe as () => void)();
-      window.electron.ipcRenderer.invoke('kernel:unsubscribe', sessionId).catch(() => {});
+      unsubscribe();
+      kernelBridge.unsubscribe(sessionId).catch(() => {});
     };
   }, [sessionId]);
 
@@ -821,23 +823,18 @@ export function AgentChat() {
         setLoading(true);
         setError(null);
 
-        const infoResult = await window.electron.ipcRenderer.invoke(
-          'marketplace:getAgent',
-          agentId
-        ) as { success: boolean; agent?: AgentInfo; error?: string };
+        const infoResult = await kernelBridge.getAgent(agentId!);
 
         if (cancelled) return;
 
         if (infoResult.success && infoResult.agent) {
-          setAgentInfo(infoResult.agent);
+          setAgentInfo(infoResult.agent as AgentInfo);
         } else {
           setError(infoResult.error || 'Agent 未找到');
           return;
         }
 
-        const checkResult = await window.electron.ipcRenderer.invoke(
-          'kernel-llm:checkActive'
-        ) as { success: boolean; error?: string; providerName?: string; model?: string; needsSetup?: boolean };
+        const checkResult = await kernelBridge.checkActiveProvider();
 
         if (cancelled) return;
 
@@ -886,9 +883,7 @@ export function AgentChat() {
     async function startNewSession() {
       setInitPhase('initializing');
       try {
-        const hireResult = await window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId) as {
-          success: boolean; sessionId?: string; error?: string;
-        };
+        const hireResult = await kernelBridge.hireAgent(agentId!);
         if (cancelled) return;
         if (hireResult.success && hireResult.sessionId) {
           setSessionId(hireResult.sessionId);
@@ -933,7 +928,7 @@ export function AgentChat() {
     const reqId = approvalRequest.requestId;
     setApprovalRequest(null);
     try {
-      await window.electron.ipcRenderer.invoke('kernel:approvalRespond', reqId, approved, autoApprove);
+      await kernelBridge.approvalRespond(reqId, approved, autoApprove);
     } catch (err) {
       console.error('[AgentChat] approval respond failed:', err);
     }
@@ -964,10 +959,7 @@ export function AgentChat() {
     try {
       let sid = sessionId;
       if (!sid) {
-        const hireResult = await window.electron.ipcRenderer.invoke(
-          'marketplace:hireAgent',
-          agentId
-        ) as { success: boolean; sessionId?: string; error?: string };
+        const hireResult = await kernelBridge.hireAgent(agentId);
 
         if (!hireResult.success || !hireResult.sessionId) {
           setStreaming(false);
@@ -1097,7 +1089,7 @@ export function AgentChat() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-full items-center justify-center" data-testid="agent-chat-loading">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         <span className="ml-3 text-muted-foreground">正在初始化 Agent...</span>
       </div>
@@ -1106,7 +1098,7 @@ export function AgentChat() {
 
   if (error && !agentInfo) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="flex h-full flex-col items-center justify-center gap-4" data-testid="agent-chat-error">
         <p className="text-destructive">{error}</p>
         <Button variant="outline" onClick={() => navigate(returnPath)}>
           返回广场
@@ -1129,6 +1121,7 @@ export function AgentChat() {
   return (
     <div
       className={cn('relative flex h-full flex-col', dragOver && 'ring-2 ring-primary/30')}
+      data-testid="agent-chat-page"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1142,13 +1135,16 @@ export function AgentChat() {
           {agentInfo.emoji}
         </div>
         <div className="min-w-0">
-          <h1 className="font-semibold truncate">{agentInfo.name}</h1>
+          <h1 className="font-semibold truncate" data-testid="agent-chat-agent-name">{agentInfo.name}</h1>
           <p className="text-xs text-muted-foreground truncate">
             {agentInfo.creature} · {agentInfo.nickname}
           </p>
         </div>
         {sessionReady && initPhase === 'ready' ? (
-          <span className="ml-auto flex items-center gap-1 text-xs text-green-600 shrink-0">
+          <span
+            className="ml-auto flex items-center gap-1 text-xs text-green-600 shrink-0"
+            data-testid="agent-chat-connected"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
             已连接{providerInfo ? ` · ${providerInfo.model}` : ''}
           </span>
@@ -1232,12 +1228,11 @@ export function AgentChat() {
                 setShowHistoryDialog(false);
                 // Start new session
                 setInitPhase('initializing');
-                window.electron.ipcRenderer.invoke('marketplace:hireAgent', agentId)
+                kernelBridge.hireAgent(agentId!)
                   .then((hireResult) => {
-                    const hr = hireResult as { success: boolean; sessionId?: string; error?: string };
-                    if (hr.success && hr.sessionId) {
-                      setSessionId(hr.sessionId);
-                      setPersistenceSessionId(hr.sessionId);
+                    if (hireResult.success && hireResult.sessionId) {
+                      setSessionId(hireResult.sessionId);
+                      setPersistenceSessionId(hireResult.sessionId);
                     } else {
                       setInitPhase('idle');
                     }

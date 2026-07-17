@@ -12,6 +12,8 @@ const HOST_EVENT_TO_IPC_CHANNEL: Record<string, string> = {
   'gateway:channel-status': 'gateway:channel-status',
   // M1: Main dual-emits chat:runtime-event; mapping only — store/UI consumption is M2+.
   'chat:runtime-event': 'chat:runtime-event',
+  // AgentChat / kernel stream — preload validChannels authority (not P0 HOST_EVENT_CHANNELS).
+  'kernel:event': 'kernel:event',
   'gateway:exit': 'gateway:exit',
   'oauth:code': 'oauth:code',
   'oauth:success': 'oauth:success',

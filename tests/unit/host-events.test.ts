@@ -67,6 +67,19 @@ describe('host-events', () => {
     expect(cleanupSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('maps kernel events to the kernel:event IPC channel for AgentChat', async () => {
+    const onMock = vi.mocked(window.electron.ipcRenderer.on);
+    const cleanupSpy = vi.fn();
+    onMock.mockImplementation(() => cleanupSpy);
+
+    const { subscribeHostEvent } = await import('@/lib/host-events');
+    const unsubscribe = subscribeHostEvent('kernel:event', vi.fn());
+
+    expect(onMock).toHaveBeenCalledWith('kernel:event', expect.any(Function));
+    unsubscribe();
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('does not use SSE fallback by default for unknown events', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { subscribeHostEvent } = await import('@/lib/host-events');
