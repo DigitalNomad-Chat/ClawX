@@ -29,4 +29,12 @@ describe('createCronApi', () => {
     await api.trigger({ id: 'job-2' });
     expect(rpcMock).toHaveBeenCalledWith('cron.run', { id: 'job-2', mode: 'force' });
   });
+
+  it('omits list/create/update so host:invoke can return UNSUPPORTED', async () => {
+    const { createCronApi } = await import('../../electron/services/cron-api');
+    const api = createCronApi({ gatewayManager: { rpc: rpcMock } as never }) as Record<string, unknown>;
+    expect(api.list).toBeUndefined();
+    expect(api.create).toBeUndefined();
+    expect(api.update).toBeUndefined();
+  });
 });

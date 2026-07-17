@@ -1,6 +1,7 @@
 /**
  * Cron Host API (P3c medium-risk, minimal write surface).
  * delete/toggle/trigger only — list/create/update stay on legacy handlers (complex transform/repair).
+ * Unimplemented actions are omitted so host:invoke returns UNSUPPORTED (not INTERNAL).
  */
 import type { GatewayManager } from '../gateway/manager';
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
@@ -10,6 +11,11 @@ export type CronApiDeps = {
   gatewayManager: GatewayManager;
 };
 
+export type CronHostApi = Pick<
+  NonNullable<CompleteHostServiceRegistry['cron']>,
+  'delete' | 'toggle' | 'trigger'
+>;
+
 function requireId(payload?: unknown): string {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
   if (isRecord(payload) && typeof payload.id === 'string' && payload.id.trim()) {
@@ -18,23 +24,9 @@ function requireId(payload?: unknown): string {
   throw new Error('cron job id is required');
 }
 
-export function createCronApi(
-  deps: CronApiDeps,
-): Pick<NonNullable<CompleteHostServiceRegistry['cron']>, 'list' | 'create' | 'update' | 'delete'> & {
-  toggle: (payload?: unknown) => Promise<unknown>;
-  trigger: (payload?: unknown) => Promise<unknown>;
-} {
+export function createCronApi(deps: CronApiDeps): CronHostApi {
   const { gatewayManager } = deps;
   return {
-    list: async () => {
-      throw new Error('cron.list remains on legacy IPC for this batch (auto-repair transforms)');
-    },
-    create: async () => {
-      throw new Error('cron.create remains on legacy IPC for this batch');
-    },
-    update: async () => {
-      throw new Error('cron.update remains on legacy IPC for this batch');
-    },
     delete: async (payload?: unknown) => {
       try {
         const id = requireId(payload);

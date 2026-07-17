@@ -37,8 +37,9 @@ describe('createChannelsApi', () => {
     expect(onChange).toHaveBeenCalledWith('feishu', false);
   });
 
-  it('saveConfig is not implemented in this batch', async () => {
+  it('omits saveConfig so host:invoke can return UNSUPPORTED', async () => {
     const { createChannelsApi } = await import('../../electron/services/channels-api');
-    await expect(createChannelsApi().saveConfig()).rejects.toThrow(/legacy/);
+    const api = createChannelsApi() as Record<string, unknown>;
+    expect(api.saveConfig).toBeUndefined();
   });
 });

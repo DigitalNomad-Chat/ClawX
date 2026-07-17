@@ -39,4 +39,10 @@ describe('createSkillsApi', () => {
     await createSkillsApi().getAllConfigs();
     expect(getAllSkillConfigsMock).toHaveBeenCalled();
   });
+
+  it('omits status so host:invoke can return UNSUPPORTED (HTTP-only)', async () => {
+    const { createSkillsApi } = await import('../../electron/services/skills-api');
+    const api = createSkillsApi() as Record<string, unknown>;
+    expect(api.status).toBeUndefined();
+  });
 });

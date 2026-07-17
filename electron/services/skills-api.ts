@@ -2,6 +2,7 @@
  * Skills config Host API (P3c medium-risk).
  * Wraps skill-config utils; never logs apiKey values.
  * Shared by skill:* IPC, HTTP /api/skills/config*, host:invoke.
+ * status stays HTTP-only — not registered on host:invoke (UNSUPPORTED if requested).
  */
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
 import {
@@ -10,6 +11,11 @@ import {
   updateSkillConfig,
 } from '../utils/skill-config';
 import { isRecord } from './payload-utils';
+
+export type SkillsHostApi = Pick<
+  NonNullable<CompleteHostServiceRegistry['skills']>,
+  'getConfig' | 'getAllConfigs' | 'updateConfig'
+>;
 
 function requireSkillKey(payload?: unknown): string {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
@@ -26,12 +32,8 @@ function getEnv(value: unknown): Record<string, string> | undefined {
   );
 }
 
-export function createSkillsApi(): NonNullable<CompleteHostServiceRegistry['skills']> {
+export function createSkillsApi(): SkillsHostApi {
   return {
-    status: async () => {
-      // Full status needs HostApiContext (Gateway + disk scan); keep on HTTP route.
-      return { success: false, error: 'skills.status requires HTTP /api/skills/status' };
-    },
     getConfig: async (payload?: unknown) => {
       return await getSkillConfig(requireSkillKey(payload));
     },

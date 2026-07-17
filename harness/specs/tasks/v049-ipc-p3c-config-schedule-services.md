@@ -20,6 +20,7 @@ touchedAreas:
   - tests/unit/skills-api.test.ts
   - tests/unit/channels-api.test.ts
   - tests/unit/cron-api.test.ts
+  - tests/unit/host-invoke-p3c-services.test.ts
   - tests/e2e/p3c-skills-config.spec.ts
 expectedUserBehavior:
   - skill config get/update return shapes unchanged; apiKey not logged by services.
@@ -43,12 +44,15 @@ requiredTests:
   - tests/unit/skills-api.test.ts
   - tests/unit/channels-api.test.ts
   - tests/unit/cron-api.test.ts
+  - tests/unit/host-invoke-p3c-services.test.ts
   - tests/e2e/p3c-skills-config.spec.ts
   - pnpm run comms:replay
   - pnpm run comms:compare
 acceptance:
   - Minimal medium-risk subset only; complex cron list/create/update deferred.
   - Dual-path retained; no P4 migration.
+  - Unimplemented host:invoke actions are not registered (UNSUPPORTED, never INTERNAL stubs).
+  - host-invoke-p3c-services proves registry→service path without page mocks.
 docs:
   required: false
 ---

@@ -1,6 +1,7 @@
 /**
  * Channels Host API (P3c medium-risk, minimal surface).
  * list/get/setEnabled only — save/delete/OAuth stay on legacy handlers.
+ * Unimplemented actions are omitted from the registry so host:invoke returns UNSUPPORTED.
  */
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
 import {
@@ -15,6 +16,11 @@ export type ChannelsApiDeps = {
   onChannelEnabledChange?: (channelType: string, enabled: boolean) => void;
 };
 
+export type ChannelsHostApi = Pick<
+  NonNullable<CompleteHostServiceRegistry['channels']>,
+  'listConfigured' | 'getConfig' | 'setEnabled'
+>;
+
 function requireChannelType(payload?: unknown): string {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
   if (isRecord(payload) && typeof payload.channelType === 'string' && payload.channelType.trim()) {
@@ -23,9 +29,7 @@ function requireChannelType(payload?: unknown): string {
   throw new Error('channelType is required');
 }
 
-export function createChannelsApi(
-  deps: ChannelsApiDeps = {},
-): NonNullable<CompleteHostServiceRegistry['channels']> {
+export function createChannelsApi(deps: ChannelsApiDeps = {}): ChannelsHostApi {
   return {
     listConfigured: async () => {
       try {
@@ -43,9 +47,6 @@ export function createChannelsApi(
       } catch (error) {
         return { success: false, error: String(error) };
       }
-    },
-    saveConfig: async () => {
-      throw new Error('channels.saveConfig remains on legacy IPC/HTTP for this batch');
     },
     setEnabled: async (payload?: unknown) => {
       try {
