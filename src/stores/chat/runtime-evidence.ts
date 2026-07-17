@@ -1,14 +1,15 @@
 /**
- * M4.1 — Runtime evidence / protection scaffold (no poll convergence yet).
+ * M4.2 — Runtime evidence + restricted history poll convergence.
  *
  * Pure helpers that answer:
  *  - does a runtime run have tool/process activity?
  *  - is that run's event stream "fresh" relative to now?
- *  - would a future M4.2 poll skip be allowed under explicit gates?
+ *  - may this poll tick skip loadHistory under explicit gates?
  *
- * Default behavior is M3-equivalent: poll skip is always disabled until
- * POLL_CONVERGENCE_ENABLED is deliberately turned on after lead approval and
- * live provider tool-chain evidence.
+ * Skip is allowed only when POLL_CONVERGENCE_ENABLED is true AND live provider
+ * tool-chain evidence has been latched AND structural gates pass (session,
+ * active run, running status, tool activity, freshness, not pendingFinal).
+ * All other paths keep loadHistory(true) — fallback is never removed.
  *
  * Single authority for per-run last-activity wall clocks lives in this module
  * (not duplicated in chat.ts / helpers.ts).
@@ -20,12 +21,11 @@ import type { ChatRuntimeRunState } from './types';
 export const RUNTIME_FRESHNESS_WINDOW_MS = 5_000;
 
 /**
- * M4.2 feature flag — MUST stay false for M4.1.
- * When true (only after lead authorization + live tool-chain evidence),
- * happy-path history poll may skip when {@link evaluateRuntimePollGate}
- * returns maySkipHistoryPoll.
+ * M4.2 feature flag — enabled after lead approval + live item→tool dual-emit evidence.
+ * Skip still requires {@link getLiveProviderToolChainEvidence} and all structural gates;
+ * any uncertainty falls back to loadHistory(true).
  */
-export const POLL_CONVERGENCE_ENABLED = false;
+export const POLL_CONVERGENCE_ENABLED = true;
 
 /**
  * Process-wide live-provider tool-chain evidence latch.
@@ -55,6 +55,10 @@ export const M4_POLL_CONVERGENCE_THRESHOLDS = {
   requireSessionKeyMatch: true,
   /** Active runId required — residual terminal runs never suppress poll. */
   requireActiveRunId: true,
+  /** Run status must be running — completed/error/aborted never suppress poll. */
+  requireRunRunning: true,
+  /** pendingFinal means history finalization uncertainty — never skip. */
+  rejectPendingFinal: true,
   /** Live provider evidence required before skip-allowed (hard gate). */
   requireLiveProviderToolChainEvidence: true,
 } as const;
@@ -78,6 +82,10 @@ export type RuntimePollGateInput = {
   currentSessionKey: string | null | undefined;
   nowMs: number;
   freshnessWindowMs?: number;
+  /**
+   * When true, history finalization / image settle is in flight — never skip.
+   */
+  pendingFinal?: boolean;
   /** Override for tests only — production uses POLL_CONVERGENCE_ENABLED. */
   convergenceEnabled?: boolean;
   /**
@@ -92,6 +100,8 @@ export type RuntimePollGateDecision = {
   hasToolActivity: boolean;
   isFresh: boolean;
   sessionKeyMatches: boolean;
+  runIsRunning: boolean;
+  pendingFinal: boolean;
   hasLiveProviderEvidence: boolean;
   lastActivityMs: number | null;
   /** True only when every documented gate passes AND convergence is enabled. */
@@ -226,13 +236,23 @@ export function runtimeEvidenceHasToolActivity(
   return runState.events.some((event) => isToolLikeRuntimeEvent(event));
 }
 
-function isToolLikeRuntimeEvent(event: ChatRuntimeEvent): boolean {
+export function isToolLikeRuntimeEvent(event: ChatRuntimeEvent): boolean {
   return event.type === 'tool.started'
     || event.type === 'tool.updated'
     || event.type === 'tool.completed'
     || event.type === 'command.output'
     || event.type === 'patch.completed'
     || event.type === 'approval.updated';
+}
+
+/**
+ * Latch process-wide live provider tool-chain evidence after a real tool-like
+ * runtime event is applied (e.g. item→tool dual-emit). Idempotent.
+ */
+export function noteLiveProviderToolChainEvidenceFromEvent(event: ChatRuntimeEvent): void {
+  if (isToolLikeRuntimeEvent(event)) {
+    liveProviderToolChainEvidence = true;
+  }
 }
 
 /**
@@ -311,6 +331,7 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
     currentSessionKey,
     nowMs,
     freshnessWindowMs = RUNTIME_FRESHNESS_WINDOW_MS,
+    pendingFinal = false,
     convergenceEnabled = POLL_CONVERGENCE_ENABLED,
     hasLiveProviderToolChainEvidence = getLiveProviderToolChainEvidence(),
   } = input;
@@ -318,6 +339,8 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
   const hasActiveRunId = Boolean(activeRunId && run && run.runId === activeRunId);
   const hasToolActivity = runtimeEvidenceHasToolActivity(run);
   const sessionOk = sessionKeyMatchesRun(run, currentSessionKey);
+  const runIsRunning = Boolean(run && run.status === 'running');
+  const isPendingFinal = pendingFinal === true;
   // Run-scoped only: never pass a process-global last-event wall clock.
   const runScopedActivityMs = hasActiveRunId && activeRunId
     ? getRunScopedActivityMs(activeRunId, currentSessionKey)
@@ -334,6 +357,8 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
     hasToolActivity,
     isFresh,
     sessionKeyMatches: sessionOk,
+    runIsRunning,
+    pendingFinal: isPendingFinal,
     hasLiveProviderEvidence,
     lastActivityMs,
   };
@@ -343,6 +368,12 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
   }
   if (!sessionOk) {
     return { ...base, sessionKeyMatches: false, maySkipHistoryPoll: false, reason: 'session-mismatch' };
+  }
+  if (!runIsRunning) {
+    return { ...base, runIsRunning: false, maySkipHistoryPoll: false, reason: 'run-not-running' };
+  }
+  if (isPendingFinal) {
+    return { ...base, pendingFinal: true, maySkipHistoryPoll: false, reason: 'pending-final' };
   }
   if (!hasToolActivity) {
     return { ...base, hasToolActivity: false, maySkipHistoryPoll: false, reason: 'no-tool-activity' };
@@ -371,8 +402,8 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
 }
 
 /**
- * Integration point for history poll. Under M4.1 defaults this always returns
- * false so poll cadence matches M3 exactly.
+ * Integration point for history poll. True only when {@link evaluateRuntimePollGate}
+ * returns maySkipHistoryPoll — otherwise callers must loadHistory(true).
  */
 export function shouldSkipHistoryPollForRuntimeEvidence(
   decision: RuntimePollGateDecision,
@@ -381,8 +412,7 @@ export function shouldSkipHistoryPollForRuntimeEvidence(
 }
 
 /**
- * Record one poll tick observation. When applySkip is false (M4.1 default),
- * pollLoads increments whenever a load is about to happen.
+ * Record one poll tick observation for metrics.
  */
 export function recordRuntimePollObservation(
   decision: RuntimePollGateDecision,
@@ -394,6 +424,8 @@ export function recordRuntimePollObservation(
     && decision.isFresh
     && decision.hasActiveRunId
     && decision.sessionKeyMatches
+    && decision.runIsRunning
+    && !decision.pendingFinal
     && decision.hasLiveProviderEvidence
   ) {
     counters.pollSkipCandidates += 1;

@@ -1,6 +1,9 @@
 import type { ChatRuntimeEvent } from '../../../shared/chat-runtime-events';
 import { applyRuntimeEventToRuns, extractToolCompletedFiles } from './runtime-graph';
-import { noteRuntimeEventActivity } from './runtime-evidence';
+import {
+  noteLiveProviderToolChainEvidenceFromEvent,
+  noteRuntimeEventActivity,
+} from './runtime-evidence';
 import type { AttachedFileMeta, ChatState, ToolStatus } from './types';
 import type { ChatGet, ChatSet } from './store-api';
 
@@ -91,6 +94,9 @@ export function createHandleRuntimeEvent(
       eventTs: event.ts,
       receivedAtMs: Date.now(),
     });
+    // M4.2: latch live provider tool-chain evidence from real tool-like runtime events
+    // (includes item→tool dual-emit). Skip remains gated by evaluateRuntimePollGate.
+    noteLiveProviderToolChainEvidenceFromEvent(event);
 
     const runtimeRuns = applyRuntimeEventToRuns(initialState.runtimeRuns, event);
     const nextPatch: Partial<ChatState> = { runtimeRuns };

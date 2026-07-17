@@ -15,6 +15,11 @@ import {
 } from './helpers';
 import type { ChatSession, RawMessage } from './types';
 import type { ChatGet, ChatSet, RuntimeActions } from './store-api';
+import {
+  evaluateRuntimePollGate,
+  recordRuntimePollObservation,
+} from './runtime-evidence';
+import { decideHistoryPollTick } from './history-poll';
 
 function normalizeAgentId(value: string | undefined | null): string {
   return (value ?? '').trim().toLowerCase() || 'main';
@@ -145,13 +150,43 @@ export function createRuntimeSendActions(set: ChatSet, get: ChatGet): Pick<Runti
 
       const POLL_START_DELAY = 1_500;
       const POLL_INTERVAL = 2_000;
+      const HISTORY_POLL_SILENCE_WINDOW_MS = 2_500;
+      // Keep modular send path aligned with monolithic chat.ts M4.2 restricted poll.
       const pollHistory = () => {
         const state = get();
-        if (!state.sending) { clearHistoryPoll(); return; }
-        if (state.streamingMessage) {
+        const nowMs = Date.now();
+        const activeRun = state.activeRunId
+          ? state.runtimeRuns[state.activeRunId] ?? null
+          : null;
+        const gate = evaluateRuntimePollGate({
+          run: activeRun,
+          activeRunId: state.activeRunId,
+          currentSessionKey: state.currentSessionKey,
+          nowMs,
+          pendingFinal: state.pendingFinal,
+        });
+        const action = decideHistoryPollTick({
+          sending: state.sending,
+          hasStreamingMessage: Boolean(state.streamingMessage),
+          lastChatEventAtMs: getLastChatEventAt(),
+          nowMs,
+          silenceWindowMs: HISTORY_POLL_SILENCE_WINDOW_MS,
+          gate,
+        });
+        if (action === 'stop') {
+          clearHistoryPoll();
+          return;
+        }
+        if (action === 'defer-streaming' || action === 'defer-silence') {
           setHistoryPollTimer(setTimeout(pollHistory, POLL_INTERVAL));
           return;
         }
+        if (action === 'skip-runtime') {
+          recordRuntimePollObservation(gate, { appliedSkip: true });
+          setHistoryPollTimer(setTimeout(pollHistory, POLL_INTERVAL));
+          return;
+        }
+        recordRuntimePollObservation(gate, { performedLoad: true });
         state.loadHistory(true);
         setHistoryPollTimer(setTimeout(pollHistory, POLL_INTERVAL));
       };

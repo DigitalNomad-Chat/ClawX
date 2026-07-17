@@ -8,6 +8,7 @@ import {
   M4_POLL_CONVERGENCE_THRESHOLDS,
   M4_POLL_ROLLBACK_BOUNDARIES,
   normalizeTimestampMs,
+  noteLiveProviderToolChainEvidenceFromEvent,
   noteRuntimeEventActivity,
   POLL_CONVERGENCE_ENABLED,
   recordRuntimePollObservation,
@@ -17,6 +18,7 @@ import {
   RUNTIME_FRESHNESS_WINDOW_MS,
   setLiveProviderToolChainEvidence,
   shouldSkipHistoryPollForRuntimeEvidence,
+  getLiveProviderToolChainEvidence,
 } from '@/stores/chat/runtime-evidence';
 import type { ChatRuntimeRunState } from '@/stores/chat/types';
 
@@ -31,16 +33,18 @@ function makeRun(partial: Partial<ChatRuntimeRunState> & Pick<ChatRuntimeRunStat
   };
 }
 
-describe('runtime evidence scaffold (M4.1 fix)', () => {
+describe('runtime evidence scaffold (M4.2 restricted convergence)', () => {
   afterEach(() => {
     resetRuntimeEvidenceCounters();
     resetRuntimeActivityStamps();
     setLiveProviderToolChainEvidence(false);
   });
 
-  it('keeps poll convergence disabled by default (M3-equivalent)', () => {
-    expect(POLL_CONVERGENCE_ENABLED).toBe(false);
+  it('enables poll convergence flag after M4.2 approval but still hard-requires live evidence', () => {
+    expect(POLL_CONVERGENCE_ENABLED).toBe(true);
     expect(M4_POLL_CONVERGENCE_THRESHOLDS.requireLiveProviderToolChainEvidence).toBe(true);
+    expect(M4_POLL_CONVERGENCE_THRESHOLDS.requireRunRunning).toBe(true);
+    expect(M4_POLL_CONVERGENCE_THRESHOLDS.rejectPendingFinal).toBe(true);
     expect(M4_POLL_ROLLBACK_BOUNDARIES.length).toBeGreaterThan(0);
   });
 
@@ -201,11 +205,12 @@ describe('runtime evidence scaffold (M4.1 fix)', () => {
     expect(['no-live-provider-evidence', 'gates-pass-flag-disabled']).toContain(productionDefault.reason);
   });
 
-  it('allows skip only when flag, live evidence, and structural gates all pass', () => {
+  it('allows skip only when flag, live evidence, running run, and structural gates all pass', () => {
     const now = Date.now();
     const run = makeRun({
       runId: 'run-active',
       sessionKey: 'agent:main:main',
+      status: 'running',
       events: [{
         type: 'tool.started',
         runId: 'run-active',
@@ -226,12 +231,30 @@ describe('runtime evidence scaffold (M4.1 fix)', () => {
       activeRunId: 'run-active',
       currentSessionKey: 'agent:main:main',
       nowMs: now + 50,
+      pendingFinal: false,
       convergenceEnabled: true,
       hasLiveProviderToolChainEvidence: true,
     });
     expect(decision.maySkipHistoryPoll).toBe(true);
     expect(decision.reason).toBe('skip-allowed');
     expect(shouldSkipHistoryPollForRuntimeEvidence(decision)).toBe(true);
+  });
+
+  it('latches live provider evidence from tool-like runtime events', () => {
+    expect(getLiveProviderToolChainEvidence()).toBe(false);
+    noteLiveProviderToolChainEvidenceFromEvent({
+      type: 'assistant.delta',
+      runId: 'r1',
+      delta: 'x',
+    });
+    expect(getLiveProviderToolChainEvidence()).toBe(false);
+    noteLiveProviderToolChainEvidenceFromEvent({
+      type: 'tool.started',
+      runId: 'r1',
+      toolCallId: 'c1',
+      name: 'read',
+    });
+    expect(getLiveProviderToolChainEvidence()).toBe(true);
   });
 
   it('reports structured reasons for missing structural gates', () => {
@@ -241,6 +264,32 @@ describe('runtime evidence scaffold (M4.1 fix)', () => {
       currentSessionKey: 'agent:main:main',
       nowMs: 1,
     }).reason).toBe('no-active-run');
+
+    expect(evaluateRuntimePollGate({
+      run: makeRun({
+        runId: 'r1',
+        status: 'completed',
+        events: [{ type: 'tool.started', runId: 'r1', toolCallId: 'c1', name: 'read', ts: Date.now() }],
+      }),
+      activeRunId: 'r1',
+      currentSessionKey: 'agent:main:main',
+      nowMs: Date.now(),
+      hasLiveProviderToolChainEvidence: true,
+      convergenceEnabled: true,
+    }).reason).toBe('run-not-running');
+
+    expect(evaluateRuntimePollGate({
+      run: makeRun({
+        runId: 'r1',
+        events: [{ type: 'tool.started', runId: 'r1', toolCallId: 'c1', name: 'read', ts: Date.now() }],
+      }),
+      activeRunId: 'r1',
+      currentSessionKey: 'agent:main:main',
+      nowMs: Date.now(),
+      pendingFinal: true,
+      hasLiveProviderToolChainEvidence: true,
+      convergenceEnabled: true,
+    }).reason).toBe('pending-final');
 
     expect(evaluateRuntimePollGate({
       run: makeRun({

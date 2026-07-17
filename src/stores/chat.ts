@@ -50,8 +50,8 @@ import { createHandleRuntimeEvent } from './chat/runtime-pipeline';
 import {
   evaluateRuntimePollGate,
   recordRuntimePollObservation,
-  shouldSkipHistoryPollForRuntimeEvidence,
 } from './chat/runtime-evidence';
+import { decideHistoryPollTick } from './chat/history-poll';
 import {
   isGeneratingStatusNarration,
   isInternalAssistantReplyText,
@@ -3359,17 +3359,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const POLL_INTERVAL = 2_000;
     const pollHistory = () => {
       const state = get();
-      if (!state.sending) { clearHistoryPoll(); return; }
-      if (state.streamingMessage) {
-        _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
-        return;
-      }
-      if (Date.now() - _lastChatEventAt < HISTORY_POLL_SILENCE_WINDOW_MS) {
-        _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
-        return;
-      }
-      // M4.1 scaffold: evaluate runtime coverage for metrics / future gates.
-      // Default POLL_CONVERGENCE_ENABLED=false + no live evidence → never skip.
+      const nowMs = Date.now();
       const activeRun = state.activeRunId
         ? state.runtimeRuns[state.activeRunId] ?? null
         : null;
@@ -3377,14 +3367,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         run: activeRun,
         activeRunId: state.activeRunId,
         currentSessionKey: state.currentSessionKey,
-        nowMs: Date.now(),
+        nowMs,
+        pendingFinal: state.pendingFinal,
       });
-      if (shouldSkipHistoryPollForRuntimeEvidence(gate)) {
-        // Unreachable under M4.1 defaults; retained as the M4.2 integration point.
+      const action = decideHistoryPollTick({
+        sending: state.sending,
+        hasStreamingMessage: Boolean(state.streamingMessage),
+        lastChatEventAtMs: _lastChatEventAt,
+        nowMs,
+        silenceWindowMs: HISTORY_POLL_SILENCE_WINDOW_MS,
+        gate,
+      });
+      if (action === 'stop') {
+        clearHistoryPoll();
+        return;
+      }
+      if (action === 'defer-streaming' || action === 'defer-silence') {
+        _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
+        return;
+      }
+      if (action === 'skip-runtime') {
         recordRuntimePollObservation(gate, { appliedSkip: true });
         _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
         return;
       }
+      // action === 'load' — fallback path always available
       recordRuntimePollObservation(gate, { performedLoad: true });
       state.loadHistory(true);
       _historyPollTimer = setTimeout(pollHistory, POLL_INTERVAL);
