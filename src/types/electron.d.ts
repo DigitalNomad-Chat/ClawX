@@ -18,9 +18,26 @@ export interface ElectronAPI {
   isDev: boolean;
 }
 
+/** v0.4.9 P2 dual-path host invoke (preload window.clawx). */
+export type HostInvokeRequest = {
+  id: string;
+  module: string;
+  action: string;
+  payload?: unknown;
+};
+
+export type HostInvokeResponse<T = unknown> =
+  | { id?: string; ok: true; data: T }
+  | { id?: string; ok: false; error: { code: string; message: string; details?: unknown } };
+
+export interface ClawxAPI {
+  hostInvoke: <T = unknown>(request: HostInvokeRequest) => Promise<HostInvokeResponse<T>>;
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI;
+    clawx?: ClawxAPI;
   }
 }
 

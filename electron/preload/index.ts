@@ -24,6 +24,8 @@ const electronAPI = {
         'gateway:httpProxy',
         'hostapi:fetch',
         'hostapi:token',
+        // P2 dual-path typed host invoke (does not replace legacy channels)
+        'host:invoke',
         'gateway:health',
         'gateway:getControlUiUrl',
         // OpenClaw
@@ -358,10 +360,25 @@ const licenseAPI = {
   },
 };
 
+/**
+ * Typed host invoke bridge (v0.4.9 P2 dual-path).
+ * Renderer may call window.clawx.hostInvoke; legacy electron.ipcRenderer remains.
+ */
+const clawxAPI = {
+  hostInvoke: (request: {
+    id: string;
+    module: string;
+    action: string;
+    payload?: unknown;
+  }) => ipcRenderer.invoke('host:invoke', request),
+};
+
 // Expose the API to the renderer process
 contextBridge.exposeInMainWorld('electron', electronAPI);
 contextBridge.exposeInMainWorld('licenseAPI', licenseAPI);
+contextBridge.exposeInMainWorld('clawx', clawxAPI);
 
 // Type declarations for the renderer process
 export type ElectronAPI = typeof electronAPI;
 export type LicenseAPI = typeof licenseAPI;
+export type ClawxAPI = typeof clawxAPI;
