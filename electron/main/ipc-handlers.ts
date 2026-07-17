@@ -71,7 +71,10 @@ import { validateApiKeyWithProvider } from '../services/providers/provider-valid
 import { appUpdater } from './updater';
 import { GatewayRpcBackpressure } from '../gateway/rpc-backpressure';
 import { registerHostApiProxyHandlers } from './ipc/host-api-proxy';
+import { HostApiRegistry, registerHostInvokeHandler } from './ipc/host-invoke';
 import { registerAuthIpcHandlers } from './ipc/auth-handlers';
+import { createAppApi } from '../services/app-api';
+import { createOpenClawApi } from '../services/openclaw-api';
 import { MemberModule } from '../services/member';
 import {
   isLaunchAtStartupKey,
@@ -95,8 +98,16 @@ export function registerIpcHandlers(
   // Unified request protocol (non-breaking: legacy channels remain available)
   registerUnifiedRequestHandlers(gatewayManager);
 
-  // Host API proxy handlers
+  // Host API proxy handlers (ClawDock HTTP proxy path — keep for dual-track)
   registerHostApiProxyHandlers();
+
+  // P2: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
+  const hostApiRegistry = new HostApiRegistry();
+  hostApiRegistry.registerCoreServices({
+    app: createAppApi(),
+    openclaw: createOpenClawApi(),
+  });
+  registerHostInvokeHandler(hostApiRegistry);
 
   // Gateway handlers
   registerGatewayHandlers(gatewayManager, mainWindow);
