@@ -47,7 +47,6 @@ import {
   ensureFeishuPluginInstalled,
   ensureWeComPluginInstalled,
 } from '../utils/plugin-install';
-import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/skill-config';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { getProviderConfig } from '../utils/provider-registry';
 import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
@@ -81,6 +80,10 @@ import { createUvApi } from '../services/uv-api';
 import { createLogsApi } from '../services/logs-api';
 import { createWindowApi } from '../services/window-api';
 import { createSettingsApi } from '../services/settings-api';
+import { createSkillsApi } from '../services/skills-api';
+import { createChannelsApi } from '../services/channels-api';
+import { createProvidersApi } from '../services/providers-api';
+import { createCronApi } from '../services/cron-api';
 import { MemberModule } from '../services/member';
 import {
   isLaunchAtStartupKey,
@@ -109,6 +112,15 @@ export function registerIpcHandlers(
 
   // P2/P3: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
   const hostApiRegistry = new HostApiRegistry();
+  // Channel setEnabled restart side-effect is bound when registerChannel handlers run;
+  // host:invoke channels.setEnabled uses a lightweight restart schedule via gatewayManager.
+  const scheduleChannelEnabledRestart = (channelType: string, enabled: boolean): void => {
+    if (gatewayManager.getStatus().state !== 'stopped') {
+      logger.info(`Scheduling Gateway restart after channel:setEnabled (${channelType}, enabled=${enabled})`);
+      gatewayManager.debouncedRestart(150);
+    }
+  };
+
   hostApiRegistry.registerCoreServices({
     app: createAppApi(),
     openclaw: createOpenClawApi(),
@@ -119,6 +131,10 @@ export function registerIpcHandlers(
     logs: createLogsApi(),
     window: createWindowApi(mainWindow),
     settings: createSettingsApi({ gatewayManager }),
+    skills: createSkillsApi(),
+    channels: createChannelsApi({ onChannelEnabledChange: scheduleChannelEnabledRestart }),
+    providers: createProvidersApi(),
+    cron: createCronApi({ gatewayManager }),
   });
   registerHostInvokeHandler(hostApiRegistry);
 
@@ -751,26 +767,20 @@ function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {
  * Direct read/write to ~/.openclaw/openclaw.json (bypasses Gateway RPC)
  */
 function registerSkillConfigHandlers(): void {
-  // Update skill config (apiKey and env)
+  // P3c: thin wrappers over createSkillsApi (credentials never logged)
+  const skillsApi = createSkillsApi();
   ipcMain.handle('skill:updateConfig', async (_, params: {
     skillKey: string;
     apiKey?: string;
     env?: Record<string, string>;
   }) => {
-    return await updateSkillConfig(params.skillKey, {
-      apiKey: params.apiKey,
-      env: params.env,
-    });
+    return await skillsApi.updateConfig(params);
   });
-
-  // Get skill config
   ipcMain.handle('skill:getConfig', async (_, skillKey: string) => {
-    return await getSkillConfig(skillKey);
+    return await skillsApi.getConfig(skillKey);
   });
-
-  // Get all skill configs
   ipcMain.handle('skill:getAllConfigs', async () => {
-    return await getAllSkillConfigs();
+    return await skillsApi.getAllConfigs();
   });
 }
 
@@ -1069,37 +1079,19 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
     }
   });
 
-  // Delete a cron job
+  // P3c: delete/toggle/trigger via createCronApi (list/create/update remain local — complex transforms)
+  const cronApi = createCronApi({ gatewayManager });
+
   ipcMain.handle('cron:delete', async (_, id: string) => {
-    try {
-      const result = await gatewayManager.rpc('cron.remove', { id });
-      return result;
-    } catch (error) {
-      console.error('Failed to delete cron job:', error);
-      throw error;
-    }
+    return await cronApi.delete(id);
   });
 
-  // Toggle a cron job enabled/disabled
   ipcMain.handle('cron:toggle', async (_, id: string, enabled: boolean) => {
-    try {
-      const result = await gatewayManager.rpc('cron.update', { id, patch: { enabled } });
-      return result;
-    } catch (error) {
-      console.error('Failed to toggle cron job:', error);
-      throw error;
-    }
+    return await cronApi.toggle({ id, enabled });
   });
 
-  // Trigger a cron job manually
   ipcMain.handle('cron:trigger', async (_, id: string) => {
-    try {
-      const result = await gatewayManager.rpc('cron.run', { id, mode: 'force' });
-      return result;
-    } catch (error) {
-      console.error('Failed to trigger cron job:', error);
-      throw error;
-    }
+    return await cronApi.trigger(id);
   });
 
   // Periodic cron job repair: checks for jobs with undefined agentId and repairs them
@@ -1653,15 +1645,16 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
     }
   });
 
+  // P3c: list/get/setEnabled via createChannelsApi
+  const channelsApi = createChannelsApi({
+    onChannelEnabledChange: (channelType, enabled) => {
+      scheduleGatewayChannelRestart(`channel:setEnabled (${channelType}, enabled=${enabled})`);
+    },
+  });
+
   // Get channel configuration
   ipcMain.handle('channel:getConfig', async (_, channelType: string) => {
-    try {
-      const config = await getChannelConfig(channelType);
-      return { success: true, config };
-    } catch (error) {
-      console.error('Failed to get channel config:', error);
-      return { success: false, error: String(error) };
-    }
+    return await channelsApi.getConfig(channelType);
   });
 
   // Get channel form values (reverse-transformed for UI pre-fill)
@@ -1687,27 +1680,12 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
     }
   });
 
-  // List configured channels
   ipcMain.handle('channel:listConfigured', async () => {
-    try {
-      const channels = await listConfiguredChannels();
-      return { success: true, channels };
-    } catch (error) {
-      console.error('Failed to list channels:', error);
-      return { success: false, error: String(error) };
-    }
+    return await channelsApi.listConfigured();
   });
 
-  // Enable or disable a channel
   ipcMain.handle('channel:setEnabled', async (_, channelType: string, enabled: boolean) => {
-    try {
-      await setChannelEnabled(channelType, enabled);
-      scheduleGatewayChannelRestart(`channel:setEnabled (${channelType}, enabled=${enabled})`);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to set channel enabled:', error);
-      return { success: false, error: String(error) };
-    }
+    return await channelsApi.setEnabled({ channelType, enabled });
   });
 
   // Validate channel configuration
@@ -1855,19 +1833,20 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
     gatewayManager.debouncedRestart(8000);
   });
 
-  // Get all providers with key info
+  // P3c: read-focused providers via createProvidersApi (no getApiKey on host:invoke surface)
+  const providersApi = createProvidersApi();
+
   ipcMain.handle('provider:list', async () => {
     logLegacyProviderChannel('provider:list');
-    return await providerService.listLegacyProvidersWithKeyInfo();
+    return await providersApi.list();
   });
 
-  // New provider-service endpoints used by the account-based refactor.
   ipcMain.handle('provider:listVendors', async () => {
-    return await providerService.listVendors();
+    return await providersApi.listVendors();
   });
 
   ipcMain.handle('provider:listAccounts', async () => {
-    return await providerService.listAccounts();
+    return await providersApi.listAccounts();
   });
 
   ipcMain.handle('provider:getAccount', async (_, accountId: string) => {
@@ -2049,7 +2028,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
   // Check if a provider has an API key
   ipcMain.handle('provider:hasApiKey', async (_, providerId: string) => {
     logLegacyProviderChannel('provider:hasApiKey');
-    return await providerService.hasLegacyProviderApiKey(providerId);
+    return await providersApi.hasApiKey(providerId);
   });
 
   // Get the actual API key (for internal use only - be careful!)

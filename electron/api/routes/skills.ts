@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { basename } from 'node:path';
-import { getAllSkillConfigs, updateSkillConfig } from '../../utils/skill-config';
+import { getAllSkillConfigs } from '../../utils/skill-config';
 import { collectQuickAccessSkills, filterEnabledQuickAccessSkills, type QuickAccessRuntimeSkillStatus, type QuickAccessSkillSource } from '../../utils/skill-quick-access';
 import type { ClawHubInstallParams, ClawHubSearchParams, ClawHubUninstallParams } from '../../gateway/clawhub';
 import type { HostApiContext } from '../context';
@@ -93,7 +93,9 @@ export async function handleSkillRoutes(
   }
 
   if (url.pathname === '/api/skills/configs' && req.method === 'GET') {
-    sendJson(res, 200, await getAllSkillConfigs());
+    // P3c: thin delegate to createSkillsApi
+    const { createSkillsApi } = await import('../../services/skills-api');
+    sendJson(res, 200, await createSkillsApi().getAllConfigs());
     return true;
   }
 
@@ -104,10 +106,8 @@ export async function handleSkillRoutes(
         apiKey?: string;
         env?: Record<string, string>;
       }>(req);
-      sendJson(res, 200, await updateSkillConfig(body.skillKey, {
-        apiKey: body.apiKey,
-        env: body.env,
-      }));
+      const { createSkillsApi } = await import('../../services/skills-api');
+      sendJson(res, 200, await createSkillsApi().updateConfig(body));
     } catch (error) {
       sendJson(res, 500, { success: false, error: error instanceof Error ? error.message : String(error) });
     }
