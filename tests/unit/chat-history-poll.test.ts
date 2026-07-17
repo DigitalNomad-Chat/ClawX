@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { decideHistoryPollTick } from '@/stores/chat/history-poll';
 import {
   evaluateRuntimePollGate,
+  noteLiveProviderToolChainEvidenceFromEvent,
   noteRuntimeEventActivity,
+  resetLiveProviderToolChainEvidence,
   resetRuntimeActivityStamps,
   resetRuntimeEvidenceCounters,
+  RUNTIME_FRESHNESS_WINDOW_MS,
   setLiveProviderToolChainEvidence,
 } from '@/stores/chat/runtime-evidence';
 import type { ChatRuntimeRunState } from '@/stores/chat/types';
@@ -55,7 +58,8 @@ describe('decideHistoryPollTick (M4.2)', () => {
   afterEach(() => {
     resetRuntimeEvidenceCounters();
     resetRuntimeActivityStamps();
-    setLiveProviderToolChainEvidence(false);
+    resetLiveProviderToolChainEvidence();
+    vi.useRealTimers();
   });
 
   it('stops when not sending', () => {
@@ -204,5 +208,99 @@ describe('decideHistoryPollTick (M4.2)', () => {
       expect(gate.maySkipHistoryPoll, name).toBe(false);
       expect(decideHistoryPollTick({ ...baseTick, gate }), name).toBe('load');
     }
+  });
+
+  it('scheduler: continuous skip reschedules, then loads after freshness window expires', () => {
+    vi.useFakeTimers();
+    // Use ms wall clocks (>= 1e12) so normalizeTimestampMs does not treat them as seconds.
+    const start = 1_700_000_000_000;
+    vi.setSystemTime(start);
+
+    const runId = 'run-timeline';
+    const sessionKey = 'agent:main:main';
+    const POLL_INTERVAL = 2_000;
+    const SILENCE = 2_500;
+    const lastChatEventAtMs = start - SILENCE - 1;
+
+    noteRuntimeEventActivity({
+      runId,
+      sessionKey,
+      receivedAtMs: start,
+    });
+    noteLiveProviderToolChainEvidenceFromEvent({
+      type: 'tool.started',
+      runId,
+      sessionKey,
+      toolCallId: 'c1',
+      name: 'read',
+      ts: start,
+    });
+
+    const run = makeRun({
+      runId,
+      sessionKey,
+      status: 'running',
+      events: [{
+        type: 'tool.started',
+        runId,
+        sessionKey,
+        toolCallId: 'c1',
+        name: 'read',
+        ts: start,
+      }],
+    });
+
+    const actions: string[] = [];
+    let scheduled: ReturnType<typeof setTimeout> | null = null;
+
+    const pollHistory = () => {
+      const nowMs = Date.now();
+      const gate = evaluateRuntimePollGate({
+        run,
+        activeRunId: runId,
+        currentSessionKey: sessionKey,
+        nowMs,
+        pendingFinal: false,
+        convergenceEnabled: true,
+        // Use production get() path via scoped latch (no override)
+      });
+      const action = decideHistoryPollTick({
+        sending: true,
+        hasStreamingMessage: false,
+        lastChatEventAtMs,
+        nowMs,
+        silenceWindowMs: SILENCE,
+        gate,
+      });
+      actions.push(`${action}@${nowMs - start}`);
+      // Mirror production: skip/load/defer all reschedule except stop
+      if (action !== 'stop') {
+        scheduled = setTimeout(pollHistory, POLL_INTERVAL);
+      }
+    };
+
+    pollHistory();
+    expect(actions[0]).toBe('skip-runtime@0');
+
+    vi.advanceTimersByTime(POLL_INTERVAL);
+    expect(actions.at(-1)?.startsWith('skip-runtime')).toBe(true);
+
+    // Still inside 5s freshness window
+    vi.advanceTimersByTime(POLL_INTERVAL);
+    expect(actions.filter((a) => a.startsWith('skip-runtime')).length).toBeGreaterThanOrEqual(2);
+
+    // Cross freshness window (5s) — next tick must load and still reschedule
+    vi.advanceTimersByTime(RUNTIME_FRESHNESS_WINDOW_MS);
+    const loadEntry = actions.find((a) => a.startsWith('load@'));
+    expect(loadEntry).toBeTruthy();
+    const loadOffset = Number(loadEntry!.split('@')[1]);
+    expect(loadOffset).toBeGreaterThan(RUNTIME_FRESHNESS_WINDOW_MS - POLL_INTERVAL);
+    expect(scheduled).not.toBeNull();
+
+    // One more tick still loads (stale) and keeps scheduling — no permanent silence
+    const before = actions.length;
+    vi.advanceTimersByTime(POLL_INTERVAL);
+    expect(actions.length).toBeGreaterThan(before);
+    expect(actions.at(-1)?.startsWith('load@')).toBe(true);
   });
 });

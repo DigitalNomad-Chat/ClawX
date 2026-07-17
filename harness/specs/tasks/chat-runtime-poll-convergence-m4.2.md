@@ -50,7 +50,8 @@ requiredTests:
 acceptance:
   - Restricted skip only; fallback loadHistory retained for all uncertainty paths.
   - No deletion of gateway notification dual-emit or phase=end non-terminal.
-  - Live provider evidence latch set from real tool-like runtime events; tests can override.
+  - Live provider evidence is runId+session scoped (Map); old runs cannot authorize a new activeRunId; cleared on run.ended.
+  - Scheduler-level test: continuous skip then load after freshness window; poll keeps rescheduling.
   - No v0.4.9 host-contract / provider / transport refactor.
   - harness:ci pre-existing AgentChat debt is listed separately if it fails.
 docs:

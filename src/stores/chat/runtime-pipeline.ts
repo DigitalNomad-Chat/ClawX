@@ -1,6 +1,7 @@
 import type { ChatRuntimeEvent } from '../../../shared/chat-runtime-events';
 import { applyRuntimeEventToRuns, extractToolCompletedFiles } from './runtime-graph';
 import {
+  clearLiveProviderToolChainEvidence,
   noteLiveProviderToolChainEvidenceFromEvent,
   noteRuntimeEventActivity,
 } from './runtime-evidence';
@@ -94,8 +95,8 @@ export function createHandleRuntimeEvent(
       eventTs: event.ts,
       receivedAtMs: Date.now(),
     });
-    // M4.2: latch live provider tool-chain evidence from real tool-like runtime events
-    // (includes item→tool dual-emit). Skip remains gated by evaluateRuntimePollGate.
+    // M4.2: latch live evidence for THIS run only (includes item→tool dual-emit).
+    // Old runs cannot authorize skip for a different activeRunId.
     noteLiveProviderToolChainEvidenceFromEvent(event);
 
     const runtimeRuns = applyRuntimeEventToRuns(initialState.runtimeRuns, event);
@@ -103,6 +104,10 @@ export function createHandleRuntimeEvent(
     const appliesToActiveUi = matchesActiveRun || (activeRunId == null && matchesCurrentSession);
 
     if (event.type === 'run.started') {
+      // Drop prior active run evidence when adopting a different runId.
+      if (activeRunId && activeRunId !== event.runId) {
+        clearLiveProviderToolChainEvidence(activeRunId);
+      }
       if (matchesCurrentSession && (activeRunId == null || matchesActiveRun)) {
         nextPatch.activeRunId = event.runId;
         nextPatch.error = null;
@@ -141,6 +146,8 @@ export function createHandleRuntimeEvent(
     }
 
     if (event.type === 'run.ended') {
+      // Terminal: evidence for this run can no longer authorize poll skip.
+      clearLiveProviderToolChainEvidence(event.runId);
       const latestState = get();
       const terminalMatchesActiveRun = latestState.activeRunId != null && event.runId === latestState.activeRunId;
       const terminalIsForCurrentUntrackedSend = latestState.activeRunId == null

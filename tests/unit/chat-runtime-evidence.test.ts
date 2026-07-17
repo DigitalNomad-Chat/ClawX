@@ -8,10 +8,12 @@ import {
   M4_POLL_CONVERGENCE_THRESHOLDS,
   M4_POLL_ROLLBACK_BOUNDARIES,
   normalizeTimestampMs,
+  clearLiveProviderToolChainEvidence,
   noteLiveProviderToolChainEvidenceFromEvent,
   noteRuntimeEventActivity,
   POLL_CONVERGENCE_ENABLED,
   recordRuntimePollObservation,
+  resetLiveProviderToolChainEvidence,
   resetRuntimeActivityStamps,
   resetRuntimeEvidenceCounters,
   runtimeEvidenceHasToolActivity,
@@ -37,7 +39,7 @@ describe('runtime evidence scaffold (M4.2 restricted convergence)', () => {
   afterEach(() => {
     resetRuntimeEvidenceCounters();
     resetRuntimeActivityStamps();
-    setLiveProviderToolChainEvidence(false);
+    resetLiveProviderToolChainEvidence();
   });
 
   it('enables poll convergence flag after M4.2 approval but still hard-requires live evidence', () => {
@@ -240,21 +242,52 @@ describe('runtime evidence scaffold (M4.2 restricted convergence)', () => {
     expect(shouldSkipHistoryPollForRuntimeEvidence(decision)).toBe(true);
   });
 
-  it('latches live provider evidence from tool-like runtime events', () => {
-    expect(getLiveProviderToolChainEvidence()).toBe(false);
+  it('latches live provider evidence per runId — old runs cannot authorize a new run', () => {
+    expect(getLiveProviderToolChainEvidence({ runId: 'r1' })).toBe(false);
     noteLiveProviderToolChainEvidenceFromEvent({
       type: 'assistant.delta',
       runId: 'r1',
+      sessionKey: 'agent:main:main',
       delta: 'x',
     });
-    expect(getLiveProviderToolChainEvidence()).toBe(false);
+    expect(getLiveProviderToolChainEvidence({ runId: 'r1' })).toBe(false);
+
     noteLiveProviderToolChainEvidenceFromEvent({
       type: 'tool.started',
       runId: 'r1',
+      sessionKey: 'agent:main:main',
       toolCallId: 'c1',
       name: 'read',
     });
-    expect(getLiveProviderToolChainEvidence()).toBe(true);
+    expect(getLiveProviderToolChainEvidence({
+      runId: 'r1',
+      sessionKey: 'agent:main:main',
+    })).toBe(true);
+    // Different run is not authorized by r1 evidence
+    expect(getLiveProviderToolChainEvidence({
+      runId: 'r2',
+      sessionKey: 'agent:main:main',
+    })).toBe(false);
+    // Foreign session for same runId rejected when both sides set sessionKey
+    expect(getLiveProviderToolChainEvidence({
+      runId: 'r1',
+      sessionKey: 'agent:main:other',
+    })).toBe(false);
+
+    noteLiveProviderToolChainEvidenceFromEvent({
+      type: 'tool.started',
+      runId: 'r2',
+      sessionKey: 'agent:main:main',
+      toolCallId: 'c2',
+      name: 'read',
+    });
+    // r2 latched independently; r1 still valid until cleared
+    expect(getLiveProviderToolChainEvidence({ runId: 'r2', sessionKey: 'agent:main:main' })).toBe(true);
+    expect(getLiveProviderToolChainEvidence({ runId: 'r1', sessionKey: 'agent:main:main' })).toBe(true);
+
+    clearLiveProviderToolChainEvidence('r1');
+    expect(getLiveProviderToolChainEvidence({ runId: 'r1' })).toBe(false);
+    expect(getLiveProviderToolChainEvidence({ runId: 'r2', sessionKey: 'agent:main:main' })).toBe(true);
   });
 
   it('reports structured reasons for missing structural gates', () => {

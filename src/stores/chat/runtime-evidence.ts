@@ -28,18 +28,60 @@ export const RUNTIME_FRESHNESS_WINDOW_MS = 5_000;
 export const POLL_CONVERGENCE_ENABLED = true;
 
 /**
- * Process-wide live-provider tool-chain evidence latch.
- * Defaults false; only flipped after verified live tool+thinking+assistant evidence.
- * Hard requirement for any future skip-allowed decision.
+ * Live-provider tool-chain evidence scoped per runId (+ optional sessionKey).
+ * Defaults empty; set only from tool-like runtime events for that run.
+ * Old runs cannot authorize skip for a different activeRunId (I1 fix).
  */
-let liveProviderToolChainEvidence = false;
+export type LiveProviderEvidenceScope = {
+  runId: string;
+  sessionKey?: string;
+};
 
-export function setLiveProviderToolChainEvidence(value: boolean): void {
-  liveProviderToolChainEvidence = value;
+const liveProviderEvidenceByRunId = new Map<string, LiveProviderEvidenceScope>();
+
+/**
+ * Test/control helper. `false` clears all; `true` requires scope (or a test sentinel runId).
+ */
+export function setLiveProviderToolChainEvidence(
+  value: boolean,
+  scope?: LiveProviderEvidenceScope,
+): void {
+  if (!value) {
+    liveProviderEvidenceByRunId.clear();
+    return;
+  }
+  const next = scope ?? { runId: '__test_run__' };
+  liveProviderEvidenceByRunId.set(next.runId, next);
 }
 
-export function getLiveProviderToolChainEvidence(): boolean {
-  return liveProviderToolChainEvidence;
+/**
+ * True when evidence is latched for this runId (and session when both sides present).
+ * Without runId, always false — never a process-global sticky bit.
+ */
+export function getLiveProviderToolChainEvidence(params?: {
+  runId?: string | null;
+  sessionKey?: string | null;
+}): boolean {
+  if (!params?.runId) return false;
+  const scope = liveProviderEvidenceByRunId.get(params.runId);
+  if (!scope) return false;
+  if (
+    params.sessionKey
+    && scope.sessionKey
+    && scope.sessionKey !== params.sessionKey
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Clear evidence for one run (terminal / superseded) or all (tests). */
+export function clearLiveProviderToolChainEvidence(runId?: string): void {
+  if (runId == null) {
+    liveProviderEvidenceByRunId.clear();
+    return;
+  }
+  liveProviderEvidenceByRunId.delete(runId);
 }
 
 /**
@@ -165,6 +207,11 @@ export function resetRuntimeActivityStamps(): void {
   lastActivityByRunId.clear();
 }
 
+/** Clear run-scoped live evidence (tests / session teardown). */
+export function resetLiveProviderToolChainEvidence(): void {
+  liveProviderEvidenceByRunId.clear();
+}
+
 /**
  * Record that a Main-normalized runtime event was applied for a specific run.
  * This is the sole authority for run-scoped wall-clock freshness — not a
@@ -246,13 +293,16 @@ export function isToolLikeRuntimeEvent(event: ChatRuntimeEvent): boolean {
 }
 
 /**
- * Latch process-wide live provider tool-chain evidence after a real tool-like
- * runtime event is applied (e.g. item→tool dual-emit). Idempotent.
+ * Latch live provider tool-chain evidence for this event's runId/sessionKey only
+ * (e.g. item→tool dual-emit). Does not grant skip rights to other runs.
  */
 export function noteLiveProviderToolChainEvidenceFromEvent(event: ChatRuntimeEvent): void {
-  if (isToolLikeRuntimeEvent(event)) {
-    liveProviderToolChainEvidence = true;
-  }
+  if (!isToolLikeRuntimeEvent(event)) return;
+  if (!event.runId) return;
+  liveProviderEvidenceByRunId.set(event.runId, {
+    runId: event.runId,
+    sessionKey: event.sessionKey,
+  });
 }
 
 /**
@@ -333,7 +383,10 @@ export function evaluateRuntimePollGate(input: RuntimePollGateInput): RuntimePol
     freshnessWindowMs = RUNTIME_FRESHNESS_WINDOW_MS,
     pendingFinal = false,
     convergenceEnabled = POLL_CONVERGENCE_ENABLED,
-    hasLiveProviderToolChainEvidence = getLiveProviderToolChainEvidence(),
+    hasLiveProviderToolChainEvidence = getLiveProviderToolChainEvidence({
+      runId: input.activeRunId,
+      sessionKey: input.currentSessionKey,
+    }),
   } = input;
 
   const hasActiveRunId = Boolean(activeRunId && run && run.runId === activeRunId);
