@@ -5,11 +5,22 @@
 import { existsSync } from 'node:fs';
 import type { CompleteHostServiceRegistry } from '../main/ipc/host-contract';
 import { getOpenClawCliCommand } from '../utils/openclaw-cli';
-import { ensureDir, getOpenClawSkillsDir, getOpenClawStatus } from '../utils/paths';
+import {
+  ensureDir,
+  getOpenClawConfigDir,
+  getOpenClawDir,
+  getOpenClawSkillsDir,
+  getOpenClawStatus,
+} from '../utils/paths';
 
-export function createOpenClawApi(): NonNullable<CompleteHostServiceRegistry['openclaw']> {
+export function createOpenClawApi(): NonNullable<CompleteHostServiceRegistry['openclaw']> & {
+  getDir: () => string;
+  getConfigDir: () => string;
+} {
   return {
     status: () => getOpenClawStatus(),
+    getDir: () => getOpenClawDir(),
+    getConfigDir: () => getOpenClawConfigDir(),
     getSkillsDir: () => {
       const dir = getOpenClawSkillsDir();
       ensureDir(dir);

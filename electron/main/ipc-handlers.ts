@@ -42,7 +42,6 @@ import {
   validateChannelCredentials,
 } from '../utils/channel-config';
 import { toOpenClawChannelType, toUiChannelType } from '../utils/channel-alias';
-import { checkUvInstalled, installUv, setupManagedPython } from '../utils/uv-setup';
 import {
   ensureDingTalkPluginInstalled,
   ensureFeishuPluginInstalled,
@@ -76,6 +75,12 @@ import { registerAuthIpcHandlers } from './ipc/auth-handlers';
 import { createAppApi } from '../services/app-api';
 import { createOpenClawApi } from '../services/openclaw-api';
 import { createUsageApi } from '../services/usage-api';
+import { createShellApi } from '../services/shell-api';
+import { createDialogApi } from '../services/dialog-api';
+import { createUvApi } from '../services/uv-api';
+import { createLogsApi } from '../services/logs-api';
+import { createWindowApi } from '../services/window-api';
+import { createSettingsApi } from '../services/settings-api';
 import { MemberModule } from '../services/member';
 import {
   isLaunchAtStartupKey,
@@ -102,12 +107,18 @@ export function registerIpcHandlers(
   // Host API proxy handlers (ClawDock HTTP proxy path — keep for dual-track)
   registerHostApiProxyHandlers();
 
-  // P2/P3a: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
+  // P2/P3: typed host:invoke registry (dual-path; does not remove legacy ipcMain.handle)
   const hostApiRegistry = new HostApiRegistry();
   hostApiRegistry.registerCoreServices({
     app: createAppApi(),
     openclaw: createOpenClawApi(),
     usage: createUsageApi(),
+    shell: createShellApi(),
+    dialog: createDialogApi(),
+    uv: createUvApi(),
+    logs: createLogsApi(),
+    window: createWindowApi(mainWindow),
+    settings: createSettingsApi({ gatewayManager }),
   });
   registerHostInvokeHandler(hostApiRegistry);
 
@@ -1155,26 +1166,10 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
  * UV-related IPC handlers
  */
 function registerUvHandlers(): void {
-  // Check if uv is installed
-  ipcMain.handle('uv:check', async () => {
-    return await checkUvInstalled();
-  });
-
-  // Install uv and setup managed Python
-  ipcMain.handle('uv:install-all', async () => {
-    try {
-      const isInstalled = await checkUvInstalled();
-      if (!isInstalled) {
-        await installUv();
-      }
-      // Always run python setup to ensure it exists in uv's cache
-      await setupManagedPython();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to setup uv/python:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+  // P3b: thin wrappers over createUvApi
+  const uvApi = createUvApi();
+  ipcMain.handle('uv:check', async () => uvApi.check());
+  ipcMain.handle('uv:install-all', async () => uvApi.installAll());
 }
 
 /**
@@ -1182,30 +1177,13 @@ function registerUvHandlers(): void {
  * Allows the renderer to read application logs for diagnostics
  */
 function registerLogHandlers(): void {
-  // Get recent logs from memory ring buffer
-  ipcMain.handle('log:getRecent', async (_, count?: number) => {
-    return logger.getRecentLogs(count);
-  });
-
-  // Read log file content (last N lines)
-  ipcMain.handle('log:readFile', async (_, tailLines?: number) => {
-    return await logger.readLogFile(tailLines);
-  });
-
-  // Get log file path (so user can open in file explorer)
-  ipcMain.handle('log:getFilePath', async () => {
-    return logger.getLogFilePath();
-  });
-
-  // Get log directory path
-  ipcMain.handle('log:getDir', async () => {
-    return logger.getLogDir();
-  });
-
-  // List all log files
-  ipcMain.handle('log:listFiles', async () => {
-    return await logger.listLogFiles();
-  });
+  // P3b: thin wrappers over createLogsApi
+  const logsApi = createLogsApi();
+  ipcMain.handle('log:getRecent', async (_, count?: number) => logsApi.getRecent(count));
+  ipcMain.handle('log:readFile', async (_, tailLines?: number) => logsApi.readFile(tailLines));
+  ipcMain.handle('log:getFilePath', async () => logsApi.getFilePath());
+  ipcMain.handle('log:getDir', async () => logsApi.getDir());
+  ipcMain.handle('log:listFiles', async () => logsApi.listFiles());
 }
 
 /**
@@ -1584,11 +1562,11 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
   });
 
   ipcMain.handle('openclaw:getDir', () => {
-    return getOpenClawDir();
+    return openclawApi.getDir();
   });
 
   ipcMain.handle('openclaw:getConfigDir', () => {
-    return getOpenClawConfigDir();
+    return openclawApi.getConfigDir();
   });
 
   ipcMain.handle('openclaw:getSkillsDir', () => {
@@ -2147,28 +2125,17 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
 /**
  * Shell-related IPC handlers
  */
-function expandShellPath(input: string): string {
-  if (input === '~') return homedir();
-  if (input.startsWith(`~${sep}`) || input.startsWith('~/') || input.startsWith('~\\')) {
-    return join(homedir(), input.slice(2));
-  }
-  return input;
-}
-
 function registerShellHandlers(): void {
-  // Open external URL
+  // P3b: thin wrappers over createShellApi (still accepts bare string args)
+  const shellApi = createShellApi();
   ipcMain.handle('shell:openExternal', async (_, url: string) => {
-    await shell.openExternal(url);
+    await shellApi.openExternal(url);
   });
-
-  // Open path in file explorer
   ipcMain.handle('shell:showItemInFolder', async (_, path: string) => {
-    shell.showItemInFolder(expandShellPath(path));
+    shellApi.showItemInFolder(path);
   });
-
-  // Open path
   ipcMain.handle('shell:openPath', async (_, path: string) => {
-    return await shell.openPath(expandShellPath(path));
+    return await shellApi.openPath(path);
   });
 }
 
@@ -2231,22 +2198,16 @@ function registerClawHubHandlers(clawHubService: ClawHubService): void {
  * Dialog-related IPC handlers
  */
 function registerDialogHandlers(): void {
-  // Show open dialog
+  // P3b: thin wrappers over createDialogApi
+  const dialogApi = createDialogApi();
   ipcMain.handle('dialog:open', async (_, options: Electron.OpenDialogOptions) => {
-    const result = await dialog.showOpenDialog(options);
-    return result;
+    return await dialogApi.open(options);
   });
-
-  // Show save dialog
   ipcMain.handle('dialog:save', async (_, options: Electron.SaveDialogOptions) => {
-    const result = await dialog.showSaveDialog(options);
-    return result;
+    return await dialogApi.save(options);
   });
-
-  // Show message box
   ipcMain.handle('dialog:message', async (_, options: Electron.MessageBoxOptions) => {
-    const result = await dialog.showMessageBox(options);
-    return result;
+    return await dialogApi.message(options);
   });
 
   // ── Read-Write Workspace: read / set / clear marker in AGENTS.md ──
@@ -2345,72 +2306,22 @@ function registerAppHandlers(): void {
 }
 
 function registerSettingsHandlers(gatewayManager: GatewayManager): void {
-  const handleProxySettingsChange = async () => {
-    const settings = await getAllSettings();
-    await syncProxyConfigToOpenClaw(settings, { preserveExistingWhenDisabled: false });
-    await applyProxySettings(settings);
-    if (gatewayManager.getStatus().state === 'running') {
-      await gatewayManager.restart();
-    }
-  };
-
+  // P3b: thin wrappers over createSettingsApi (preserves proxy/launch side effects)
+  const settingsApi = createSettingsApi({ gatewayManager });
   ipcMain.handle('settings:get', async (_, key: keyof AppSettings) => {
-    return await getSetting(key);
+    return await settingsApi.get(key);
   });
-
   ipcMain.handle('settings:getAll', async () => {
-    return await getAllSettings();
+    return await settingsApi.getAll();
   });
-
   ipcMain.handle('settings:set', async (_, key: keyof AppSettings, value: AppSettings[keyof AppSettings]) => {
-    await setSetting(key, value as never);
-
-    if (
-      key === 'proxyEnabled' ||
-      key === 'proxyServer' ||
-      key === 'proxyHttpServer' ||
-      key === 'proxyHttpsServer' ||
-      key === 'proxyAllServer' ||
-      key === 'proxyBypassRules'
-    ) {
-      await handleProxySettingsChange();
-    }
-    if (key === 'launchAtStartup') {
-      await syncLaunchAtStartupSettingFromStore();
-    }
-
-    return { success: true };
+    return await settingsApi.set({ key, value });
   });
-
   ipcMain.handle('settings:setMany', async (_, patch: Partial<AppSettings>) => {
-    const entries = Object.entries(patch) as Array<[keyof AppSettings, AppSettings[keyof AppSettings]]>;
-    for (const [key, value] of entries) {
-      await setSetting(key, value as never);
-    }
-
-    if (entries.some(([key]) =>
-      key === 'proxyEnabled' ||
-      key === 'proxyServer' ||
-      key === 'proxyHttpServer' ||
-      key === 'proxyHttpsServer' ||
-      key === 'proxyAllServer' ||
-      key === 'proxyBypassRules'
-    )) {
-      await handleProxySettingsChange();
-    }
-    if (entries.some(([key]) => key === 'launchAtStartup')) {
-      await syncLaunchAtStartupSettingFromStore();
-    }
-
-    return { success: true };
+    return await settingsApi.setMany(patch);
   });
-
   ipcMain.handle('settings:reset', async () => {
-    await resetSettings();
-    const settings = await getAllSettings();
-    await handleProxySettingsChange();
-    await syncLaunchAtStartupSettingFromStore();
-    return { success: true, settings };
+    return await settingsApi.reset();
   });
 }
 function registerUsageHandlers(): void {
@@ -2424,24 +2335,19 @@ function registerUsageHandlers(): void {
  * Window control handlers (for custom title bar on Windows)
  */
 function registerWindowHandlers(mainWindow: BrowserWindow): void {
+  // P3b: thin wrappers over createWindowApi
+  const windowApi = createWindowApi(mainWindow);
   ipcMain.handle('window:minimize', () => {
-    mainWindow.minimize();
+    windowApi.minimize();
   });
-
   ipcMain.handle('window:maximize', () => {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
+    windowApi.maximize();
   });
-
   ipcMain.handle('window:close', () => {
-    mainWindow.close();
+    windowApi.close();
   });
-
   ipcMain.handle('window:isMaximized', () => {
-    return mainWindow.isMaximized();
+    return windowApi.isMaximized();
   });
 }
 
