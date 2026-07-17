@@ -22,11 +22,7 @@ const SAMPLE_USAGE = [
   },
 ];
 
-/**
- * Install host:invoke mock for usage.recentTokenHistory.
- * success → ok array; unsupported-fallback → UNSUPPORTED (facade uses hostapi:fetch).
- */
-async function installHostInvokeUsage(
+async function mockUsageHostPaths(
   app: ElectronApplication,
   mode: 'host-success' | 'unsupported-fallback',
   sample: typeof SAMPLE_USAGE,
@@ -66,67 +62,69 @@ async function installHostInvokeUsage(
         },
       );
 
-      // Hybrid hostapi:fetch — usage deterministic; gateway running; empty-ok otherwise.
-      // Required for UNSUPPORTED fallback path and for Models shell incidental fetches.
-      ipcMain.removeHandler('hostapi:fetch');
-      ipcMain.handle('hostapi:fetch', async (_e, request: { path?: string }) => {
-        const path = request?.path ?? '';
-        if (path.startsWith('/api/usage/recent-token-history')) {
-          return { ok: true, data: { status: 200, ok: true, json: usage } };
-        }
-        if (path.includes('/api/gateway/status')) {
-          return {
-            ok: true,
-            data: {
-              status: 200,
+      if (mockMode === 'unsupported-fallback') {
+        ipcMain.removeHandler('hostapi:fetch');
+        ipcMain.handle('hostapi:fetch', async (_e, request: { path?: string }) => {
+          const path = request?.path ?? '';
+          if (path.startsWith('/api/usage/recent-token-history')) {
+            return { ok: true, data: { status: 200, ok: true, json: usage } };
+          }
+          if (path.includes('/api/gateway/status')) {
+            return {
               ok: true,
-              json: {
-                state: 'running',
-                port: 18789,
-                pid: 1,
-                gatewayReady: true,
-                connectedAt: Date.now(),
+              data: {
+                status: 200,
+                ok: true,
+                json: {
+                  state: 'running',
+                  port: 18789,
+                  pid: 1,
+                  gatewayReady: true,
+                  connectedAt: Date.now(),
+                },
               },
-            },
-          };
-        }
-        return { ok: true, data: { status: 200, ok: true, json: {} } };
-      });
+            };
+          }
+          return { ok: true, data: { status: 200, ok: true, json: {} } };
+        });
+      }
     },
     { sample, mode },
   );
 }
 
-async function openModelsWithUsageFetchArmed(page: Page): Promise<void> {
-  // Production Models only fetches usage when gateway is running.
-  // E2E opt-in flag (Models/index.tsx) arms fetch without live Gateway process.
+async function openModelsPage(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.localStorage.setItem('clawdock:e2e-force-gateway-running', '1');
-  });
-  await page.evaluate(() => {
     window.location.hash = '#/models';
   });
-  // Remount so usage effect sees the flag
+  await expect(page.getByTestId('models-page')).toBeVisible({ timeout: 60_000 });
+}
+
+async function remountModels(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.location.hash = '#/';
   });
   await page.evaluate(() => {
     window.location.hash = '#/models';
   });
-  await expect(page.getByTestId('models-page')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('models-page')).toBeVisible({ timeout: 30_000 });
 }
 
 /**
  * P4a: Models page real UI path for hostApi.usage —
- * (1) host:invoke success, (2) UNSUPPORTED → HTTP hostapi:fetch fallback.
- * Asserts token-usage-entry rows (not only raw IPC probes).
+ * open Models first (shell intact), then mock host paths and remount to fetch.
  */
 test.describe('P4a Models usage facade', () => {
   test('Models page loads usage when host:invoke succeeds', async ({ launchElectronApp }) => {
     const app = await launchElectronApp({ skipSetup: true });
     try {
       const page = await getStableWindow(app);
-      await installHostInvokeUsage(app, 'host-success', SAMPLE_USAGE);
+
+      // Shell first — do not mock hostapi:fetch before Models mounts
+      await openModelsPage(page);
+
+      await mockUsageHostPaths(app, 'host-success', SAMPLE_USAGE);
 
       const invokeProbe = await page.evaluate(async () => {
         return await window.clawx!.hostInvoke({
@@ -138,7 +136,8 @@ test.describe('P4a Models usage facade', () => {
       expect(invokeProbe).toMatchObject({ ok: true });
       expect((invokeProbe as { data: unknown[] }).data[0]).toMatchObject({ model: 'p4a-ui-model' });
 
-      await openModelsWithUsageFetchArmed(page);
+      // Remount so usage effect runs against mocks + force-gateway flag
+      await remountModels(page);
 
       await expect
         .poll(async () => await page.getByTestId('token-usage-entry').count(), { timeout: 60_000 })
@@ -153,9 +152,11 @@ test.describe('P4a Models usage facade', () => {
     const app = await launchElectronApp({ skipSetup: true });
     try {
       const page = await getStableWindow(app);
-      await installHostInvokeUsage(app, 'unsupported-fallback', SAMPLE_USAGE);
 
-      // Probe: raw host:invoke is UNSUPPORTED; HTTP path has sample (facade will use HTTP).
+      // Mount Models before replacing hostapi:fetch (full replace can break remount).
+      await openModelsPage(page);
+      await mockUsageHostPaths(app, 'unsupported-fallback', SAMPLE_USAGE);
+
       const unsup = await page.evaluate(async () => {
         return await window.clawx!.hostInvoke({
           id: 'probe-unsup',
@@ -165,17 +166,10 @@ test.describe('P4a Models usage facade', () => {
       });
       expect(unsup).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED' } });
 
-      const httpProbe = await page.evaluate(async () => {
-        return await window.electron.ipcRenderer.invoke('hostapi:fetch', {
-          path: '/api/usage/recent-token-history',
-          method: 'GET',
-        });
-      }) as { ok?: boolean; data?: { json?: unknown } };
-      expect(httpProbe?.data?.json).toEqual(
-        expect.arrayContaining([expect.objectContaining({ model: 'p4a-ui-model' })]),
-      );
-
-      await openModelsWithUsageFetchArmed(page);
+      // Re-fetch without remount: focus triggers usageRefreshNonce when gateway forced on.
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
 
       await expect
         .poll(async () => await page.getByTestId('token-usage-entry').count(), { timeout: 60_000 })
