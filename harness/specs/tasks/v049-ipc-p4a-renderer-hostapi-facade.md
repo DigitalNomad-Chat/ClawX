@@ -13,13 +13,19 @@ touchedAreas:
   - harness/specs/tasks/v049-ipc-p4a-renderer-hostapi-facade.md
   - src/lib/host-api-client.ts
   - src/lib/host-api.ts
+  - src/lib/usage-history-entries.ts
   - src/pages/Models/index.tsx
+  - src/pages/Models/usage-history.ts
   - tests/unit/host-api-facade.test.ts
+  - tests/unit/usage-history-entries.test.ts
   - tests/e2e/p4a-host-api-facade.spec.ts
+  - tests/e2e/p4a-models-usage-facade.spec.ts
 expectedUserBehavior:
   - Models token usage history still loads via dual-path facade.
   - hostInvoke preferred when available; fetch/IPC fallback retained.
   - providers.getApiKey remains UNSUPPORTED on host:invoke; no skill/channel writes via facade.
+  - Transport fallback uses explicit error codes only (never message heuristics).
+  - Models page UI shows usage for hostInvoke success and UNSUPPORTED→HTTP fallback.
 requiredProfiles:
   - fast
   - comms
@@ -36,12 +42,14 @@ requiredTests:
   - tests/unit/host-api-facade.test.ts
   - tests/unit/host-api.test.ts
   - tests/e2e/p4a-host-api-facade.spec.ts
+  - tests/e2e/p4a-models-usage-facade.spec.ts
   - pnpm run comms:replay
   - pnpm run comms:compare
 acceptance:
   - Facade limited to app/openclaw/usage low-risk actions.
   - hostApiFetch export retained for all other call sites.
   - No P4b skills/providers/channels/chat migration; no legacy deletion.
+  - Fallback only on explicit transport codes (UNSUPPORTED/BRIDGE/CHANNEL_UNAVAILABLE).
 docs:
   required: false
 ---
