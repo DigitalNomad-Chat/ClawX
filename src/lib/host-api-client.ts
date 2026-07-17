@@ -1,9 +1,11 @@
 /**
  * v0.4.9 P4a — typed host:invoke client with HTTP/IPC fallback.
  *
- * Prefer window.clawx.hostInvoke (Main HostApiRegistry). When the bridge is
- * missing or returns UNSUPPORTED, fall back to hostApiFetch / invokeIpc so
- * legacy dual-path continues to work. Does not delete any old transport.
+ * Prefer window.clawx.hostInvoke (Main HostApiRegistry). Fallback only when:
+ * - bridge is missing, or
+ * - response / thrown error carries an explicit transport code (UNSUPPORTED,
+ *   BRIDGE_UNAVAILABLE, CHANNEL_UNAVAILABLE).
+ * Never infer fallback from error message substrings (e.g. "channel"/"bridge").
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
@@ -14,6 +16,44 @@ export type HostApiActionMap = {
   openclaw: 'status';
   usage: 'recentTokenHistory';
 };
+
+/** Explicit transport failure codes that allow dual-path fallback. */
+export type HostTransportCode =
+  | 'UNSUPPORTED'
+  | 'BRIDGE_UNAVAILABLE'
+  | 'CHANNEL_UNAVAILABLE';
+
+const TRANSPORT_CODES = new Set<string>([
+  'UNSUPPORTED',
+  'BRIDGE_UNAVAILABLE',
+  'CHANNEL_UNAVAILABLE',
+]);
+
+export class HostTransportError extends Error {
+  readonly code: HostTransportCode;
+
+  constructor(code: HostTransportCode, message: string) {
+    super(message);
+    this.name = 'HostTransportError';
+    this.code = code;
+  }
+}
+
+export function isHostTransportError(error: unknown): error is HostTransportError {
+  return error instanceof HostTransportError;
+}
+
+/** True when error exposes an explicit transport code (class or { code }). */
+export function isFallbackableTransportFailure(error: unknown): boolean {
+  if (error instanceof HostTransportError) {
+    return TRANSPORT_CODES.has(error.code);
+  }
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code: unknown }).code;
+    return typeof code === 'string' && TRANSPORT_CODES.has(code);
+  }
+  return false;
+}
 
 type FallbackHandler = (payload?: unknown) => Promise<unknown>;
 
@@ -59,6 +99,7 @@ const FALLBACKS: {
     },
   },
 };
+
 function createRequestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -66,7 +107,7 @@ function createRequestId(): string {
   return `host-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function isUnsupported(response: HostInvokeResponse): boolean {
+function isUnsupportedResponse(response: HostInvokeResponse): boolean {
   return !response.ok && response.error?.code === 'UNSUPPORTED';
 }
 
@@ -95,27 +136,21 @@ export async function invokeHost<T = unknown>(
       if (response.ok) {
         return response.data as T;
       }
-      if (!isUnsupported(response)) {
-        throw new Error(response.error?.message || `Host request failed: ${module}.${action}`);
-      }
-      // UNSUPPORTED → fall through to dual-path fallback
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      // Missing channel / bridge errors also fall back
-      if (
-        !message.toLowerCase().includes('unsupported')
-        && !message.toLowerCase().includes('no handler')
-        && !message.toLowerCase().includes('invalid ipc channel')
-        && !message.toLowerCase().includes('host invoke bridge')
-      ) {
-        // Real application errors (e.g. doctor failed) should surface
-        // unless this was a transport-level failure.
-        const isTransport =
-          message.toLowerCase().includes('channel')
-          || message.toLowerCase().includes('bridge');
-        if (!isTransport) {
-          throw error instanceof Error ? error : new Error(message);
+      if (isUnsupportedResponse(response)) {
+        // Explicit UNSUPPORTED envelope → dual-path fallback (exit try)
+      } else {
+        const code = response.error?.code;
+        const message = response.error?.message || `Host request failed: ${module}.${action}`;
+        if (typeof code === 'string' && TRANSPORT_CODES.has(code)) {
+          throw new HostTransportError(code as HostTransportCode, message);
         }
+        throw new Error(message);
+      }
+    } catch (error) {
+      // Only explicit transport failures fall through; business errors rethrow.
+      // Never inspect error.message for "channel"/"bridge" substrings.
+      if (!isFallbackableTransportFailure(error)) {
+        throw error instanceof Error ? error : new Error(String(error));
       }
     }
   }
@@ -123,7 +158,10 @@ export async function invokeHost<T = unknown>(
   const moduleFallbacks = FALLBACKS[module] as Record<string, FallbackHandler> | undefined;
   const fallback = moduleFallbacks?.[action];
   if (!fallback) {
-    throw new Error(`Host invoke bridge unavailable and no fallback for ${module}.${action}`);
+    throw new HostTransportError(
+      'BRIDGE_UNAVAILABLE',
+      `Host invoke bridge unavailable and no fallback for ${module}.${action}`,
+    );
   }
   return (await fallback(payload)) as T;
 }
