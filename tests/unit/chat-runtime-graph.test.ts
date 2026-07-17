@@ -153,4 +153,115 @@ describe('applyRuntimeEventToRuns', () => {
     expect(completed).toHaveLength(1);
     expect(completed[0]).toMatchObject({ result: { ok: true } });
   });
+
+  it('item-first then tool-with-args/result upgrades in place without dropping richer payload', () => {
+    let runs = applyRuntimeEventToRuns({}, {
+      type: 'run.started',
+      runId: 'run-1',
+      seq: 1,
+    });
+    // stream=item mapped first (sparse)
+    runs = applyRuntimeEventToRuns(runs, toolStarted({
+      seq: 2,
+      toolCallId: 'call-1',
+      args: undefined,
+    }));
+    // stream=tool later with args
+    runs = applyRuntimeEventToRuns(runs, toolStarted({
+      seq: 3,
+      toolCallId: 'call-1',
+      args: { path: '/tmp/rich.md' },
+    }));
+    const started = runs['run-1'].events.filter((e) => e.type === 'tool.started');
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({
+      toolCallId: 'call-1',
+      args: { path: '/tmp/rich.md' },
+    });
+
+    // item end first (no result)
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 4,
+      toolCallId: 'call-1',
+      name: 'read',
+      isError: false,
+    });
+    // tool result later with payload
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 5,
+      toolCallId: 'call-1',
+      name: 'read',
+      result: { summary: 'file contents' },
+      meta: { bytes: 12 },
+      isError: false,
+    });
+    const completed = runs['run-1'].events.filter((e) => e.type === 'tool.completed');
+    expect(completed).toHaveLength(1);
+    expect(completed[0]).toMatchObject({
+      result: { summary: 'file contents' },
+      meta: { bytes: 12 },
+      isError: false,
+    });
+  });
+
+  it('keeps distinct tool.updated fingerprints and error-flip completed events', () => {
+    let runs = applyRuntimeEventToRuns({}, {
+      type: 'run.started',
+      runId: 'run-1',
+      seq: 1,
+    });
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.updated',
+      runId: 'run-1',
+      seq: 2,
+      toolCallId: 'call-1',
+      name: 'read',
+      partialResult: { n: 1 },
+    });
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.updated',
+      runId: 'run-1',
+      seq: 3,
+      toolCallId: 'call-1',
+      name: 'read',
+      partialResult: { n: 2 },
+    });
+    // dual-stream identical update must not double
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.updated',
+      runId: 'run-1',
+      seq: 4,
+      toolCallId: 'call-1',
+      name: 'read',
+      partialResult: { n: 2 },
+    });
+    const updates = runs['run-1'].events.filter((e) => e.type === 'tool.updated');
+    expect(updates).toHaveLength(2);
+
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 5,
+      toolCallId: 'call-1',
+      name: 'read',
+      isError: false,
+    });
+    // error flip must append a second completed
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 6,
+      toolCallId: 'call-1',
+      name: 'read',
+      result: 'boom',
+      isError: true,
+    });
+    const completed = runs['run-1'].events.filter((e) => e.type === 'tool.completed');
+    expect(completed).toHaveLength(2);
+    expect(completed.map((e) => (e.type === 'tool.completed' ? e.isError : null))).toEqual([false, true]);
+  });
 });

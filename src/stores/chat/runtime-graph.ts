@@ -87,53 +87,116 @@ function sameRuntimeEvent(left: ChatRuntimeEvent | undefined, right: ChatRuntime
 }
 
 /**
- * True when a tool lifecycle event is a cross-stream duplicate of one already
- * stored on this run (e.g. stream=tool then stream=item for the same toolCallId).
- * Unlike consecutive-only dedupe, this scans the full run event list.
+ * True when `candidate` carries more usable payload than `existing`
+ * (e.g. tool stream args/result after a sparse item frame, or reverse order).
  */
-function isDuplicateToolLifecycleEvent(
-  events: ChatRuntimeEvent[],
+function isRicherToolPayload(candidate: unknown, existing: unknown): boolean {
+  if (candidate === undefined || candidate === null) return false;
+  if (typeof candidate === 'string' && candidate.length === 0) return false;
+  if (existing === undefined || existing === null) return true;
+  if (typeof existing === 'string' && existing.length === 0) {
+    return typeof candidate === 'string' ? candidate.length > 0 : true;
+  }
+  const existingFp = stableRuntimeFingerprint(existing);
+  const candidateFp = stableRuntimeFingerprint(candidate);
+  if (existingFp === candidateFp) return false;
+  if (existingFp === '{}' || existingFp === '[]' || existingFp === 'string:') return true;
+  // Both already have content: keep the first (do not thrash on dual-stream noise).
+  return false;
+}
+
+function isToolLifecycleEvent(
   event: ChatRuntimeEvent,
-): boolean {
+): event is Extract<ChatRuntimeEvent, { type: 'tool.started' | 'tool.updated' | 'tool.completed' }> {
+  return event.type === 'tool.started'
+    || event.type === 'tool.updated'
+    || event.type === 'tool.completed';
+}
+
+/**
+ * Merge tool lifecycle events across stream=tool + stream=item dual sources.
+ * - Same toolCallId started/completed: skip poorer duplicate; replace when the
+ *   incoming event has richer args/result/meta (supports item-first reverse order).
+ * - completed with different isError (error flip): always append.
+ * - updated: skip only identical partialResult fingerprint; keep distinct updates.
+ */
+function mergeToolLifecycleEvent(
+  events: ChatRuntimeEvent[],
+  event: Extract<ChatRuntimeEvent, { type: 'tool.started' | 'tool.updated' | 'tool.completed' }>,
+): ChatRuntimeEvent[] {
   if (event.type === 'tool.started') {
-    return events.some(
+    const idx = events.findIndex(
       (existing) => existing.type === 'tool.started' && existing.toolCallId === event.toolCallId,
     );
+    if (idx < 0) return [...events, event];
+    const existing = events[idx] as Extract<ChatRuntimeEvent, { type: 'tool.started' }>;
+    if (!isRicherToolPayload(event.args, existing.args)) return events;
+    const next = events.slice();
+    next[idx] = {
+      ...existing,
+      ...event,
+      args: event.args !== undefined ? event.args : existing.args,
+      name: event.name || existing.name,
+    };
+    return next;
   }
+
   if (event.type === 'tool.completed') {
-    return events.some(
+    const idx = events.findIndex(
       (existing) => existing.type === 'tool.completed'
         && existing.toolCallId === event.toolCallId
         && existing.isError === event.isError,
     );
+    if (idx < 0) return [...events, event];
+    const existing = events[idx] as Extract<ChatRuntimeEvent, { type: 'tool.completed' }>;
+    const richerResult = isRicherToolPayload(event.result, existing.result);
+    const richerMeta = isRicherToolPayload(event.meta, existing.meta);
+    if (!richerResult && !richerMeta) return events;
+    const next = events.slice();
+    next[idx] = {
+      ...existing,
+      ...event,
+      result: richerResult ? event.result : existing.result,
+      meta: richerMeta ? event.meta : existing.meta,
+      name: event.name || existing.name,
+      isError: event.isError ?? existing.isError,
+    };
+    return next;
   }
-  if (event.type === 'tool.updated') {
-    return events.some(
-      (existing) => existing.type === 'tool.updated'
-        && existing.toolCallId === event.toolCallId
-        && stableRuntimeFingerprint(existing.partialResult)
-          === stableRuntimeFingerprint(event.partialResult),
-    );
-  }
-  return false;
+
+  // tool.updated — distinct fingerprints are real progress; identical ones are dual-stream noise.
+  const duplicateUpdate = events.some(
+    (existing) => existing.type === 'tool.updated'
+      && existing.toolCallId === event.toolCallId
+      && stableRuntimeFingerprint(existing.partialResult)
+        === stableRuntimeFingerprint(event.partialResult),
+  );
+  return duplicateUpdate ? events : [...events, event];
 }
 
 /**
  * Pure reducer: apply one ChatRuntimeEvent into runtimeRuns.
- * Dedupes consecutive identical events (seq or fingerprint) and cross-stream
- * tool lifecycle duplicates (same toolCallId from stream=tool + stream=item).
+ * Dedupes consecutive identical events (seq or fingerprint) and merges
+ * cross-stream tool lifecycle duplicates (same toolCallId from stream=tool + item)
+ * without dropping richer args/result when order is reversed.
  */
 export function applyRuntimeEventToRuns(
   currentRuns: Record<string, ChatRuntimeRunState>,
   event: ChatRuntimeEvent,
 ): Record<string, ChatRuntimeRunState> {
   const existing = currentRuns[event.runId] ?? cloneRunState(event.runId, event);
-  const skipAppend = sameRuntimeEvent(existing.events.at(-1), event)
-    || isDuplicateToolLifecycleEvent(existing.events, event);
+  let nextEvents = existing.events;
+  if (sameRuntimeEvent(existing.events.at(-1), event)) {
+    nextEvents = existing.events;
+  } else if (isToolLifecycleEvent(event)) {
+    nextEvents = mergeToolLifecycleEvent(existing.events, event);
+  } else {
+    nextEvents = [...existing.events, event];
+  }
   const nextRun: ChatRuntimeRunState = {
     ...existing,
     sessionKey: event.sessionKey ?? existing.sessionKey,
-    events: skipAppend ? existing.events : [...existing.events, event],
+    events: nextEvents,
   };
 
   switch (event.type) {

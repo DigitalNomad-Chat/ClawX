@@ -19,9 +19,10 @@ touchedAreas:
   - tests/e2e/chat-run-state-events.spec.ts
 expectedUserBehavior:
   - item kind=tool start/update/end normalize to tool.started/updated/completed and dual-emit with notification.
-  - item kind=command/patch and incomplete items stay notification-only.
+  - item kind=command/patch, missing kind, and incomplete items stay notification-only (strict kind === 'tool').
   - lifecycle phase=end remains non-terminal (not run.ended).
-  - runtimeRuns does not double-append tool lifecycle for same toolCallId when both stream=tool and stream=item map to tool.*.
+  - runtimeRuns merges tool+item dual sources for same toolCallId without dropping richer args/result on reverse order.
+  - Distinct tool.updated fingerprints and completed isError flips are retained.
   - Active Execution Graph shows tool steps when only item-derived runtime events arrive.
   - M4 poll convergence stays off; history poll / image settle / stale send / New Chat unchanged.
 requiredProfiles:
@@ -46,7 +47,8 @@ acceptance:
   - No v0.4.9 host-contract / api→services refactor.
   - No M4.2 poll convergence (POLL_CONVERGENCE_ENABLED remains false).
   - Legacy agent notification path always retained on dual-emit.
-  - Does not map kind=command/patch items to tool.* (command_output / patch streams remain authoritative).
+  - Does not map kind=command/patch or kind-less items to tool.* (command_output / patch streams remain authoritative).
+  - item-first then tool-with-args/result upgrades stored tool.started/completed in place.
 docs:
   required: false
 ---

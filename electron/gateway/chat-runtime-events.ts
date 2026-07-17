@@ -158,11 +158,11 @@ export function normalizeGatewayChatRuntimeEvent(payload: unknown): ChatRuntimeE
 
   // OpenClaw 2026.5.x dual-emits stream=item (kind=tool) for all control-UI clients,
   // while stream=tool is recipient-gated (tool-events + registerToolEventRecipient).
-  // Map only kind=tool items so Execution Graph gets live tool coverage when tool
-  // frames are filtered; kind=command/patch keep their dedicated streams.
+  // Strict: only explicit kind=tool maps; missing kind / command / patch stay null
+  // so command_output and patch streams remain authoritative.
   if (stream === 'item') {
     const kind = readString(data.kind);
-    if (kind !== undefined && kind !== 'tool') return null;
+    if (kind !== 'tool') return null;
 
     const phase = readString(data.phase);
     const toolCallId = readString(data.toolCallId);

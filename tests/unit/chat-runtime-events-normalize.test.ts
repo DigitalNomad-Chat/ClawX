@@ -227,7 +227,7 @@ describe('normalizeGatewayChatRuntimeEvent', () => {
     });
   });
 
-  it('does not map item kind=command/patch or incomplete tool items', () => {
+  it('does not map item kind=command/patch, missing kind, or incomplete tool items', () => {
     expect(normalizeGatewayChatRuntimeEvent({
       runId: 'run-1',
       stream: 'item',
@@ -249,6 +249,30 @@ describe('normalizeGatewayChatRuntimeEvent', () => {
         name: 'apply_patch',
         toolCallId: 'c-patch',
         itemId: 'patch:c-patch',
+      },
+    })).toBeNull();
+
+    // I1: missing kind must never map (strict kind === 'tool')
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'start',
+        name: 'read',
+        toolCallId: 'call-no-kind',
+        itemId: 'tool:call-no-kind',
+        status: 'running',
+      },
+    })).toBeNull();
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'end',
+        name: 'read',
+        toolCallId: 'call-no-kind',
+        status: 'completed',
       },
     })).toBeNull();
 
