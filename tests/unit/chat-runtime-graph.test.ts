@@ -100,4 +100,57 @@ describe('applyRuntimeEventToRuns', () => {
     expect(runs['run-a'].assistantText).toBe('only-a');
     expect(runs['run-b'].assistantText).toBe('');
   });
+
+  it('dedupes tool.started/completed across tool+item dual stream when interrupted by other events', () => {
+    let runs = applyRuntimeEventToRuns({}, {
+      type: 'run.started',
+      runId: 'run-1',
+      seq: 1,
+    });
+    // stream=tool
+    runs = applyRuntimeEventToRuns(runs, toolStarted({ seq: 2, toolCallId: 'call-1' }));
+    // intervening assistant delta would break consecutive-only dedupe
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'assistant.delta',
+      runId: 'run-1',
+      seq: 3,
+      delta: 'x',
+    });
+    // stream=item mapped to the same tool.started
+    runs = applyRuntimeEventToRuns(runs, toolStarted({
+      seq: 4,
+      toolCallId: 'call-1',
+      args: undefined,
+    }));
+    const started = runs['run-1'].events.filter((e) => e.type === 'tool.started');
+    expect(started).toHaveLength(1);
+
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 5,
+      toolCallId: 'call-1',
+      name: 'read',
+      result: { ok: true },
+      isError: false,
+    });
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'assistant.delta',
+      runId: 'run-1',
+      seq: 6,
+      delta: 'y',
+    });
+    // item end → tool.completed same toolCallId/isError
+    runs = applyRuntimeEventToRuns(runs, {
+      type: 'tool.completed',
+      runId: 'run-1',
+      seq: 7,
+      toolCallId: 'call-1',
+      name: 'read',
+      isError: false,
+    });
+    const completed = runs['run-1'].events.filter((e) => e.type === 'tool.completed');
+    expect(completed).toHaveLength(1);
+    expect(completed[0]).toMatchObject({ result: { ok: true } });
+  });
 });

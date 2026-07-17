@@ -156,6 +156,67 @@ export function normalizeGatewayChatRuntimeEvent(payload: unknown): ChatRuntimeE
     return null;
   }
 
+  // OpenClaw 2026.5.x dual-emits stream=item (kind=tool) for all control-UI clients,
+  // while stream=tool is recipient-gated (tool-events + registerToolEventRecipient).
+  // Map only kind=tool items so Execution Graph gets live tool coverage when tool
+  // frames are filtered; kind=command/patch keep their dedicated streams.
+  if (stream === 'item') {
+    const kind = readString(data.kind);
+    if (kind !== undefined && kind !== 'tool') return null;
+
+    const phase = readString(data.phase);
+    const toolCallId = readString(data.toolCallId);
+    const name = readString(data.name);
+    if (!toolCallId || !name) return null;
+
+    if (phase === 'start') {
+      const base = withBase('tool.started', raw);
+      return base
+        ? {
+            ...base,
+            toolCallId,
+            name,
+            // item frames often omit args; preserve when present for parity with stream=tool
+            args: data.args,
+          }
+        : null;
+    }
+    if (phase === 'update') {
+      const base = withBase('tool.updated', raw);
+      return base
+        ? {
+            ...base,
+            toolCallId,
+            name,
+            partialResult: data.partialResult ?? data.progressText,
+          }
+        : null;
+    }
+    if (phase === 'end') {
+      const status = readString(data.status);
+      let isError: boolean | undefined;
+      if (typeof data.isError === 'boolean') {
+        isError = data.isError;
+      } else if (status === 'failed' || status === 'error') {
+        isError = true;
+      } else if (status === 'completed' || status === 'ok' || status === 'success') {
+        isError = false;
+      }
+      const base = withBase('tool.completed', raw);
+      return base
+        ? {
+            ...base,
+            toolCallId,
+            name,
+            result: data.result ?? data.error,
+            meta: data.meta,
+            isError,
+          }
+        : null;
+    }
+    return null;
+  }
+
   if (stream === 'command_output') {
     const base = withBase('command.output', raw);
     return base

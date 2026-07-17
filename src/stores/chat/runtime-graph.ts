@@ -87,20 +87,53 @@ function sameRuntimeEvent(left: ChatRuntimeEvent | undefined, right: ChatRuntime
 }
 
 /**
+ * True when a tool lifecycle event is a cross-stream duplicate of one already
+ * stored on this run (e.g. stream=tool then stream=item for the same toolCallId).
+ * Unlike consecutive-only dedupe, this scans the full run event list.
+ */
+function isDuplicateToolLifecycleEvent(
+  events: ChatRuntimeEvent[],
+  event: ChatRuntimeEvent,
+): boolean {
+  if (event.type === 'tool.started') {
+    return events.some(
+      (existing) => existing.type === 'tool.started' && existing.toolCallId === event.toolCallId,
+    );
+  }
+  if (event.type === 'tool.completed') {
+    return events.some(
+      (existing) => existing.type === 'tool.completed'
+        && existing.toolCallId === event.toolCallId
+        && existing.isError === event.isError,
+    );
+  }
+  if (event.type === 'tool.updated') {
+    return events.some(
+      (existing) => existing.type === 'tool.updated'
+        && existing.toolCallId === event.toolCallId
+        && stableRuntimeFingerprint(existing.partialResult)
+          === stableRuntimeFingerprint(event.partialResult),
+    );
+  }
+  return false;
+}
+
+/**
  * Pure reducer: apply one ChatRuntimeEvent into runtimeRuns.
- * Dedupes consecutive identical events (seq or fingerprint) to avoid double-append.
+ * Dedupes consecutive identical events (seq or fingerprint) and cross-stream
+ * tool lifecycle duplicates (same toolCallId from stream=tool + stream=item).
  */
 export function applyRuntimeEventToRuns(
   currentRuns: Record<string, ChatRuntimeRunState>,
   event: ChatRuntimeEvent,
 ): Record<string, ChatRuntimeRunState> {
   const existing = currentRuns[event.runId] ?? cloneRunState(event.runId, event);
+  const skipAppend = sameRuntimeEvent(existing.events.at(-1), event)
+    || isDuplicateToolLifecycleEvent(existing.events, event);
   const nextRun: ChatRuntimeRunState = {
     ...existing,
     sessionKey: event.sessionKey ?? existing.sessionKey,
-    events: sameRuntimeEvent(existing.events.at(-1), event)
-      ? existing.events
-      : [...existing.events, event],
+    events: skipAppend ? existing.events : [...existing.events, event],
   };
 
   switch (event.type) {

@@ -147,6 +147,65 @@ describe('dispatchProtocolEvent', () => {
     });
   });
 
+  it('dual-emits item kind=tool as tool.started while keeping legacy notification', () => {
+    const emitter = createMockEmitter();
+    const payload = {
+      runId: 'run-item',
+      sessionKey: 'agent:main:explicit:cap',
+      stream: 'item',
+      seq: 2,
+      ts: 20,
+      data: {
+        phase: 'start',
+        kind: 'tool',
+        name: 'read',
+        toolCallId: 'call-item-1',
+        itemId: 'tool:call-item-1',
+        status: 'running',
+      },
+    };
+
+    dispatchProtocolEvent(emitter, 'agent', payload);
+
+    expect(emitter.emit).toHaveBeenCalledWith('chat:runtime-event', {
+      type: 'tool.started',
+      runId: 'run-item',
+      sessionKey: 'agent:main:explicit:cap',
+      seq: 2,
+      ts: 20,
+      toolCallId: 'call-item-1',
+      name: 'read',
+      args: undefined,
+    });
+    expect(emitter.emit).toHaveBeenCalledWith('notification', {
+      method: 'agent',
+      params: payload,
+    });
+  });
+
+  it('keeps item kind=command notification-only (no tool runtime event)', () => {
+    const emitter = createMockEmitter();
+    const payload = {
+      runId: 'run-item',
+      stream: 'item',
+      data: {
+        phase: 'start',
+        kind: 'command',
+        name: 'exec',
+        toolCallId: 'c-exec',
+        itemId: 'command:c-exec',
+      },
+    };
+
+    dispatchProtocolEvent(emitter, 'agent', payload);
+
+    expect(emitter.emit).not.toHaveBeenCalledWith('chat:runtime-event', expect.anything());
+    expect(emitter.emit).toHaveBeenCalledWith('notification', {
+      method: 'agent',
+      params: payload,
+    });
+  });
+
   it('suppresses tick events', () => {
     const emitter = createMockEmitter();
     dispatchProtocolEvent(emitter, 'tick', {});

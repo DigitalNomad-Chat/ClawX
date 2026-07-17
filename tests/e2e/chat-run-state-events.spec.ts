@@ -210,6 +210,107 @@ test.describe('ClawX chat run state events', () => {
     }
   });
 
+  test('drives active execution graph from item-kind tool runtime events (stream=item compat)', async ({ launchElectronApp }) => {
+    // Simulates Main dual-emit output after normalize maps OpenClaw stream=item
+    // kind=tool → tool.started/completed (no args on start; isError from status).
+    const app = await launchElectronApp({ skipSetup: true });
+
+    try {
+      await installIpcMocks(app, {
+        gatewayStatus: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+        gatewayRpc: {
+          [stableStringify(['sessions.list', { includeDerivedTitles: true, includeLastMessage: true }])]: {
+            success: true,
+            result: {
+              sessions: [{ key: MAIN_SESSION_KEY, displayName: 'main' }],
+            },
+          },
+          [stableStringify(['chat.history', { sessionKey: MAIN_SESSION_KEY, limit: 200 }])]: {
+            success: true,
+            result: { messages: [] },
+          },
+          [stableStringify(['chat.send', null])]: {
+            success: true,
+            result: { runId: 'run-e2e-item-tool' },
+          },
+        },
+        hostApi: {
+          [stableStringify(['/api/gateway/status', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { state: 'running', port: 18789, pid: 12345, gatewayReady: true },
+            },
+          },
+          [stableStringify(['/api/agents', 'GET'])]: {
+            ok: true,
+            data: {
+              status: 200,
+              ok: true,
+              json: { success: true, agents: [{ id: 'main', name: 'Main' }] },
+            },
+          },
+        },
+      });
+
+      const page = await getStableWindow(app);
+      try {
+        await page.reload();
+      } catch (error) {
+        if (!String(error).includes('ERR_FILE_NOT_FOUND')) {
+          throw error;
+        }
+      }
+
+      const sendButton = page.getByTestId('chat-composer-send');
+      await expect(page.getByTestId('chat-composer-input')).toBeEnabled({ timeout: 30_000 });
+      await page.getByTestId('chat-composer-input').fill('run with item tool stream');
+      await sendButton.click();
+      await expect(sendButton).toHaveAttribute('title', /Stop|停止/);
+
+      await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          // Shape matches normalize(stream=item, kind=tool, phase=start)
+          win.webContents.send('chat:runtime-event', {
+            type: 'tool.started',
+            runId: 'run-e2e-item-tool',
+            sessionKey: 'agent:main:main',
+            toolCallId: 'call-item-read',
+            name: 'read',
+          });
+        }
+      });
+
+      await expect(page.getByTestId('chat-execution-graph')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('read')).toBeVisible();
+
+      await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.webContents.send('chat:runtime-event', {
+            type: 'tool.completed',
+            runId: 'run-e2e-item-tool',
+            sessionKey: 'agent:main:main',
+            toolCallId: 'call-item-read',
+            name: 'read',
+            isError: false,
+          });
+          win.webContents.send('chat:runtime-event', {
+            type: 'run.ended',
+            runId: 'run-e2e-item-tool',
+            sessionKey: 'agent:main:main',
+            status: 'completed',
+            endedAt: Date.now(),
+          });
+        }
+      });
+
+      await expect(sendButton).toHaveAttribute('title', /Send|发送/);
+    } finally {
+      await closeElectronApp(app);
+    }
+  });
+
   test('settles unfinished command.output steps after runtime run.ended', async ({ launchElectronApp }) => {
     const app = await launchElectronApp({ skipSetup: true });
 

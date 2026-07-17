@@ -148,6 +148,123 @@ describe('normalizeGatewayChatRuntimeEvent', () => {
     })).toBeNull();
   });
 
+  it('maps stream=item kind=tool to tool.started/updated/completed', () => {
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      sessionKey: 'agent:main:explicit:x',
+      stream: 'item',
+      seq: 2,
+      data: {
+        phase: 'start',
+        kind: 'tool',
+        name: 'read',
+        toolCallId: 'call-1',
+        itemId: 'tool:call-1',
+        status: 'running',
+        title: 'read AGENTS.md',
+      },
+    })).toMatchObject({
+      type: 'tool.started',
+      runId: 'run-1',
+      sessionKey: 'agent:main:explicit:x',
+      toolCallId: 'call-1',
+      name: 'read',
+    });
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'update',
+        kind: 'tool',
+        name: 'read',
+        toolCallId: 'call-1',
+        status: 'running',
+        partialResult: { n: 1 },
+      },
+    })).toMatchObject({
+      type: 'tool.updated',
+      toolCallId: 'call-1',
+      name: 'read',
+      partialResult: { n: 1 },
+    });
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'end',
+        kind: 'tool',
+        name: 'read',
+        toolCallId: 'call-1',
+        status: 'completed',
+        meta: { path: '/x' },
+      },
+    })).toMatchObject({
+      type: 'tool.completed',
+      toolCallId: 'call-1',
+      name: 'read',
+      isError: false,
+      meta: { path: '/x' },
+    });
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'end',
+        kind: 'tool',
+        name: 'read',
+        toolCallId: 'call-1',
+        status: 'failed',
+        error: 'ENOENT',
+      },
+    })).toMatchObject({
+      type: 'tool.completed',
+      toolCallId: 'call-1',
+      isError: true,
+      result: 'ENOENT',
+    });
+  });
+
+  it('does not map item kind=command/patch or incomplete tool items', () => {
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'start',
+        kind: 'command',
+        name: 'exec',
+        toolCallId: 'c-exec',
+        itemId: 'command:c-exec',
+      },
+    })).toBeNull();
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: {
+        phase: 'end',
+        kind: 'patch',
+        name: 'apply_patch',
+        toolCallId: 'c-patch',
+        itemId: 'patch:c-patch',
+      },
+    })).toBeNull();
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: { phase: 'start', kind: 'tool', name: 'read' },
+    })).toBeNull();
+
+    expect(normalizeGatewayChatRuntimeEvent({
+      runId: 'run-1',
+      stream: 'item',
+      data: { phase: 'start', kind: 'tool', toolCallId: 'c1' },
+    })).toBeNull();
+  });
+
   it('normalizes command_output / patch / approval streams', () => {
     expect(normalizeGatewayChatRuntimeEvent({
       runId: 'run-1',
