@@ -12,7 +12,7 @@ import { GlobalDefaultModelCard } from '@/components/models/GlobalDefaultModelCa
 import { AgentModelAssignmentsView } from '@/components/models/AgentModelAssignmentsView';
 import { useGatewayStore } from '@/stores/gateway';
 import { useSettingsStore } from '@/stores/settings';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi } from '@/lib/host-api';
 import { trackUiEvent } from '@/lib/telemetry';
 import { ProvidersSettings } from '@/components/settings/ProvidersSettings';
 import { FeedbackState } from '@/components/common/FeedbackState';
@@ -184,7 +184,8 @@ export function Models() {
         restartMarker,
       });
       try {
-        const entries = await hostApiFetch<UsageHistoryEntry[]>('/api/usage/recent-token-history');
+        // P4a: prefer host:invoke usage.recentTokenHistory; falls back to hostApiFetch
+        const entries = await hostApi.usage.recentTokenHistory() as UsageHistoryEntry[];
         if (usageFetchGenerationRef.current !== generation) return;
 
         const normalized = Array.isArray(entries) ? entries : [];

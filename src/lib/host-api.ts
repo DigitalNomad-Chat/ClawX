@@ -1,9 +1,35 @@
 import { invokeIpc } from '@/lib/api-client';
 import { trackUiEvent } from './telemetry';
 import { normalizeAppError } from './error-model';
+import { invokeHost } from './host-api-client';
 
 const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
+
+/**
+ * P4a typed hostApi facade (low-risk only).
+ * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
+ * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media.
+ */
+export const hostApi = {
+  app: {
+    openClawDoctor: (mode?: 'fix' | string) =>
+      invokeHost('app', 'openClawDoctor', mode ? { mode } : undefined),
+  },
+  openclaw: {
+    status: () => invokeHost('openclaw', 'status'),
+  },
+  usage: {
+    recentTokenHistory: (limit?: number) =>
+      invokeHost(
+        'usage',
+        'recentTokenHistory',
+        limit !== undefined ? { limit } : undefined,
+      ),
+  },
+};
+
+export type HostApi = typeof hostApi;
 
 /** Cached Host API auth token, fetched once from the main process via IPC. */
 let cachedHostApiToken: string | null = null;
