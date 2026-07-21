@@ -7,18 +7,30 @@ const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
 /**
- * Typed hostApi facade (P4a + P4b-B1 + P4b-B2 setMany + P4b-B3 cron writes).
+ * Typed hostApi facade (P4a–P4b-B4).
  * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
- * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media,
- * full settings CRUD, cron list/create/update, and gateway control (later batches).
+ * Intentionally omits updates/uv Main services, skills/providers writes,
+ * chat/sessions/media, full settings CRUD, cron list/create/update, gateway control.
  */
 export const hostApi = {
   app: {
     openClawDoctor: (mode?: 'fix' | string) =>
       invokeHost('app', 'openClawDoctor', mode ? { mode } : undefined),
   },
+  /**
+   * OpenClaw package path/CLI read helpers (registered on Main).
+   * status since P4a; dir/CLI helpers added in P4b-B4.
+   */
   openclaw: {
     status: () => invokeHost('openclaw', 'status'),
+    getDir: () => invokeHost<string>('openclaw', 'getDir'),
+    getConfigDir: () => invokeHost<string>('openclaw', 'getConfigDir'),
+    getSkillsDir: () => invokeHost<string>('openclaw', 'getSkillsDir'),
+    getCliCommand: () =>
+      invokeHost<{ success: boolean; command?: string; error?: string }>(
+        'openclaw',
+        'getCliCommand',
+      ),
   },
   usage: {
     /**
@@ -82,6 +94,25 @@ export const hostApi = {
     toggle: (id: string, enabled: boolean) =>
       invokeHost('cron', 'toggle', { id, enabled }),
     trigger: (id: string) => invokeHost('cron', 'trigger', { id }),
+  },
+  /**
+   * P4b-B4 — logs read-only.
+   * readFile/getDir shapes match prior HTTP helpers used by Settings/Setup
+   * ({ content } / { dir }) so UI call sites stay stable.
+   */
+  logs: {
+    getRecent: (count?: number) =>
+      invokeHost<string[]>('logs', 'getRecent', count !== undefined ? { count } : undefined),
+    readFile: async (tailLines = 100) => {
+      const content = await invokeHost<string>('logs', 'readFile', { tailLines });
+      return { content: typeof content === 'string' ? content : String(content ?? '') };
+    },
+    getFilePath: () => invokeHost<string | null>('logs', 'getFilePath'),
+    getDir: async () => {
+      const dir = await invokeHost<string | null>('logs', 'getDir');
+      return { dir: dir ?? null };
+    },
+    listFiles: () => invokeHost<unknown[]>('logs', 'listFiles'),
   },
 };
 

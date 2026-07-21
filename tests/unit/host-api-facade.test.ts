@@ -179,6 +179,87 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(cron.list).toBeUndefined();
     expect(cron.create).toBeUndefined();
     expect(cron.update).toBeUndefined();
+    // P4b-B4: logs + openclaw read helpers present; no updates/uv
+    expect(api.logs).toBeDefined();
+    expect(api.updates).toBeUndefined();
+    expect(api.uv).toBeUndefined();
+    const oc = api.openclaw as Record<string, unknown>;
+    expect(oc.status).toEqual(expect.any(Function));
+    expect(oc.getDir).toEqual(expect.any(Function));
+    expect(oc.getConfigDir).toEqual(expect.any(Function));
+    expect(oc.getSkillsDir).toEqual(expect.any(Function));
+    expect(oc.getCliCommand).toEqual(expect.any(Function));
+  });
+
+  it('P4b-B4: logs.readFile/getDir go through hostInvoke and wrap UI shapes', async () => {
+    hostInvoke
+      .mockResolvedValueOnce({ id: '1', ok: true, data: 'line1\nline2' })
+      .mockResolvedValueOnce({ id: '2', ok: true, data: '/tmp/clawdock-logs' });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.logs.readFile(100)).resolves.toEqual({ content: 'line1\nline2' });
+    await expect(hostApi.logs.getDir()).resolves.toEqual({ dir: '/tmp/clawdock-logs' });
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        module: 'logs',
+        action: 'readFile',
+        payload: { tailLines: 100 },
+      }),
+    );
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ module: 'logs', action: 'getDir' }),
+    );
+  });
+
+  it('P4b-B4: logs falls back to legacy log:* IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: logs.readFile' },
+    });
+    invokeIpcMock.mockResolvedValueOnce('from-legacy-log');
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.logs.readFile(50)).resolves.toEqual({ content: 'from-legacy-log' });
+    expect(invokeIpcMock).toHaveBeenCalledWith('log:readFile', 50);
+  });
+
+  it('P4b-B4: openclaw dir/cli helpers go through hostInvoke', async () => {
+    hostInvoke
+      .mockResolvedValueOnce({ id: '1', ok: true, data: '/oc' })
+      .mockResolvedValueOnce({ id: '2', ok: true, data: '/oc-config' })
+      .mockResolvedValueOnce({ id: '3', ok: true, data: '/oc-skills' })
+      .mockResolvedValueOnce({
+        id: '4',
+        ok: true,
+        data: { success: true, command: 'node entry.js' },
+      });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.openclaw.getDir()).resolves.toBe('/oc');
+    await expect(hostApi.openclaw.getConfigDir()).resolves.toBe('/oc-config');
+    await expect(hostApi.openclaw.getSkillsDir()).resolves.toBe('/oc-skills');
+    await expect(hostApi.openclaw.getCliCommand()).resolves.toEqual({
+      success: true,
+      command: 'node entry.js',
+    });
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'openclaw', action: 'getDir' }),
+    );
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'openclaw', action: 'getCliCommand' }),
+    );
+  });
+
+  it('P4b-B4: openclaw getDir falls back to legacy IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: openclaw.getDir' },
+    });
+    invokeIpcMock.mockResolvedValueOnce('/legacy-oc');
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.openclaw.getDir()).resolves.toBe('/legacy-oc');
+    expect(invokeIpcMock).toHaveBeenCalledWith('openclaw:getDir');
   });
 
   it('P4b-B3: cron delete/toggle/trigger go through hostInvoke', async () => {

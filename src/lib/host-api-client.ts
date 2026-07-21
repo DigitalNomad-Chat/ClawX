@@ -9,6 +9,7 @@
  *
  * P4b-B1: window / shell / dialog. P4b-B2: settings.setMany.
  * P4b-B3: cron delete/toggle/trigger only (list/create/update stay legacy/HTTP).
+ * P4b-B4: logs read-only + openclaw dir/CLI read helpers (no updates/uv/skills/providers).
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
@@ -21,10 +22,11 @@ export type HostApiModule =
   | 'shell'
   | 'dialog'
   | 'settings'
-  | 'cron';
+  | 'cron'
+  | 'logs';
 export type HostApiActionMap = {
   app: 'openClawDoctor';
-  openclaw: 'status';
+  openclaw: 'status' | 'getDir' | 'getConfigDir' | 'getSkillsDir' | 'getCliCommand';
   usage: 'recentTokenHistory';
   window: 'minimize' | 'maximize' | 'close' | 'isMaximized' | 'syncTrafficLightPosition';
   shell: 'openExternal' | 'showItemInFolder' | 'openPath';
@@ -33,7 +35,25 @@ export type HostApiActionMap = {
   settings: 'setMany';
   /** P4b-B3 — registered write surface only. */
   cron: 'delete' | 'toggle' | 'trigger';
+  /** P4b-B4 — logs read-only surface (registered on Main). */
+  logs: 'getRecent' | 'readFile' | 'getFilePath' | 'getDir' | 'listFiles';
 };
+
+function resolveLogTailArg(payload?: unknown, fallback = 100): number {
+  if (typeof payload === 'number' && Number.isFinite(payload)) {
+    return Math.max(Math.floor(payload), 1);
+  }
+  if (payload && typeof payload === 'object') {
+    const record = payload as { tailLines?: unknown; count?: unknown };
+    if (typeof record.tailLines === 'number' && Number.isFinite(record.tailLines)) {
+      return Math.max(Math.floor(record.tailLines), 1);
+    }
+    if (typeof record.count === 'number' && Number.isFinite(record.count)) {
+      return Math.max(Math.floor(record.count), 1);
+    }
+  }
+  return fallback;
+}
 
 function resolveCronIdArg(payload?: unknown): string {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
@@ -127,6 +147,10 @@ const FALLBACKS: {
   },
   openclaw: {
     status: async () => await invokeIpc('openclaw:status'),
+    getDir: async () => await invokeIpc('openclaw:getDir'),
+    getConfigDir: async () => await invokeIpc('openclaw:getConfigDir'),
+    getSkillsDir: async () => await invokeIpc('openclaw:getSkillsDir'),
+    getCliCommand: async () => await invokeIpc('openclaw:getCliCommand'),
   },
   usage: {
     recentTokenHistory: async (payload) => {
@@ -185,6 +209,14 @@ const FALLBACKS: {
       return await invokeIpc('cron:toggle', id, enabled);
     },
     trigger: async (payload) => await invokeIpc('cron:trigger', resolveCronIdArg(payload)),
+  },
+  // P4b-B4: legacy log:* IPC (bare count/tail args) — same as ipc-handlers thin wrappers.
+  logs: {
+    getRecent: async (payload) => await invokeIpc('log:getRecent', resolveLogTailArg(payload, 50)),
+    readFile: async (payload) => await invokeIpc('log:readFile', resolveLogTailArg(payload, 100)),
+    getFilePath: async () => await invokeIpc('log:getFilePath'),
+    getDir: async () => await invokeIpc('log:getDir'),
+    listFiles: async () => await invokeIpc('log:listFiles'),
   },
 };
 
