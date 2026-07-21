@@ -25,7 +25,6 @@ import { useGatewayStore } from '@/stores/gateway';
 import { useUpdateStore } from '@/stores/update';
 import {
   getGatewayWsDiagnosticEnabled,
-  invokeIpc,
   setGatewayWsDiagnosticEnabled,
   toUserMessage,
 } from '@/lib/api-client';
@@ -96,7 +95,8 @@ export function Settings() {
 
   const handleShowLogs = async () => {
     try {
-      const logs = await hostApiFetch<{ content: string }>('/api/logs?tailLines=100');
+      // P4b-B4: hostApi.logs.readFile → host:invoke / legacy log:readFile.
+      const logs = await hostApi.logs.readFile(100);
       setLogContent(logs.content);
       setShowLogs(true);
     } catch {
@@ -107,9 +107,10 @@ export function Settings() {
 
   const handleOpenLogDir = async () => {
     try {
-      const { dir: logDir } = await hostApiFetch<{ dir: string | null }>('/api/logs/dir');
+      const { dir: logDir } = await hostApi.logs.getDir();
       if (logDir) {
-        await invokeIpc('shell:showItemInFolder', logDir);
+        // B1: shell facade; keep reveal path dual-path.
+        await hostApi.shell.showItemInFolder(logDir);
       }
     } catch {
       // ignore
@@ -455,7 +456,13 @@ export function Settings() {
                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                     {t('common:actions.restart')}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleShowLogs} className="h-8 px-3">
+                  <Button
+                    data-testid="settings-show-logs-button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShowLogs}
+                    className="h-8 px-3"
+                  >
                     <FileText className="h-3.5 w-3.5 mr-1.5" />
                     {t('gateway.logs')}
                   </Button>
@@ -463,11 +470,17 @@ export function Settings() {
               </div>
 
               {showLogs && (
-                <div className="p-4 rounded-2xl bg-muted border border">
+                <div data-testid="settings-logs-panel" className="p-4 rounded-2xl bg-muted border border">
                   <div className="flex items-center justify-between mb-3">
                     <p className="font-medium text-sm">{t('gateway.appLogs')}</p>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleOpenLogDir}>
+                      <Button
+                        data-testid="settings-open-log-dir-button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={handleOpenLogDir}
+                      >
                         <ExternalLink className="h-3 w-3 mr-1.5" />
                         {t('gateway.openFolder')}
                       </Button>
@@ -476,7 +489,10 @@ export function Settings() {
                       </Button>
                     </div>
                   </div>
-                  <pre className="text-xs text-muted-foreground bg-card p-4 rounded-xl max-h-60 overflow-auto whitespace-pre-wrap font-mono border border shadow-inner">
+                  <pre
+                    data-testid="settings-logs-content"
+                    className="text-xs text-muted-foreground bg-card p-4 rounded-xl max-h-60 overflow-auto whitespace-pre-wrap font-mono border border shadow-inner"
+                  >
                     {logContent || t('chat:noLogs')}
                   </pre>
                 </div>

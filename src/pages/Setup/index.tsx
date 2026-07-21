@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next';
 import { SUPPORTED_LANGUAGES } from '@/i18n';
 import { toast } from 'sonner';
 import { invokeIpc } from '@/lib/api-client';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi } from '@/lib/host-api';
 
 interface SetupStep {
   id: string;
@@ -491,7 +491,8 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   const handleShowLogs = async () => {
     try {
-      const logs = await hostApiFetch<{ content: string }>('/api/logs?tailLines=100');
+      // P4b-B4: hostApi.logs.readFile → host:invoke / legacy log:readFile.
+      const logs = await hostApi.logs.readFile(100);
       setLogContent(logs.content);
       setShowLogs(true);
     } catch {
@@ -502,9 +503,9 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   const handleOpenLogDir = async () => {
     try {
-      const { dir: logDir } = await hostApiFetch<{ dir: string | null }>('/api/logs/dir');
+      const { dir: logDir } = await hostApi.logs.getDir();
       if (logDir) {
-        await invokeIpc('shell:showItemInFolder', logDir);
+        await hostApi.shell.showItemInFolder(logDir);
       }
     } catch {
       // ignore
