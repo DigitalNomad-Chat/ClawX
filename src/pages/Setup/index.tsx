@@ -106,13 +106,22 @@ export function Setup() {
 
   const markSetupComplete = useSettingsStore((state) => state.markSetupComplete);
 
+  // E2E-only unlock for install-step coverage (production never sets this key).
+  const e2eForceRuntimePass = (() => {
+    try {
+      return window.localStorage.getItem('clawdock:e2e-force-setup-runtime-pass') === '1';
+    } catch {
+      return false;
+    }
+  })();
+
   // Derive canProceed based on current step - computed directly to avoid useEffect
   const canProceed = useMemo(() => {
     switch (safeStepIndex) {
       case STEP.WELCOME:
         return true;
       case STEP.RUNTIME:
-        return runtimeChecksPassed;
+        return runtimeChecksPassed || e2eForceRuntimePass;
       case STEP.INSTALLING:
         return false; // Cannot manually proceed, auto-proceeds when done
       case STEP.COMPLETE:
@@ -120,7 +129,7 @@ export function Setup() {
       default:
         return true;
     }
-  }, [safeStepIndex, runtimeChecksPassed]);
+  }, [safeStepIndex, runtimeChecksPassed, e2eForceRuntimePass]);
 
   const handleNext = async () => {
     if (isLastStep) {
@@ -322,9 +331,9 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
   const startGateway = useGatewayStore((state) => state.start);
 
   const [checks, setChecks] = useState({
-    nodejs: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
-    hermes: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
-    gateway: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
+    nodejs: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
+    hermes: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
+    gateway: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
   });
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
@@ -368,8 +377,8 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         setChecks((prev) => ({
           ...prev,
           hermes: {
-            status: 'error',
-            message: 'Hermes not installed. Run: pip install hermes-agent'
+            status: 'optional',
+            message: t('runtime.status.hermesOptional', 'Hermes not installed (optional)'),
           },
         }));
       } else {
@@ -421,8 +430,9 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   // Update canProceed when gateway status changes
   useEffect(() => {
+    const hermesReady = checks.hermes.status === 'success' || checks.hermes.status === 'optional';
     const allPassed = checks.nodejs.status === 'success'
-      && checks.hermes.status === 'success'
+      && hermesReady
       && (checks.gateway.status === 'success' || gatewayStatus.state === 'running');
     onStatusChange(allPassed);
   }, [checks, gatewayStatus, onStatusChange]);
@@ -514,7 +524,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   const ERROR_TRUNCATE_LEN = 30;
 
-  const renderStatus = (status: 'checking' | 'success' | 'error', message: string) => {
+  const renderStatus = (status: 'checking' | 'success' | 'error' | 'optional', message: string) => {
     if (status === 'checking') {
       return (
         <span className="flex items-center gap-2 text-yellow-400 whitespace-nowrap">
@@ -527,6 +537,14 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
       return (
         <span className="flex items-center gap-2 text-green-400 whitespace-nowrap">
           <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+          {message}
+        </span>
+      );
+    }
+    if (status === 'optional') {
+      return (
+        <span className="flex items-center gap-2 text-amber-400 whitespace-nowrap">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
           {message}
         </span>
       );
@@ -561,7 +579,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
           <Button variant="ghost" size="sm" onClick={handleShowLogs}>
             {t('runtime.viewLogs')}
           </Button>
-          <Button variant="ghost" size="sm" onClick={runChecks}>
+          <Button data-testid="setup-runtime-recheck-button" variant="ghost" size="sm" onClick={runChecks}>
             <RefreshCw className="h-4 w-4 mr-2" />
             {t('runtime.recheck')}
           </Button>
@@ -607,7 +625,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         </div>
       </div>
 
-      {(checks.nodejs.status === 'error' || checks.hermes.status === 'error') && (
+      {(checks.nodejs.status === 'error') && (
         <div className="mt-4 p-4 rounded-lg bg-red-900/20 border border-red-500/20">
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
@@ -684,11 +702,9 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
         setSkillStates(prev => prev.map(s => ({ ...s, status: 'installing' })));
         setOverallProgress(10);
 
-        // Step 2: Call the backend to install uv and setup Python
-        const result = await invokeIpc('uv:install-all') as {
-          success: boolean;
-          error?: string
-        };
+        // Step 2: UV + managed Python via hostApi.uv.installAll (legacy uv:install-all fallback).
+        // Preserves prior UI progress / loading / error / skip semantics.
+        const result = await hostApi.uv.installAll();
 
         if (result.success) {
           setSkillStates(prev => prev.map(s => ({ ...s, status: 'completed' })));
@@ -738,7 +754,7 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="setup-installing-step" className="space-y-6">
       <div className="text-center">
         <div className="text-4xl mb-4">⚙️</div>
         <h2 className="text-xl font-semibold mb-2">{t('installing.title')}</h2>
@@ -751,7 +767,7 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">{t('installing.progress')}</span>
-          <span className="text-primary">{overallProgress}%</span>
+          <span data-testid="setup-install-progress" className="text-primary">{overallProgress}%</span>
         </div>
         <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <motion.div
@@ -790,6 +806,7 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
       {/* Error Message Display */}
       {errorMessage && (
         <motion.div
+          data-testid="setup-install-error"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="p-4 rounded-lg bg-red-900/30 border border-red-500/50 text-red-200 text-sm"
@@ -820,6 +837,7 @@ function InstallingContent({ skills, onComplete, onSkip }: InstallingContentProp
       )}
       <div className="flex justify-end">
         <Button
+          data-testid="setup-install-skip-button"
           variant="ghost"
           className="text-muted-foreground"
           onClick={onSkip}
