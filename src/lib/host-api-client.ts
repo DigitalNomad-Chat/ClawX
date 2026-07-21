@@ -7,8 +7,8 @@
  *   BRIDGE_UNAVAILABLE, CHANNEL_UNAVAILABLE).
  * Never infer fallback from error message substrings (e.g. "channel"/"bridge").
  *
- * P4b-B1: window / shell / dialog. P4b-B2: settings.setMany only.
- * Still omits cron/chat/sessions/media/providers/gateway and other settings actions.
+ * P4b-B1: window / shell / dialog. P4b-B2: settings.setMany.
+ * P4b-B3: cron delete/toggle/trigger only (list/create/update stay legacy/HTTP).
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
@@ -20,7 +20,8 @@ export type HostApiModule =
   | 'window'
   | 'shell'
   | 'dialog'
-  | 'settings';
+  | 'settings'
+  | 'cron';
 export type HostApiActionMap = {
   app: 'openClawDoctor';
   openclaw: 'status';
@@ -30,7 +31,18 @@ export type HostApiActionMap = {
   dialog: 'open' | 'save' | 'message';
   /** P4b-B2 — only setMany; get/set/reset stay on legacy/HTTP for now. */
   settings: 'setMany';
+  /** P4b-B3 — registered write surface only. */
+  cron: 'delete' | 'toggle' | 'trigger';
 };
+
+function resolveCronIdArg(payload?: unknown): string {
+  if (typeof payload === 'string' && payload.trim()) return payload.trim();
+  if (payload && typeof payload === 'object' && 'id' in payload) {
+    const id = (payload as { id: unknown }).id;
+    if (typeof id === 'string' && id.trim()) return id.trim();
+  }
+  throw new Error('cron job id is required');
+}
 
 function resolveShellPathArg(payload?: unknown): string {
   if (typeof payload === 'string') return payload;
@@ -160,6 +172,19 @@ const FALLBACKS: {
   // P4b-B2: same patch object as legacy settings:setMany (proxy/launch side effects on Main).
   settings: {
     setMany: async (payload) => await invokeIpc('settings:setMany', payload ?? {}),
+  },
+  // P4b-B3: legacy IPC uses bare id (+ enabled for toggle), same as ipc-handlers thin wrappers.
+  cron: {
+    delete: async (payload) => await invokeIpc('cron:delete', resolveCronIdArg(payload)),
+    toggle: async (payload) => {
+      if (!payload || typeof payload !== 'object' || typeof (payload as { enabled?: unknown }).enabled !== 'boolean') {
+        throw new Error('toggle requires { id, enabled }');
+      }
+      const id = resolveCronIdArg(payload);
+      const enabled = (payload as { enabled: boolean }).enabled;
+      return await invokeIpc('cron:toggle', id, enabled);
+    },
+    trigger: async (payload) => await invokeIpc('cron:trigger', resolveCronIdArg(payload)),
   },
 };
 

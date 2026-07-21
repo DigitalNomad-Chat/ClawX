@@ -162,7 +162,6 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(api.chat).toBeUndefined();
     expect(api.sessions).toBeUndefined();
     expect(api.media).toBeUndefined();
-    expect(api.cron).toBeUndefined();
     expect(api.gateway).toBeUndefined();
     // P4b-B2: settings exposes setMany only
     expect(api.settings).toBeDefined();
@@ -171,6 +170,73 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect((api.settings as Record<string, unknown>).get).toBeUndefined();
     expect((api.settings as Record<string, unknown>).set).toBeUndefined();
     expect((api.settings as Record<string, unknown>).reset).toBeUndefined();
+    // P4b-B3: cron exposes delete/toggle/trigger only
+    expect(api.cron).toBeDefined();
+    const cron = api.cron as Record<string, unknown>;
+    expect(cron.delete).toEqual(expect.any(Function));
+    expect(cron.toggle).toEqual(expect.any(Function));
+    expect(cron.trigger).toEqual(expect.any(Function));
+    expect(cron.list).toBeUndefined();
+    expect(cron.create).toBeUndefined();
+    expect(cron.update).toBeUndefined();
+  });
+
+  it('P4b-B3: cron delete/toggle/trigger go through hostInvoke', async () => {
+    hostInvoke
+      .mockResolvedValueOnce({ id: '1', ok: true, data: { removed: true } })
+      .mockResolvedValueOnce({ id: '2', ok: true, data: { enabled: false } })
+      .mockResolvedValueOnce({ id: '3', ok: true, data: { started: true } });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.cron.delete('job-a')).resolves.toEqual({ removed: true });
+    await expect(hostApi.cron.toggle('job-a', false)).resolves.toEqual({ enabled: false });
+    await expect(hostApi.cron.trigger('job-a')).resolves.toEqual({ started: true });
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        module: 'cron',
+        action: 'delete',
+        payload: { id: 'job-a' },
+      }),
+    );
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        module: 'cron',
+        action: 'toggle',
+        payload: { id: 'job-a', enabled: false },
+      }),
+    );
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        module: 'cron',
+        action: 'trigger',
+        payload: { id: 'job-a' },
+      }),
+    );
+  });
+
+  it('P4b-B3: cron falls back to legacy cron:* IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: cron.toggle' },
+    });
+    invokeIpcMock.mockResolvedValueOnce({ ok: true });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.cron.toggle('job-b', true)).resolves.toEqual({ ok: true });
+    expect(invokeIpcMock).toHaveBeenCalledWith('cron:toggle', 'job-b', true);
+  });
+
+  it('P4b-B3: cron business INTERNAL does not fallback', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'INTERNAL', message: 'cron channel offline' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.cron.delete('job-c')).rejects.toThrow(/cron channel offline/);
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 
   it('P4b-B2: settings.setMany goes through hostInvoke with patch payload', async () => {

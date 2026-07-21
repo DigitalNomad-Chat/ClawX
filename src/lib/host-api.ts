@@ -7,10 +7,10 @@ const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
 /**
- * Typed hostApi facade (P4a + P4b-B1 + P4b-B2 settings.setMany).
+ * Typed hostApi facade (P4a + P4b-B1 + P4b-B2 setMany + P4b-B3 cron writes).
  * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
  * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media,
- * full settings CRUD, cron, and gateway control (later P4b batches).
+ * full settings CRUD, cron list/create/update, and gateway control (later batches).
  */
 export const hostApi = {
   app: {
@@ -69,6 +69,19 @@ export const hostApi = {
   settings: {
     setMany: (patch: Record<string, unknown>) =>
       invokeHost<{ success: boolean }>('settings', 'setMany', patch),
+  },
+  /**
+   * P4b-B3 — cron write surface registered on Main only.
+   * delete → cron.remove { id }
+   * toggle → cron.update { id, patch: { enabled } }
+   * trigger → cron.run { id, mode: 'force' }
+   * list/create/update stay on hostApiFetch (complex transform/repair/delivery).
+   */
+  cron: {
+    delete: (id: string) => invokeHost('cron', 'delete', { id }),
+    toggle: (id: string, enabled: boolean) =>
+      invokeHost('cron', 'toggle', { id, enabled }),
+    trigger: (id: string) => invokeHost('cron', 'trigger', { id }),
   },
 };
 
