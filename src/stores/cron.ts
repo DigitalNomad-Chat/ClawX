@@ -3,7 +3,7 @@
  * Manages scheduled task state
  */
 import { create } from 'zustand';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi, hostApiFetch } from '@/lib/host-api';
 import { useChatStore } from './chat';
 import type { CronJob, CronJobCreateInput, CronJobUpdateInput } from '../types/cron';
 
@@ -103,9 +103,9 @@ export const useCronStore = create<CronState>((set) => ({
 
   deleteJob: async (id) => {
     try {
-      await hostApiFetch(`/api/cron/jobs/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
+      // P4b-B3: host:invoke cron.delete → legacy cron:delete IPC fallback.
+      // list/create/update remain hostApiFetch (complex transform/repair).
+      await hostApi.cron.delete(id);
       set((state) => ({
         jobs: state.jobs.filter((job) => job.id !== id),
       }));
@@ -117,10 +117,8 @@ export const useCronStore = create<CronState>((set) => ({
 
   toggleJob: async (id, enabled) => {
     try {
-      await hostApiFetch('/api/cron/toggle', {
-        method: 'POST',
-        body: JSON.stringify({ id, enabled }),
-      });
+      // P4b-B3: hostApi.cron.toggle → cron.update { patch: { enabled } } on Main.
+      await hostApi.cron.toggle(id, enabled);
       set((state) => ({
         jobs: state.jobs.map((job) =>
           job.id === id ? { ...job, enabled } : job
@@ -134,11 +132,9 @@ export const useCronStore = create<CronState>((set) => ({
 
   triggerJob: async (id) => {
     try {
-      await hostApiFetch('/api/cron/trigger', {
-        method: 'POST',
-        body: JSON.stringify({ id }),
-      });
-      // Refresh jobs after trigger to update lastRun/nextRun state
+      // P4b-B3: hostApi.cron.trigger → cron.run { mode: 'force' } on Main.
+      await hostApi.cron.trigger(id);
+      // Refresh jobs after trigger to update lastRun/nextRun state (list stays HTTP).
       try {
         const result = await hostApiFetch<CronJob[]>('/api/cron/jobs');
         set({ jobs: result });
