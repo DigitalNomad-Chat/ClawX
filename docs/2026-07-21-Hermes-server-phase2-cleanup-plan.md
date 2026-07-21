@@ -16,14 +16,15 @@
 
 ### 2.1 Koa Web UI 入口（已无人引用）
 
-- `server/src/routes/index.ts` 导出 `registerRoutes`，在仓库内 **没有任何 import**。
+- `server/src/routes/index.ts` 导出 `registerRoutes`，在仓库内 **没有任何 import**（`grep -R "registerRoutes" server/src electron` 无结果）。
+- `package.json`（根目录与 `server/package.json`）中均未声明 `koa` 或 `@koa/router` 依赖；当前 Electron 主进程也不 `import` 任何 `server/src/` 下的 Koa 路由/控制器。
 - 因此以 `registerRoutes` 为根的整个 Koa/Hermes 服务端栈当前均为死代码。
 
 ### 2.2 Hermes 专用路由 / 控制器 / DB
 
 | 路径 | 说明 | 分类 |
 |---|---|---|
-| `server/src/routes/hermes/*.ts` | 所有 Hermes 业务路由 | 可删除 |
+| `server/src/routes/hermes/*.ts` | 27 个 Hermes 业务路由文件 | 可删除 |
 | `server/src/controllers/hermes/*.ts` | 所有 Hermes 业务控制器 | 可删除 |
 | `server/src/db/hermes/*.ts` | Hermes 专用 SQLite/JSON 存储层 | 可删除 |
 
@@ -93,11 +94,36 @@
 
 | 变量 / 目录 | 当前设置/使用位置 | 分类 | 处理建议 |
 |---|---|---|---|
-| `HERMES_WEB_UI_HOME` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | 需改名/移除 | Koa 删除后从 `electron/main/index.ts` 移除 |
-| `HERMES_WEBUI_STATE_DIR` | `server/src/config.ts` 兼容别名 | 需改名/移除 | 随 `config.ts` 删除 |
-| `HERMES_DATA_DIR` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | 需改名/移除 | Koa 删除后从 `electron/main/index.ts` 移除 |
-| `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` | `electron/main/index.ts` 设置；`services/shutdown.ts`、`services/hermes/gateway-manager.ts` 读取 | 需改名/移除 | Koa 删除后从 `electron/main/index.ts` 移除 |
+| `HERMES_WEB_UI_HOME` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **HOLD（暂缓删除）** | Koa 删除后，若确认无外部 runtime/脚本读取，再从 `electron/main/index.ts` 移除；否则保留为兼容 alias |
+| `HERMES_WEBUI_STATE_DIR` | `server/src/config.ts` 兼容别名 | **HOLD** | 随 `config.ts` 删除；Electron 侧未设置 |
+| `HERMES_DATA_DIR` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **HOLD** | 同 `HERMES_WEB_UI_HOME` |
+| `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` | `electron/main/index.ts` 设置；`services/shutdown.ts`、`services/hermes/gateway-manager.ts` 读取 | **HOLD** | 同 `HERMES_WEB_UI_HOME` |
+| `HERMES_HOME` / `HERMES_AGENT_ROOT` / `HERMES_BIN` / `HERMES_MODEL` 等 | 外部 OpenClaw runtime 可能读取 | **保留** | 不在本仓库代码中设置，禁止在本阶段删除或改名 |
 | `~/.hermes-web-ui` / `~/.hermes` / `<userData>/hermes` | 由 Koa 配置推导 | 资源审计 | 确认无授权服务使用后，在后续版本中迁移或重命名 |
+
+### 2.9 Runtime 依赖证明（当前分支可复现）
+
+以下命令证明 Koa/Hermes 服务端栈当前不被 OpenClaw 运行时依赖：
+
+```bash
+# 1. Koa 入口 registerRoutes 无人引用
+grep -RIn "registerRoutes" server/src electron
+# 预期输出：仅 server/src/routes/index.ts 自身的定义
+
+# 2. Electron 主进程不引用任何 server/src 下的 Koa 路由/控制器/服务
+grep -RIn "from ['\"].*server/src" electron
+# 预期输出：无（仅有注释提及 server/src/config.ts）
+
+# 3. package.json 未声明 Koa 运行时依赖
+grep -Ein "koa|@koa/router" package.json server/package.json
+# 预期输出：无
+
+# 4. 授权服务（Cloudflare Workers）入口不依赖 Koa
+grep -RIn "Koa\\|koa" server/src/index.ts server/src/handlers server/src/middleware
+# 预期输出：无
+```
+
+> 若以上任何一条在实施后发生变化（例如新代码开始 import `registerRoutes` 或 Koa 依赖被重新加入），立即停止并重新评估。
 
 ## 3. 分批清理方案
 
@@ -107,7 +133,7 @@
 
 - 删除：
   - `server/src/routes/index.ts`
-  - `server/src/routes/hermes/*.ts`（共 25 个文件）
+  - `server/src/routes/hermes/*.ts`（共 27 个文件）
   - `server/src/routes/{health,auth,upload,update,webhook}.ts`
 - 验证：
   - `grep -R "registerRoutes" server/src electron` 无结果。
@@ -136,18 +162,25 @@
   - `pnpm run typecheck`。
 - Stop 条件：若发现服务被授权服务或 Electron 主进程引用，停止并将其移出本批。
 
-### Batch D：移除 Koa 配置与 electron/main 环境变量
+### Batch D：移除 Koa 配置，HOLD electron/main 环境变量
 
 - 删除：
   - `server/src/config.ts`
   - `server/src/db/index.ts`（若 Batch C 后无引用）
-- 修改：
-  - `electron/main/index.ts`：删除 `HERMES_WEB_UI_HOME`、`HERMES_DATA_DIR`、`HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` 三行设置，并清理相关注释。
+- 对 `electron/main/index.ts` 中的三个 Web UI 专用 env 改为 **HOLD**，不立即删除：
+  - `HERMES_WEB_UI_HOME`
+  - `HERMES_DATA_DIR`
+  - `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN`
+- HOLD 决策条件：
+  1. Batch A/B/C 完成后，确认 `server/src/` 与 `electron/` 中已无读取方（`grep -R` 无结果）。
+  2. 检查外部 OpenClaw runtime、打包脚本、安装/升级脚本、文档中是否引用这三个变量；若存在引用，保留为兼容 alias 或提供迁移脚本，不能直接删除。
+  3. 在干净环境（新用户目录）中启动应用，确认不依赖这三个 env 也能正常运行。
+  4. 若 1-3 全部通过，方可删除；否则保留并上报。
 - 验证：
-  - `grep -R "HERMES_WEB_UI_HOME\|HERMES_DATA_DIR\|HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN" server/src electron` 无结果。
   - `pnpm run typecheck`。
   - Electron 应用可正常启动（`pnpm dev` 或 E2E smoke）。
-- Stop 条件：若这三个 env 仍被授权服务或非 Koa 代码读取，保留并报告。
+  - 干净环境启动后，检查 `process.env` 中无 `HERMES_WEB_UI_HOME` / `HERMES_DATA_DIR` / `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` 泄漏（可通过 Main 进程 `app.evaluate` 打印）。
+- Stop 条件：若这三个 env 被授权服务或非 Koa 代码读取，立即停止并报告。
 
 ### Batch E：依赖与运行时资源审计
 
@@ -159,6 +192,33 @@
 - 验证：
   - `pnpm run typecheck`、`pnpm run harness:ci`。
   - 在干净环境中启动应用，确认无 `hermes` 相关目录新建。
+
+### 干净环境验证步骤（Batch D/E 复用）
+
+1. 创建新的临时用户目录：
+   ```bash
+   export HOME=$(mktemp -d)
+   ```
+2. 启动 Electron 应用：
+   ```bash
+   pnpm dev
+   # 或运行 E2E smoke：pnpm exec playwright test tests/e2e/smoke.spec.ts
+   ```
+3. 检查 Main 进程环境变量：
+   ```js
+   await app.evaluate(() => ({
+     HERMES_WEB_UI_HOME: process.env.HERMES_WEB_UI_HOME,
+     HERMES_DATA_DIR: process.env.HERMES_DATA_DIR,
+     HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN: process.env.HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN,
+   }));
+   ```
+   预期：上述三个变量未定义（若已删除）或仍为兼容 alias（若决定保留）。
+4. 检查文件系统：
+   ```bash
+   ls -la "$HOME/.hermes-web-ui" "$HOME/.hermes" 2>&1 || true
+   ```
+   预期：不存在，或已被新的 OpenClaw 目录替代。
+5. Stop 条件：若发现应用仍依赖 `HERMES_*` Web UI 变量才能启动，或仍在新建 `~/.hermes*` 目录，停止并报告。
 
 ## 4. 测试与验证矩阵
 
