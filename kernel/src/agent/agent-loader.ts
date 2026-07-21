@@ -65,7 +65,7 @@ export function deriveKey(): Buffer {
 }
 
 /**
- * Agent Config Cache (inspired by Hermes _agent_cache)
+ * Agent Config Cache (inspired by OpenClaw _agent_cache)
  * Stores decrypted AgentConfig in memory after first load.
  * Keyed by agentId — once loaded, subsequent requests reuse the cached config.
  */

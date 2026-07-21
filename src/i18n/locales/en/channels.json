@@ -186,17 +186,17 @@
             ]
         },
         "wechat": {
-            "description": "Connect personal WeChat with Tencent's official Hermes plugin by scanning a QR code",
+            "description": "Connect personal WeChat with Tencent's official OpenClaw plugin by scanning a QR code",
             "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/GHYZwuPCriF0gWkXwkFcJ9zon3b",
             "instructions": [
-                "Click Generate QR Code to install and enable the official WeChat plugin inside Hermes",
+                "Click Generate QR Code to install and enable the official WeChat plugin inside OpenClaw",
                 "Scan the QR code below with WeChat and confirm the connection on your phone",
                 "After linking succeeds, a new WeChat ClawBot chat will appear in WeChat automatically",
                 "You can repeat the QR flow later to add another WeChat account or reconnect an existing one"
             ]
         },
         "dingtalk": {
-            "description": "Connect DingTalk via Hermes channel plugin (Stream mode)",
+            "description": "Connect DingTalk via OpenClaw channel plugin (Stream mode)",
             "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/Y5eNwiSiZidkLskrwtJc1rUln0b#doxcnDgA78n43DbkiQjI1OqUA7b",
             "fields": {
                 "clientId": {
@@ -209,14 +209,14 @@
                 }
             },
             "instructions": [
-                "Install and enable the dingtalk plugin in Hermes",
+                "Install and enable the dingtalk plugin in OpenClaw",
                 "Create a DingTalk internal app and enable Stream mode",
                 "Fill in Client ID (AppKey) and Client Secret (AppSecret)"
             ]
         },
         "signal": {
             "description": "Connect Signal using signal-cli",
-            "docsUrl": "https://docs.hermes.ai/channels/signal",
+            "docsUrl": "https://docs.openclaw.ai/channels/signal",
             "fields": {
                 "phoneNumber": {
                     "label": "Phone Number",
@@ -270,7 +270,7 @@
         },
         "imessage": {
             "description": "Connect iMessage via BlueBubbles (macOS)",
-            "docsUrl": "https://docs.hermes.ai/channels/bluebubbles",
+            "docsUrl": "https://docs.openclaw.ai/channels/bluebubbles",
             "fields": {
                 "serverUrl": {
                     "label": "BlueBubbles Server URL",
@@ -289,7 +289,7 @@
         },
         "matrix": {
             "description": "Connect to Matrix protocol",
-            "docsUrl": "https://docs.hermes.ai/channels/matrix",
+            "docsUrl": "https://docs.openclaw.ai/channels/matrix",
             "fields": {
                 "homeserver": {
                     "label": "Homeserver URL",
@@ -308,7 +308,7 @@
         },
         "line": {
             "description": "Connect LINE Messaging API",
-            "docsUrl": "https://docs.hermes.ai/channels/line",
+            "docsUrl": "https://docs.openclaw.ai/channels/line",
             "fields": {
                 "channelAccessToken": {
                     "label": "Channel Access Token",
@@ -327,7 +327,7 @@
         },
         "msteams": {
             "description": "Connect Microsoft Teams via Bot Framework",
-            "docsUrl": "https://docs.hermes.ai/channels/msteams",
+            "docsUrl": "https://docs.openclaw.ai/channels/msteams",
             "fields": {
                 "appId": {
                     "label": "App ID",
@@ -347,7 +347,7 @@
         },
         "googlechat": {
             "description": "Connect Google Chat via webhook",
-            "docsUrl": "https://docs.hermes.ai/channels/googlechat",
+            "docsUrl": "https://docs.openclaw.ai/channels/googlechat",
             "fields": {
                 "serviceAccountKey": {
                     "label": "Service Account JSON Path",
@@ -363,7 +363,7 @@
         },
         "mattermost": {
             "description": "Connect Mattermost via Bot API",
-            "docsUrl": "https://docs.hermes.ai/channels/mattermost",
+            "docsUrl": "https://docs.openclaw.ai/channels/mattermost",
             "fields": {
                 "serverUrl": {
                     "label": "Server URL",
@@ -381,7 +381,7 @@
             ]
         },
         "qqbot": {
-            "description": "Connect QQ Bot channel (built-in since Hermes 3.31)",
+            "description": "Connect QQ Bot channel (built-in since OpenClaw)",
             "docsUrl": "https://icnnp7d0dymg.feishu.cn/wiki/KPIJwlyiGiupMrkiS9ice39Zn2c",
             "fields": {
                 "appId": {
@@ -401,7 +401,7 @@
         },
         "slack": {
             "description": "Connect Slack via Bot API",
-            "docsUrl": "https://docs.hermes.ai/channels/slack",
+            "docsUrl": "https://docs.openclaw.ai/channels/slack",
             "fields": {
                 "botToken": {
                     "label": "Bot Token",

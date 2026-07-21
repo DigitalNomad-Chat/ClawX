@@ -58,7 +58,7 @@
         "noDeliveryTargets": "Для выбранной учётной записи {{channel}} цели доставки недоступны.",
         "deliveryTargetPlaceholder": "Введите цель доставки для этого канала",
         "deliveryTargetPlaceholderFeishu": "напр., user:ou_xxx или chat:oc_xxx",
-        "deliveryTargetDesc": "Это соответствует delivery.to в Hermes и отправляется как есть.",
+        "deliveryTargetDesc": "Это соответствует delivery.to в OpenClaw и отправляется как есть.",
         "deliveryTargetDescFeishu": "Используйте цель пользователя Feishu, например user:ou_xxx, или цель чата, например chat:oc_xxx.",
         "deliveryTargetDescAuto": "Выберите из целей, обнаруженных для выбранной учётной записи канала.",
         "deliveryTargetDescFeishuSelect": "Выберите подтверждённого получателя Feishu из доступных пользователей или чатов.",

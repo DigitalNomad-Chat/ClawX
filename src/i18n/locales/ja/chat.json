@@ -3,7 +3,7 @@
         "title": "モデル呼び出しに失敗しました"
     },
     "gatewayNotRunning": "ゲートウェイが停止中",
-    "gatewayRequired": "チャットを利用するには Hermes ゲートウェイが実行されている必要があります。自動的に起動するか、設定から起動できます。",
+    "gatewayRequired": "チャットを利用するには OpenClaw ゲートウェイが実行されている必要があります。自動的に起動するか、設定から起動できます。",
     "welcome": {
         "title": "ClawDock チャット",
         "subtitle": "お手伝いできることはありますか？",

@@ -52,8 +52,8 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from 
 
 import { startHostApiServer } from '../api/server';
 import { HostEventBus } from '../api/event-bus';
-// Hermes Server imports are deferred to startMainApp() so that
-// process.env.HERMES_WEB_UI_HOME is set before server/src/config.ts is evaluated.
+// Server-side env vars are configured in startMainApp() before server/src/config.ts
+// is evaluated. HERMES_* names are legacy aliases still consumed by the OpenClaw server.
 import { registerExtensions, shutdownExtensions } from '../extensions';
 import { initModules, shutdownModules } from '../modules/registry';
 import { deviceOAuthManager } from '../utils/device-oauth';
@@ -327,7 +327,7 @@ async function initialize(): Promise<void> {
 }
 
 async function startMainApp(): Promise<void> {
-  // Configure Hermes Server environment before any server code runs
+  // Configure OpenClaw server environment before any server code runs
   process.env.HERMES_WEB_UI_HOME = join(app.getPath('userData'), 'hermes');
   process.env.PORT = '8648';
   process.env.HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN = '0';
@@ -414,8 +414,8 @@ async function startMainApp(): Promise<void> {
     mainWindow: window,
   });
 
-  // Hermes Server (Koa + Socket.IO backend) is not implemented on this branch.
-  // The OpenClaw Gateway provides the chat runtime; skip any Hermes bootstrap.
+  // The standalone Koa/Socket.IO backend is not implemented on this branch.
+  // The OpenClaw Gateway provides the chat runtime; skip any legacy bootstrap.
 
   // Initialize extension system
   await extensionRegistry.initialize({
@@ -702,7 +702,7 @@ if (gotTheLock) {
       logger.warn('gatewayManager.stop() error during quit:', err);
     });
 
-    // Hermes Server is not implemented on this branch; no extra shutdown needed.
+    // The standalone backend is not implemented on this branch; no extra shutdown needed.
 
     // Stop independent kernel extensions
     const extensionsStopPromise = shutdownExtensions().catch((err) => {

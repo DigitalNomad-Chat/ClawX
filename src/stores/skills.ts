@@ -107,7 +107,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
       let combinedSkills: Skill[] = [];
       const currentSkills = get().skills;
 
-      // Map runtime skills info (from Hermes Gateway or fallback)
+      // Map runtime skills info (from OpenClaw Gateway or fallback)
       if (runtimeData?.skills) {
         combinedSkills = runtimeData.skills.map((s: GatewaySkillStatus) => {
           // Merge with direct config if available

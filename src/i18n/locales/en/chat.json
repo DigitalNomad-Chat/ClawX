@@ -3,7 +3,7 @@
         "title": "Model call failed"
     },
     "gatewayNotRunning": "Gateway Not Running",
-    "gatewayRequired": "The Hermes Gateway needs to be running to use chat. It will start automatically, or you can start it from Settings.",
+    "gatewayRequired": "The OpenClaw Gateway needs to be running to use chat. It will start automatically, or you can start it from Settings.",
     "welcome": {
         "title": "ClawDock Chat",
         "subtitle": "What can I do for you?",

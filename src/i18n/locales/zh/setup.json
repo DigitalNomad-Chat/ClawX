@@ -27,7 +27,7 @@
     },
     "welcome": {
         "title": "欢迎使用 ClawDock",
-        "description": "ClawDock 是基于 Hermes Agent 框架的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
+        "description": "ClawDock 是基于 OpenClaw 的图形界面，让您可以在喜爱的消息平台上轻松使用 AI 助手。",
         "features": {
             "noCommand": "无需命令行",
             "modernUI": "现代美观的界面",
@@ -40,19 +40,17 @@
         "viewLogs": "查看日志",
         "recheck": "重新检查",
         "nodejs": "Node.js 运行时",
-        "hermes": "Hermes 运行时",
         "gateway": "网关服务",
         "startGateway": "启动网关",
         "status": {
             "checking": "检查中...",
             "success": "Node.js 可用",
             "error": "失败",
-            "gatewayRunning": "运行在端口 {{port}}",
-            "hermesReady": "Hermes 已就绪"
+            "gatewayRunning": "运行在端口 {{port}}"
         },
         "issue": {
             "title": "检测到环境问题",
-            "desc": "请确保 Hermes 已正确安装（pip install hermes-agent）。查看日志以获取详情。"
+            "desc": "请查看日志以获取详情。"
         },
         "logs": {
             "title": "应用程序日志",

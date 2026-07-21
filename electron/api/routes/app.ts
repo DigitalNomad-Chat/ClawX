@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import type { HostApiContext } from '../context';
 import { parseJsonBody, sendJson } from '../route-utils';
 import { createAppApi } from '../../services/app-api';
-
 const appApi = createAppApi();
 
 export async function handleAppRoutes(
@@ -23,17 +22,6 @@ export async function handleAppRoutes(
     // Send a current-state snapshot immediately so renderer subscribers do not
     // miss lifecycle transitions that happened before the SSE connection opened.
     res.write(`event: gateway:status\ndata: ${JSON.stringify(ctx.gatewayManager.getStatus())}\n\n`);
-    return true;
-  }
-
-  // Hermes installation status check (embedded — always available)
-  if (url.pathname === '/api/app/hermes-status' && req.method === 'GET') {
-    sendJson(res, 200, {
-      success: true,
-      installed: true,
-      path: null,
-      installCommand: null,
-    });
     return true;
   }
 

@@ -88,8 +88,6 @@ export function Settings() {
   const [showTelemetryViewer, setShowTelemetryViewer] = useState(false);
   const [telemetryEntries, setTelemetryEntries] = useState<UiTelemetryEntry[]>([]);
 
-  const isWindows = window.electron.platform === 'win32';
-  const showCliTools = true;
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
 
@@ -140,15 +138,6 @@ export function Settings() {
       toast.success(t('developer.tokenCopied'));
     } catch (error) {
       toast.error(`Failed to copy token: ${String(error)}`);
-    }
-  };
-
-  const handleCopyHermesInstallCommand = async () => {
-    try {
-      await navigator.clipboard.writeText('pip install hermes-agent');
-      toast.success(t('developer.cmdCopied'));
-    } catch (error) {
-      toast.error(`Failed to copy command: ${String(error)}`);
     }
   };
 
@@ -696,36 +685,6 @@ export function Settings() {
                       </Button>
                     </div>
                   </div>
-
-                  {showCliTools && (
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium text-foreground">Hermes CLI</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Hermes is an external Python dependency. Install it via pip to enable Gateway functionality.
-                      </p>
-                      {isWindows && (
-                        <p className="text-xs text-muted-foreground">
-                          On Windows, you may need to run this in PowerShell as Administrator.
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        <Input
-                          readOnly
-                          value="pip install hermes-agent"
-                          className="font-mono text-sm h-10 rounded-xl bg-muted border-transparent flex-1 min-w-[200px]"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCopyHermesInstallCommand}
-                          className="rounded-xl h-10 px-4 bg-transparent border hover:bg-muted"
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          {t('common:actions.copy')}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between rounded-2xl border border p-5 bg-transparent">

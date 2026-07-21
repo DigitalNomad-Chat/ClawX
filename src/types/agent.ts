@@ -10,7 +10,7 @@ export interface AgentSummary {
   agentDir: string;
   mainSessionKey: string;
   channelTypes: string[];
-  // Hermes profile fields
+  // OpenClaw profile fields
   gatewayState?: string;
   gatewayPort?: number;
 }

@@ -1,5 +1,5 @@
 /**
- * Channels State Store (Hermes version)
+ * Channels State Store (OpenClaw version)
  *
  * Manages messaging platform state via Host API.
  * Replaces legacy OpenClaw Gateway JSON-RPC with direct HTTP calls.
@@ -150,8 +150,8 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   },
 
   requestQrCode: async (channelType) => {
-    // QR code login is not yet implemented for Hermes.
-    throw new Error(`QR code login not supported for ${channelType} in Hermes mode`);
+    // QR code login is not yet implemented for OpenClaw.
+    throw new Error(`QR code login not supported for ${channelType} in OpenClaw mode`);
   },
 
   setChannels: (channels) => set({ channels }),
@@ -165,12 +165,12 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   },
 
   scheduleAutoReconnect: (channelId) => {
-    // Placeholder: auto-reconnect logic for Hermes channels is not yet implemented.
+    // Placeholder: auto-reconnect logic for OpenClaw channels is not yet implemented.
     console.debug('[channels] scheduleAutoReconnect requested for', channelId);
   },
 
   clearAutoReconnect: (channelId) => {
-    // Placeholder: auto-reconnect logic for Hermes channels is not yet implemented.
+    // Placeholder: auto-reconnect logic for OpenClaw channels is not yet implemented.
     console.debug('[channels] clearAutoReconnect requested for', channelId);
   },
 

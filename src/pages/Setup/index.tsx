@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { SUPPORTED_LANGUAGES } from '@/i18n';
 import { toast } from 'sonner';
-import { invokeIpc } from '@/lib/api-client';
 import { hostApi } from '@/lib/host-api';
 
 interface SetupStep {
@@ -331,72 +330,25 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
   const startGateway = useGatewayStore((state) => state.start);
 
   const [checks, setChecks] = useState({
-    nodejs: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
-    hermes: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
-    gateway: { status: 'checking' as 'checking' | 'success' | 'error' | 'optional', message: '' },
+    nodejs: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
+    gateway: { status: 'checking' as 'checking' | 'success' | 'error', message: '' },
   });
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
-  const [hermesInstallCommand] = useState('pip install hermes-agent');
-  const [hermesError, setHermesError] = useState<string | null>(null);
   const gatewayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const runChecks = useCallback(async () => {
     // Reset checks
     setChecks({
       nodejs: { status: 'checking', message: '' },
-      hermes: { status: 'checking', message: '' },
       gateway: { status: 'checking', message: '' },
     });
-    setHermesError(null);
 
     // Check Node.js — always available in Electron
     setChecks((prev) => ({
       ...prev,
       nodejs: { status: 'success', message: t('runtime.status.success') },
     }));
-
-    // Check Hermes installation status
-    try {
-      const hermesStatus = await invokeIpc('hermes:status') as {
-        success: boolean;
-        installed?: boolean;
-        error?: string;
-      };
-
-      if (!hermesStatus.success) {
-        setHermesError(hermesStatus.error || 'Unknown error');
-        setChecks((prev) => ({
-          ...prev,
-          hermes: {
-            status: 'error',
-            message: hermesStatus.error || 'Hermes check failed'
-          },
-        }));
-      } else if (!hermesStatus.installed) {
-        setChecks((prev) => ({
-          ...prev,
-          hermes: {
-            status: 'optional',
-            message: t('runtime.status.hermesOptional', 'Hermes not installed (optional)'),
-          },
-        }));
-      } else {
-        setChecks((prev) => ({
-          ...prev,
-          hermes: {
-            status: 'success',
-            message: 'Hermes installed'
-          },
-        }));
-      }
-    } catch (error) {
-      setHermesError(String(error));
-      setChecks((prev) => ({
-        ...prev,
-        hermes: { status: 'error', message: `Check failed: ${error}` },
-      }));
-    }
 
     // Check Gateway — read directly from store to avoid stale closure
     // Don't immediately report error; gateway may still be initializing
@@ -430,9 +382,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   // Update canProceed when gateway status changes
   useEffect(() => {
-    const hermesReady = checks.hermes.status === 'success' || checks.hermes.status === 'optional';
     const allPassed = checks.nodejs.status === 'success'
-      && hermesReady
       && (checks.gateway.status === 'success' || gatewayStatus.state === 'running');
     onStatusChange(allPassed);
   }, [checks, gatewayStatus, onStatusChange]);
@@ -524,7 +474,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
 
   const ERROR_TRUNCATE_LEN = 30;
 
-  const renderStatus = (status: 'checking' | 'success' | 'error' | 'optional', message: string) => {
+  const renderStatus = (status: 'checking' | 'success' | 'error', message: string) => {
     if (status === 'checking') {
       return (
         <span className="flex items-center gap-2 text-yellow-400 whitespace-nowrap">
@@ -541,15 +491,6 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
         </span>
       );
     }
-    if (status === 'optional') {
-      return (
-        <span className="flex items-center gap-2 text-amber-400 whitespace-nowrap">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          {message}
-        </span>
-      );
-    }
-
     const isLong = message.length > ERROR_TRUNCATE_LEN;
     const displayMsg = isLong ? message.slice(0, ERROR_TRUNCATE_LEN) : message;
 
@@ -572,7 +513,7 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div data-testid="setup-runtime-step" className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">{t('runtime.title')}</h2>
         <div className="flex gap-2">
@@ -590,24 +531,6 @@ function RuntimeContent({ onStatusChange }: RuntimeContentProps) {
           <span className="text-left">{t('runtime.nodejs')}</span>
           <div className="flex justify-end">
             {renderStatus(checks.nodejs.status, checks.nodejs.message)}
-          </div>
-        </div>
-        <div className="grid grid-cols-[1fr_auto] items-center gap-4 p-3 rounded-lg bg-muted/50">
-          <div className="text-left min-w-0">
-            <span>{t('runtime.hermes')}</span>
-            {checks.hermes.status === 'error' && (
-              <p className="text-xs text-muted-foreground mt-0.5 font-mono break-all">
-                {hermesInstallCommand}
-              </p>
-            )}
-            {hermesError && (
-              <p className="text-xs text-red-400 mt-0.5 font-mono break-all">
-                {hermesError}
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end self-start mt-0.5">
-            {renderStatus(checks.hermes.status, checks.hermes.message)}
           </div>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-4 p-3 rounded-lg bg-muted/50">

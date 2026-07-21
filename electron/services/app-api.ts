@@ -13,4 +13,5 @@ export function createAppApi(): NonNullable<CompleteHostServiceRegistry['app']> 
       return mode === 'fix' ? runOpenClawDoctorFix() : runOpenClawDoctor();
     },
   };
+
 }
