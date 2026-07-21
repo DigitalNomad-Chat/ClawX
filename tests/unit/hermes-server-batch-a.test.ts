@@ -20,14 +20,9 @@ describe('Hermes server phase 2 Batch A route removal', () => {
     }
   });
 
-  it('removes Hermes routes except group-chat.ts (kept for Batch B)', () => {
-    const hermesDir = resolve(repoRoot, 'server/src/routes/hermes');
-    const files = existsSync(hermesDir)
-      ? readdirSync(hermesDir, { withFileTypes: true })
-          .filter((d) => d.isFile() && d.name.endsWith('.ts'))
-          .map((d) => d.name)
-          .sort()
-      : [];
-    expect(files).toEqual(['group-chat.ts']);
+  it('removes all Hermes routes (group-chat.ts removed in Batch B)', () => {
+    expect(fileExists('server/src/routes/hermes/group-chat.ts')).toBe(false);
+    // After Batch B the hermes route directory is empty and removed.
+    expect(fileExists('server/src/routes/hermes')).toBe(false);
   });
 });
