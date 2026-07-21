@@ -82,8 +82,5 @@ describe('Hermes server phase 2 Batch C', () => {
     expect(existsSync('server/src/types.ts')).toBe(true);
     // Electron main process
     expect(existsSync('electron/main/index.ts')).toBe(true);
-    // Batch D files still protected
-    expect(existsSync('server/src/config.ts')).toBe(true);
-    expect(existsSync('server/src/db/index.ts')).toBe(true);
   });
 });

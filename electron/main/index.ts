@@ -52,8 +52,7 @@ import { ensureBuiltinSkillsInstalled, ensurePreinstalledSkillsInstalled } from 
 
 import { startHostApiServer } from '../api/server';
 import { HostEventBus } from '../api/event-bus';
-// Server-side env vars are configured in startMainApp() before server/src/config.ts
-// is evaluated. HERMES_* names are legacy aliases still consumed by the OpenClaw server.
+// Server-side env vars are configured in startMainApp() before any server code runs.
 import { registerExtensions, shutdownExtensions } from '../extensions';
 import { initModules, shutdownModules } from '../modules/registry';
 import { deviceOAuthManager } from '../utils/device-oauth';
@@ -328,10 +327,7 @@ async function initialize(): Promise<void> {
 
 async function startMainApp(): Promise<void> {
   // Configure OpenClaw server environment before any server code runs
-  process.env.HERMES_WEB_UI_HOME = join(app.getPath('userData'), 'hermes');
   process.env.PORT = '8648';
-  process.env.HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN = '0';
-  process.env.HERMES_DATA_DIR = join(app.getPath('userData'), 'hermes', 'data');
 
   // Initialize logger first
   logger.init();
