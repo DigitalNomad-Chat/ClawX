@@ -38,7 +38,7 @@ import {
 } from '@/lib/telemetry';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '@/i18n';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi, hostApiFetch } from '@/lib/host-api';
 import { cn } from '@/lib/utils';
 type ControlUiInfo = {
   url: string;
@@ -226,7 +226,9 @@ export function Settings() {
       const normalizedHttpsServer = proxyHttpsServerDraft.trim();
       const normalizedAllServer = proxyAllServerDraft.trim();
       const normalizedBypassRules = proxyBypassRulesDraft.trim();
-      await invokeIpc('settings:setMany', {
+      // P4b-B2: hostApi.settings.setMany → host:invoke; legacy settings:setMany fallback.
+      // Main settings-api still applies proxy sync + gateway restart when running.
+      await hostApi.settings.setMany({
         proxyEnabled: proxyEnabledDraft,
         proxyServer: normalizedProxyServer,
         proxyHttpServer: normalizedHttpServer,

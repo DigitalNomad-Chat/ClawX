@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { invokeIpc } from '@/lib/api-client';
+import { hostApi } from '@/lib/host-api';
 import { useProviderStore } from '@/stores/providers';
 import {
   buildConfiguredModelOptions,
@@ -111,7 +112,8 @@ export function QuickModelSwitchDialog({
   async function persistQuickModels(next: QuickModelRef[]) {
     setSaving(true);
     try {
-      await invokeIpc('settings:setMany', { quickModelRefs: next });
+      // P4b-B2: hostApi.settings.setMany (legacy settings:setMany fallback).
+      await hostApi.settings.setMany({ quickModelRefs: next });
       setQuickModels(next);
     } catch (err) {
       toast.error('保存快捷模型失败');
