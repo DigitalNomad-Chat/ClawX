@@ -105,22 +105,13 @@ export function Setup() {
 
   const markSetupComplete = useSettingsStore((state) => state.markSetupComplete);
 
-  // E2E-only unlock for install-step coverage (production never sets this key).
-  const e2eForceRuntimePass = (() => {
-    try {
-      return window.localStorage.getItem('clawdock:e2e-force-setup-runtime-pass') === '1';
-    } catch {
-      return false;
-    }
-  })();
-
   // Derive canProceed based on current step - computed directly to avoid useEffect
   const canProceed = useMemo(() => {
     switch (safeStepIndex) {
       case STEP.WELCOME:
         return true;
       case STEP.RUNTIME:
-        return runtimeChecksPassed || e2eForceRuntimePass;
+        return runtimeChecksPassed;
       case STEP.INSTALLING:
         return false; // Cannot manually proceed, auto-proceeds when done
       case STEP.COMPLETE:
@@ -128,7 +119,7 @@ export function Setup() {
       default:
         return true;
     }
-  }, [safeStepIndex, runtimeChecksPassed, e2eForceRuntimePass]);
+  }, [safeStepIndex, runtimeChecksPassed]);
 
   const handleNext = async () => {
     if (isLastStep) {

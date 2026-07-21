@@ -2,12 +2,22 @@ import {
   closeElectronApp,
   expect,
   getStableWindow,
+  installIpcMocks,
   test,
 } from './fixtures/electron';
 
+function stableStringify(value: unknown): string {
+  if (value == null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`);
+  return `{${entries.join(',')}}`;
+}
+
 async function installUvMocks(
   app: import('@playwright/test').ElectronApplication,
-  mode: 'success' | 'fail',
+  mode: 'success' | 'fail' | 'fallback',
 ): Promise<void> {
   await app.evaluate(
     ({ ipcMain }, uvMode) => {
@@ -25,6 +35,13 @@ async function installUvMocks(
               return { id, ok: true, data: false };
             }
             if (request.action === 'installAll') {
+              if (uvMode === 'fallback') {
+                return {
+                  id,
+                  ok: false,
+                  error: { code: 'UNSUPPORTED', message: 'test unsupported installAll' },
+                };
+              }
               if (uvMode === 'success') {
                 return { id, ok: true, data: { success: true } };
               }
@@ -49,7 +66,7 @@ async function installUvMocks(
       ipcMain.removeHandler('uv:install-all');
       ipcMain.handle('uv:install-all', async () => {
         calls.push({ action: 'installAll-legacy' });
-        if (uvMode === 'success') return { success: true };
+        if (uvMode === 'success' || uvMode === 'fallback') return { success: true };
         return { success: false, error: 'p4b-b5-simulated-fail' };
       });
       ipcMain.removeHandler('uv:check');
@@ -62,15 +79,24 @@ async function installUvMocks(
   );
 }
 
-async function advanceToInstallingStep(page: import('@playwright/test').Page): Promise<void> {
-  await expect(page.getByTestId('setup-page')).toBeVisible({ timeout: 60_000 });
-  // Production never sets this key; E2E-only unlock for install-step coverage.
-  await page.evaluate(() => {
-    window.localStorage.setItem('clawdock:e2e-force-setup-runtime-pass', '1');
+async function advanceToInstallingStep(
+  page: import('@playwright/test').Page,
+  app: import('@playwright/test').ElectronApplication,
+): Promise<void> {
+  await installIpcMocks(app, {
+    gatewayStatus: { state: 'running', port: 18789 },
+    hostApi: {
+      [stableStringify(['/api/gateway/status', 'GET'])]: {
+        ok: true,
+        data: { status: 200, ok: true, json: { state: 'running', port: 18789 } },
+      },
+    },
   });
+
+  await expect(page.getByTestId('setup-page')).toBeVisible({ timeout: 60_000 });
   // Welcome → Runtime (Next enabled on welcome)
   await page.getByTestId('setup-next-button').click();
-  // Runtime → Installing (unlocked by e2e flag)
+  // Runtime → Installing (unlocked when gateway status is running)
   await expect(page.getByTestId('setup-next-button')).toBeEnabled({ timeout: 15_000 });
   await page.getByTestId('setup-next-button').click();
   await expect(page.getByTestId('setup-installing-step')).toBeVisible({ timeout: 30_000 });
@@ -119,7 +145,7 @@ test.describe('P4b-B5 UV Setup facade', () => {
         expect(probe.installData).toMatchObject({ success: true });
       }
 
-      await advanceToInstallingStep(page);
+      await advanceToInstallingStep(page, app);
       await expect(page.getByTestId('setup-install-progress')).toBeVisible();
       await expect(page.getByTestId('setup-install-skip-button')).toBeVisible();
 
@@ -128,7 +154,7 @@ test.describe('P4b-B5 UV Setup facade', () => {
           return await app.evaluate(() => {
             const calls =
               (globalThis as { __p4bB5UvCalls?: Array<{ action?: string }> }).__p4bB5UvCalls ?? [];
-            return calls.some((c) => c.action === 'installAll' || c.action === 'installAll-legacy');
+            return calls.some((c) => c.action === 'installAll');
           });
         }, { timeout: 25_000 })
         .toBe(true);
@@ -144,63 +170,34 @@ test.describe('P4b-B5 UV Setup facade', () => {
     }
   });
 
-  test('UNSUPPORTED uv.installAll falls back to legacy uv:install-all', async ({
+  test('UNSUPPORTED uv.installAll falls back to legacy uv:install-all through Setup', async ({
     launchElectronApp,
   }) => {
-    const app = await launchElectronApp({ skipSetup: true });
+    const app = await launchElectronApp({ skipSetup: false });
     try {
+      await installUvMocks(app, 'fallback');
       const page = await getStableWindow(app);
-      await expect(page.getByTestId('main-layout')).toBeVisible({ timeout: 60_000 });
+      await advanceToInstallingStep(page, app);
 
-      await app.evaluate(({ ipcMain }) => {
-        ipcMain.removeHandler('host:invoke');
-        ipcMain.handle(
-          'host:invoke',
-          async (_e, request: { id?: string; module?: string; action?: string }) => {
-            if (request?.module === 'uv' && request?.action === 'installAll') {
-              return {
-                id: request.id ?? 'x',
-                ok: false,
-                error: { code: 'UNSUPPORTED', message: 'test unsupported installAll' },
-              };
-            }
-            return {
-              id: request?.id ?? 'x',
-              ok: false,
-              error: {
-                code: 'UNSUPPORTED',
-                message: `Unsupported host request: ${request?.module}.${request?.action}`,
-              },
-            };
-          },
-        );
-        ipcMain.removeHandler('uv:install-all');
-        ipcMain.handle('uv:install-all', async () => ({ success: true, via: 'legacy' }));
-      });
+      await expect(page.getByTestId('setup-install-progress')).toBeVisible();
 
-      try {
-        await page.reload();
-      } catch (error) {
-        if (!String(error).includes('ERR_FILE_NOT_FOUND')) throw error;
-      }
-      await expect(page.getByTestId('main-layout')).toBeVisible({ timeout: 60_000 });
+      // InstallingContent calls hostApi.uv.installAll(); fallback should hit legacy handler.
+      await expect
+        .poll(async () => {
+          return await app.evaluate(() => {
+            const calls =
+              (globalThis as { __p4bB5UvCalls?: Array<{ action?: string }> }).__p4bB5UvCalls ?? [];
+            return calls.some((c) => c.action === 'installAll-legacy');
+          });
+        }, { timeout: 25_000 })
+        .toBe(true);
 
-      const fallback = await page.evaluate(async () => {
-        const res = await window.clawx!.hostInvoke({
-          id: 'fb-uv',
-          module: 'uv',
-          action: 'installAll',
-        });
-        if (res.ok) return { path: 'host', value: res.data };
-        if (res.error?.code === 'UNSUPPORTED') {
-          const legacy = await window.electron.ipcRenderer.invoke('uv:install-all');
-          return { path: 'legacy', value: legacy };
-        }
-        return { path: 'error', value: res.error };
-      });
-
-      expect(fallback.path).toBe('legacy');
-      expect(fallback.value).toMatchObject({ success: true, via: 'legacy' });
+      await expect
+        .poll(async () => {
+          const text = await page.getByTestId('setup-install-progress').textContent();
+          return Number(String(text).replace('%', '')) >= 10;
+        }, { timeout: 15_000 })
+        .toBe(true);
     } finally {
       await closeElectronApp(app);
     }
@@ -213,7 +210,7 @@ test.describe('P4b-B5 UV Setup facade', () => {
     try {
       await installUvMocks(app, 'fail');
       const page = await getStableWindow(app);
-      await advanceToInstallingStep(page);
+      await advanceToInstallingStep(page, app);
       await expect(page.getByTestId('setup-install-error')).toBeVisible({ timeout: 25_000 });
       await expect(page.getByTestId('setup-install-error')).toContainText(/p4b-b5-simulated-fail/i);
       await expect(page.getByTestId('setup-install-skip-button')).toBeVisible();
