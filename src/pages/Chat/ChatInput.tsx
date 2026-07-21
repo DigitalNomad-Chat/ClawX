@@ -11,7 +11,7 @@ import { SendHorizontal, Square, X, Paperclip, FileText, Film, Music, FileArchiv
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi, hostApiFetch } from '@/lib/host-api';
 import { invokeIpc } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { useGatewayStore } from '@/stores/gateway';
@@ -697,7 +697,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
   const pickFiles = useCallback(async () => {
     try {
-      const result = await invokeIpc('dialog:open', {
+      const result = await hostApi.dialog.open({
         properties: ['openFile', 'multiSelections'],
       }) as { canceled: boolean; filePaths?: string[] };
       if (result.canceled || !result.filePaths?.length) return;

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ChatInput } from '@/pages/Chat/ChatInput';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { hostApiFetch } from '@/lib/host-api';
+import { hostApi, hostApiFetch } from '@/lib/host-api';
 
 const { agentsState, chatState, gatewayState, providersState, artifactPanelMocks } = vi.hoisted(() => ({
   agentsState: {
@@ -49,6 +49,10 @@ vi.mock('@/stores/artifact-panel', () => ({
 
 vi.mock('@/lib/host-api', () => ({
   hostApiFetch: vi.fn(),
+  hostApi: {
+    dialog: { open: vi.fn() },
+    shell: { showItemInFolder: vi.fn() },
+  },
 }));
 
 vi.mock('@/lib/api-client', () => ({
@@ -648,5 +652,55 @@ describe('ChatInput agent targeting', () => {
       });
     });
     expect(await screen.findByText('Archive')).toBeInTheDocument();
+  });
+});
+
+describe('P4b-B6 ChatInput media periphery', () => {
+  beforeEach(() => {
+    vi.mocked(hostApi.dialog.open).mockReset();
+    vi.mocked(hostApiFetch).mockReset();
+    agentsState.agents = [
+      {
+        id: 'main',
+        name: 'Main',
+        isDefault: true,
+        modelDisplay: 'MiniMax',
+        inheritedModel: true,
+        workspace: '~/.openclaw/workspace',
+        agentDir: '~/.openclaw/agents/main/agent',
+        mainSessionKey: 'agent:main:main',
+        channelTypes: [],
+      },
+    ];
+    gatewayState.status = { state: 'running', port: 18789 };
+  });
+
+  it('uses hostApi.dialog.open when the attach button is clicked', async () => {
+    vi.mocked(hostApi.dialog.open).mockResolvedValueOnce({
+      canceled: false,
+      filePaths: ['/tmp/test-file.txt'],
+    });
+    vi.mocked(hostApiFetch).mockResolvedValueOnce([{
+      id: 'file-id',
+      fileName: 'test-file.txt',
+      mimeType: 'text/plain',
+      fileSize: 12,
+      stagedPath: '/tmp/test-file.txt',
+      preview: null,
+    }]);
+
+    renderChatInput();
+
+    fireEvent.click(screen.getByTitle('Attach files'));
+
+    await waitFor(() => {
+      expect(hostApi.dialog.open).toHaveBeenCalledWith({
+        properties: ['openFile', 'multiSelections'],
+      });
+    });
+    expect(hostApiFetch).toHaveBeenCalledWith('/api/files/stage-paths', {
+      method: 'POST',
+      body: JSON.stringify({ filePaths: ['/tmp/test-file.txt'] }),
+    });
   });
 });

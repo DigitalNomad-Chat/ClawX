@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, FolderOpen, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ImagePreviewProps, ImageLightboxProps } from './types';
-import { invokeIpc } from '@/lib/api-client';
+import { hostApi } from '@/lib/host-api';
 
 export function ImageThumbnail({
   src,
@@ -57,7 +57,7 @@ export function ImageLightbox({
 
   const handleShowInFolder = useCallback(() => {
     if (filePath) {
-      void invokeIpc('shell:showItemInFolder', filePath);
+      void hostApi.shell.showItemInFolder(filePath);
     }
   }, [filePath]);
 
