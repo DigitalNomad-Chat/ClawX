@@ -1,21 +1,45 @@
 /**
- * v0.4.9 P4a — typed host:invoke client with HTTP/IPC fallback.
+ * v0.4.9 P4a/P4b-B1 — typed host:invoke client with HTTP/IPC fallback.
  *
  * Prefer window.clawx.hostInvoke (Main HostApiRegistry). Fallback only when:
  * - bridge is missing, or
  * - response / thrown error carries an explicit transport code (UNSUPPORTED,
  *   BRIDGE_UNAVAILABLE, CHANNEL_UNAVAILABLE).
  * Never infer fallback from error message substrings (e.g. "channel"/"bridge").
+ *
+ * P4b-B1 adds window / shell / dialog with legacy IPC fallbacks only
+ * (no settings/cron/chat/sessions/media/providers).
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
 
-export type HostApiModule = 'app' | 'openclaw' | 'usage';
+export type HostApiModule = 'app' | 'openclaw' | 'usage' | 'window' | 'shell' | 'dialog';
 export type HostApiActionMap = {
   app: 'openClawDoctor';
   openclaw: 'status';
   usage: 'recentTokenHistory';
+  window: 'minimize' | 'maximize' | 'close' | 'isMaximized' | 'syncTrafficLightPosition';
+  shell: 'openExternal' | 'showItemInFolder' | 'openPath';
+  dialog: 'open' | 'save' | 'message';
 };
+
+function resolveShellPathArg(payload?: unknown): string {
+  if (typeof payload === 'string') return payload;
+  if (payload && typeof payload === 'object' && 'path' in payload) {
+    const path = (payload as { path: unknown }).path;
+    if (typeof path === 'string') return path;
+  }
+  throw new Error('path is required');
+}
+
+function resolveShellUrlArg(payload?: unknown): string {
+  if (typeof payload === 'string') return payload;
+  if (payload && typeof payload === 'object' && 'url' in payload) {
+    const url = (payload as { url: unknown }).url;
+    if (typeof url === 'string') return url;
+  }
+  throw new Error('url is required');
+}
 
 /** Explicit transport failure codes that allow dual-path fallback. */
 export type HostTransportCode =
@@ -97,6 +121,32 @@ const FALLBACKS: {
           : '';
       return await hostApiFetchFallback(`/api/usage/recent-token-history${qs}`);
     },
+  },
+  // P4b-B1: legacy IPC channels remain registered; bare-string args preserved.
+  window: {
+    minimize: async () => await invokeIpc('window:minimize'),
+    maximize: async () => await invokeIpc('window:maximize'),
+    close: async () => await invokeIpc('window:close'),
+    isMaximized: async () => await invokeIpc('window:isMaximized'),
+    syncTrafficLightPosition: async (payload) => {
+      // No dedicated legacy channel; no-op fallback keeps dual-path safe.
+      void payload;
+      return undefined;
+    },
+  },
+  shell: {
+    openExternal: async (payload) => {
+      await invokeIpc('shell:openExternal', resolveShellUrlArg(payload));
+    },
+    showItemInFolder: async (payload) => {
+      await invokeIpc('shell:showItemInFolder', resolveShellPathArg(payload));
+    },
+    openPath: async (payload) => await invokeIpc('shell:openPath', resolveShellPathArg(payload)),
+  },
+  dialog: {
+    open: async (payload) => await invokeIpc('dialog:open', payload ?? {}),
+    save: async (payload) => await invokeIpc('dialog:save', payload ?? {}),
+    message: async (payload) => await invokeIpc('dialog:message', payload ?? {}),
   },
 };
 

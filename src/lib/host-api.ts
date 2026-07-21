@@ -7,9 +7,10 @@ const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
 /**
- * P4a typed hostApi facade (low-risk only).
+ * Typed hostApi facade (P4a + P4b-B1 low-risk surfaces).
  * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
- * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media.
+ * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media,
+ * settings, cron, and gateway control (later P4b batches).
  */
 export const hostApi = {
   app: {
@@ -33,6 +34,32 @@ export const hostApi = {
       );
       return normalizeUsageHistoryEntries(raw);
     },
+  },
+  /** P4b-B1 — window chrome controls (legacy window:* IPC fallback). */
+  window: {
+    minimize: () => invokeHost('window', 'minimize'),
+    maximize: () => invokeHost('window', 'maximize'),
+    close: () => invokeHost('window', 'close'),
+    isMaximized: () => invokeHost<boolean>('window', 'isMaximized'),
+    syncTrafficLightPosition: (sidebarCollapsed?: boolean) =>
+      invokeHost('window', 'syncTrafficLightPosition', {
+        sidebarCollapsed: Boolean(sidebarCollapsed),
+      }),
+  },
+  /** P4b-B1 — shell open/reveal (legacy shell:* IPC fallback). */
+  shell: {
+    openExternal: (url: string) => invokeHost('shell', 'openExternal', { url }),
+    showItemInFolder: (path: string) => invokeHost('shell', 'showItemInFolder', { path }),
+    openPath: (path: string) => invokeHost<string>('shell', 'openPath', { path }),
+  },
+  /** P4b-B1 — native dialogs (legacy dialog:* IPC fallback). */
+  dialog: {
+    open: (options?: Record<string, unknown>) =>
+      invokeHost('dialog', 'open', options ?? {}),
+    save: (options?: Record<string, unknown>) =>
+      invokeHost('dialog', 'save', options ?? {}),
+    message: (options: Record<string, unknown>) =>
+      invokeHost<{ response?: number }>('dialog', 'message', options),
   },
 };
 

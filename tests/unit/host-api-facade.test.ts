@@ -162,5 +162,81 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(api.chat).toBeUndefined();
     expect(api.sessions).toBeUndefined();
     expect(api.media).toBeUndefined();
+    expect(api.settings).toBeUndefined();
+    expect(api.cron).toBeUndefined();
+    expect(api.gateway).toBeUndefined();
+  });
+
+  it('P4b-B1: window/shell/dialog go through hostInvoke', async () => {
+    hostInvoke
+      .mockResolvedValueOnce({ id: 'w1', ok: true, data: true })
+      .mockResolvedValueOnce({ id: 'w2', ok: true, data: undefined })
+      .mockResolvedValueOnce({ id: 's1', ok: true, data: '' })
+      .mockResolvedValueOnce({ id: 'd1', ok: true, data: { response: 1 } });
+    const { hostApi } = await import('@/lib/host-api');
+
+    await expect(hostApi.window.isMaximized()).resolves.toBe(true);
+    await expect(hostApi.window.minimize()).resolves.toBeUndefined();
+    await expect(hostApi.shell.openPath('/tmp/x')).resolves.toBe('');
+    await expect(
+      hostApi.dialog.message({ type: 'question', message: 'ok', buttons: ['a', 'b'] }),
+    ).resolves.toEqual({ response: 1 });
+
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'window', action: 'isMaximized' }),
+    );
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'window', action: 'minimize' }),
+    );
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: 'shell',
+        action: 'openPath',
+        payload: { path: '/tmp/x' },
+      }),
+    );
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'dialog', action: 'message' }),
+    );
+  });
+
+  it('P4b-B1: shell falls back to legacy shell:* IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: shell.showItemInFolder' },
+    });
+    invokeIpcMock.mockResolvedValueOnce(undefined);
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.shell.showItemInFolder('/tmp/file.txt')).resolves.toBeUndefined();
+    expect(invokeIpcMock).toHaveBeenCalledWith('shell:showItemInFolder', '/tmp/file.txt');
+  });
+
+  it('P4b-B1: window falls back to legacy window:* IPC when bridge missing', async () => {
+    vi.stubGlobal('window', {
+      clawx: undefined,
+      localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    });
+    invokeIpcMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(true);
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.window.maximize()).resolves.toBeUndefined();
+    await expect(hostApi.window.isMaximized()).resolves.toBe(true);
+    expect(invokeIpcMock).toHaveBeenCalledWith('window:maximize');
+    expect(invokeIpcMock).toHaveBeenCalledWith('window:isMaximized');
+  });
+
+  it('P4b-B1: dialog business INTERNAL does not fallback', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'INTERNAL', message: 'dialog channel busy' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.dialog.open({ properties: ['openFile'] })).rejects.toThrow(
+      /dialog channel busy/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 });
