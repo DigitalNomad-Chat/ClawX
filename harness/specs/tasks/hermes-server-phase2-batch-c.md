@@ -18,6 +18,7 @@ touchedAreas:
   - server/src/controllers/upload.ts
   - server/src/controllers/webhook.ts
   # Step 2: Hermes services
+  - server/src/services/hermes/agent-bridge/README.md
   - server/src/services/hermes/agent-bridge/client.ts
   - server/src/services/hermes/agent-bridge/hermes_bridge.py
   - server/src/services/hermes/agent-bridge/index.ts
