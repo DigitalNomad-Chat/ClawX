@@ -43,17 +43,12 @@ describe('Hermes server phase 2 Batch B', () => {
     }
   });
 
-  it('does not delete unrelated routes/controllers', () => {
+  it('does not delete out-of-scope routes', () => {
     // server/src/routes/hermes should now be empty/removed; only group-chat was left after Batch A
     if (existsSync('server/src/routes/hermes')) {
       const remaining = readdirSync('server/src/routes/hermes');
       expect(remaining).toEqual([]);
     }
-    // General Koa controllers are out of scope for Batch B
-    expect(existsSync('server/src/controllers/health.ts')).toBe(true);
-    expect(existsSync('server/src/controllers/auth.ts')).toBe(true);
-    expect(existsSync('server/src/controllers/upload.ts')).toBe(true);
-    expect(existsSync('server/src/controllers/update.ts')).toBe(true);
-    expect(existsSync('server/src/controllers/webhook.ts')).toBe(true);
+    // General Koa controllers/services, services/hermes, and context-compressor are Batch C scope
   });
 });
