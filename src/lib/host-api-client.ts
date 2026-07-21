@@ -7,13 +7,20 @@
  *   BRIDGE_UNAVAILABLE, CHANNEL_UNAVAILABLE).
  * Never infer fallback from error message substrings (e.g. "channel"/"bridge").
  *
- * P4b-B1 adds window / shell / dialog with legacy IPC fallbacks only
- * (no settings/cron/chat/sessions/media/providers).
+ * P4b-B1: window / shell / dialog. P4b-B2: settings.setMany only.
+ * Still omits cron/chat/sessions/media/providers/gateway and other settings actions.
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
 
-export type HostApiModule = 'app' | 'openclaw' | 'usage' | 'window' | 'shell' | 'dialog';
+export type HostApiModule =
+  | 'app'
+  | 'openclaw'
+  | 'usage'
+  | 'window'
+  | 'shell'
+  | 'dialog'
+  | 'settings';
 export type HostApiActionMap = {
   app: 'openClawDoctor';
   openclaw: 'status';
@@ -21,6 +28,8 @@ export type HostApiActionMap = {
   window: 'minimize' | 'maximize' | 'close' | 'isMaximized' | 'syncTrafficLightPosition';
   shell: 'openExternal' | 'showItemInFolder' | 'openPath';
   dialog: 'open' | 'save' | 'message';
+  /** P4b-B2 — only setMany; get/set/reset stay on legacy/HTTP for now. */
+  settings: 'setMany';
 };
 
 function resolveShellPathArg(payload?: unknown): string {
@@ -147,6 +156,10 @@ const FALLBACKS: {
     open: async (payload) => await invokeIpc('dialog:open', payload ?? {}),
     save: async (payload) => await invokeIpc('dialog:save', payload ?? {}),
     message: async (payload) => await invokeIpc('dialog:message', payload ?? {}),
+  },
+  // P4b-B2: same patch object as legacy settings:setMany (proxy/launch side effects on Main).
+  settings: {
+    setMany: async (payload) => await invokeIpc('settings:setMany', payload ?? {}),
   },
 };
 

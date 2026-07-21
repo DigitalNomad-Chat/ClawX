@@ -7,10 +7,10 @@ const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
 /**
- * Typed hostApi facade (P4a + P4b-B1 low-risk surfaces).
+ * Typed hostApi facade (P4a + P4b-B1 + P4b-B2 settings.setMany).
  * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
  * Intentionally omits skills config, provider keys, channels writes, chat/sessions/media,
- * settings, cron, and gateway control (later P4b batches).
+ * full settings CRUD, cron, and gateway control (later P4b batches).
  */
 export const hostApi = {
   app: {
@@ -60,6 +60,15 @@ export const hostApi = {
       invokeHost('dialog', 'save', options ?? {}),
     message: (options: Record<string, unknown>) =>
       invokeHost<{ response?: number }>('dialog', 'message', options),
+  },
+  /**
+   * P4b-B2 — batch settings write only.
+   * Payload/return match legacy `settings:setMany(patch)` → `{ success: true }`.
+   * Main preserves proxy restart + launchAtStartup OS sync (settings-api).
+   */
+  settings: {
+    setMany: (patch: Record<string, unknown>) =>
+      invokeHost<{ success: boolean }>('settings', 'setMany', patch),
   },
 };
 

@@ -153,7 +153,7 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(invokeIpcMock).toHaveBeenCalledWith('openclaw:status');
   });
 
-  it('does not expose skills/providers/channels/chat on P4a facade', async () => {
+  it('does not expose skills/providers/channels/chat on facade', async () => {
     const { hostApi } = await import('@/lib/host-api');
     const api = hostApi as Record<string, unknown>;
     expect(api.skills).toBeUndefined();
@@ -162,9 +162,58 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(api.chat).toBeUndefined();
     expect(api.sessions).toBeUndefined();
     expect(api.media).toBeUndefined();
-    expect(api.settings).toBeUndefined();
     expect(api.cron).toBeUndefined();
     expect(api.gateway).toBeUndefined();
+    // P4b-B2: settings exposes setMany only
+    expect(api.settings).toBeDefined();
+    expect((api.settings as Record<string, unknown>).setMany).toEqual(expect.any(Function));
+    expect((api.settings as Record<string, unknown>).getAll).toBeUndefined();
+    expect((api.settings as Record<string, unknown>).get).toBeUndefined();
+    expect((api.settings as Record<string, unknown>).set).toBeUndefined();
+    expect((api.settings as Record<string, unknown>).reset).toBeUndefined();
+  });
+
+  it('P4b-B2: settings.setMany goes through hostInvoke with patch payload', async () => {
+    hostInvoke.mockResolvedValueOnce({ id: 's1', ok: true, data: { success: true } });
+    const { hostApi } = await import('@/lib/host-api');
+    const patch = {
+      proxyEnabled: true,
+      proxyServer: 'http://127.0.0.1:7890',
+    };
+    await expect(hostApi.settings.setMany(patch)).resolves.toEqual({ success: true });
+    expect(hostInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: 'settings',
+        action: 'setMany',
+        payload: patch,
+      }),
+    );
+  });
+
+  it('P4b-B2: settings.setMany falls back to legacy settings:setMany on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: settings.setMany' },
+    });
+    invokeIpcMock.mockResolvedValueOnce({ success: true });
+    const { hostApi } = await import('@/lib/host-api');
+    const patch = { launchAtStartup: true };
+    await expect(hostApi.settings.setMany(patch)).resolves.toEqual({ success: true });
+    expect(invokeIpcMock).toHaveBeenCalledWith('settings:setMany', patch);
+  });
+
+  it('P4b-B2: settings.setMany business INTERNAL does not fallback', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'INTERNAL', message: 'settings channel locked' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.settings.setMany({ theme: 'dark' })).rejects.toThrow(
+      /settings channel locked/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 
   it('P4b-B1: window/shell/dialog go through hostInvoke', async () => {
