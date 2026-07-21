@@ -33,9 +33,9 @@
 | 路径 | 说明 | 分类 |
 |---|---|---|
 | `server/src/routes/{health,auth,upload,update,webhook}.ts` | Koa 公共/认证/上传/更新/Webhook 路由 | 可删除 |
-| `server/src/controllers/{health,auth,upload,update,webhook}.ts` | 对应控制器 | 可删除 |
+| `server/src/controllers/{health,auth,upload,update,webhook}.ts` | 对应控制器 | **Batch C** |
 
-> 注意：`server/src/controllers/health.ts` 导入了 `services/hermes/hermes-cli` 获取 Hermes 版本，属于产品逻辑，一并删除。
+> 注意：`server/src/controllers/health.ts` 导入了 `services/hermes/hermes-cli` 获取 Hermes 版本，属于产品逻辑；因依赖 Batch C 要删除的服务，这些控制器在 Batch C 开头删除。
 
 ### 2.4 Koa 专用服务
 
@@ -145,20 +145,22 @@ grep -RIn "Koa\\|koa" server/src/index.ts server/src/handlers server/src/middlew
 - 删除：
   - `server/src/controllers/hermes/*.ts`
   - `server/src/db/hermes/*.ts`
-  - `server/src/controllers/{health,auth,upload,update,webhook}.ts`（Batch A 后已成为死代码）
 - 验证：
   - 无 `from '../../controllers/hermes'`、`from '../../db/hermes'` 等遗留 import。
   - `pnpm run typecheck`。
 - Stop 条件：若任何被删控制器仍被授权服务引用，停止。
 
-### Batch C：移除 Hermes/Koa 服务与辅助库
+> 注：Batch B 完成后，`server/src/controllers/{health,auth,upload,update,webhook}.ts` 仍保留。它们依赖 Batch C 要删除的服务（`services/hermes/hermes-cli`、`services/gateway-bootstrap`、`services/auth`、`services/credentials`、`services/login-limiter`、`services/logger`、`config`），因此移至 Batch C 开头删除。
 
-- 删除：
-  - `server/src/services/hermes/*`（整个目录）
-  - `server/src/services/{auth,credentials,login-limiter,app-config,safe-file-store,logger,gateway-bootstrap,shutdown,config-helpers}.ts`
-  - `server/src/lib/context-compressor/*`
+### Batch C：移除 Hermes/Koa 服务、辅助库与遗留控制器
+
+- 删除顺序（必须按此顺序，否则会出现遗留 import 导致 typecheck 失败）：
+  1. `server/src/controllers/{health,auth,upload,update,webhook}.ts`（Batch A 后已成为死代码，且依赖下列服务）
+  2. `server/src/services/hermes/*`（整个目录）
+  3. `server/src/services/{auth,credentials,login-limiter,app-config,safe-file-store,logger,gateway-bootstrap,shutdown,config-helpers}.ts`
+  4. `server/src/lib/context-compressor/*`
 - 验证：
-  - 无 `from '*/services/hermes/*'`、`from '*/services/auth'` 等遗留 import。
+  - 无 `from '*/services/hermes/*'`、`from '*/services/auth'`、`from '*/controllers/health'` 等遗留 import。
   - `pnpm run typecheck`。
 - Stop 条件：若发现服务被授权服务或 Electron 主进程引用，停止并将其移出本批。
 
