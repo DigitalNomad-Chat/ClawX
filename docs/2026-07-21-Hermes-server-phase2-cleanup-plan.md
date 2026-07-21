@@ -94,10 +94,10 @@
 
 | 变量 / 目录 | 当前设置/使用位置 | 分类 | 处理建议 |
 |---|---|---|---|
-| `HERMES_WEB_UI_HOME` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **HOLD（暂缓删除）** | Koa 删除后，若确认无外部 runtime/脚本读取，再从 `electron/main/index.ts` 移除；否则保留为兼容 alias |
-| `HERMES_WEBUI_STATE_DIR` | `server/src/config.ts` 兼容别名 | **HOLD** | 随 `config.ts` 删除；Electron 侧未设置 |
-| `HERMES_DATA_DIR` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **HOLD** | 同 `HERMES_WEB_UI_HOME` |
-| `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` | `electron/main/index.ts` 设置；`services/shutdown.ts`、`services/hermes/gateway-manager.ts` 读取 | **HOLD** | 同 `HERMES_WEB_UI_HOME` |
+| `HERMES_WEB_UI_HOME` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **已在 Batch D 删除** | 确认无外部 runtime/脚本读取后移除 |
+| `HERMES_WEBUI_STATE_DIR` | `server/src/config.ts` 兼容别名 | **已随 config.ts 删除** | Electron 侧未设置 |
+| `HERMES_DATA_DIR` | `electron/main/index.ts` 设置；`server/src/config.ts` 读取 | **已在 Batch D 删除** | 同 `HERMES_WEB_UI_HOME` |
+| `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` | `electron/main/index.ts` 设置；`services/shutdown.ts`、`services/hermes/gateway-manager.ts` 读取 | **已在 Batch D 删除** | 同 `HERMES_WEB_UI_HOME` |
 | `HERMES_HOME` / `HERMES_AGENT_ROOT` / `HERMES_BIN` / `HERMES_MODEL` 等 | 外部 OpenClaw runtime 可能读取 | **保留** | 不在本仓库代码中设置，禁止在本阶段删除或改名 |
 | `~/.hermes-web-ui` / `~/.hermes` / `<userData>/hermes` | 由 Koa 配置推导 | 资源审计 | 确认无授权服务使用后，在后续版本中迁移或重命名 |
 
@@ -184,16 +184,27 @@ grep -RIn "Koa\\|koa" server/src/index.ts server/src/handlers server/src/middlew
   - 干净环境启动后，检查 `process.env` 中无 `HERMES_WEB_UI_HOME` / `HERMES_DATA_DIR` / `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` 泄漏（可通过 Main 进程 `app.evaluate` 打印）。
 - Stop 条件：若这三个 env 被授权服务或非 Koa 代码读取，立即停止并报告。
 
-### Batch E：依赖与运行时资源审计
+### Batch E：依赖、资源与遗留目录审计（已完成）
 
-- 依赖：
-  - 检查根 `package.json`、`server/package.json` 是否还有直接声明的 `hermes-*` 依赖（目前仅存在 `eslint-plugin-react-hooks` 的传递依赖 `hermes-parser`，不是 Hermes 产品，无需处理）。
-- 资源：
-  - 列出运行时可能创建的目录：`~/.hermes-web-ui`、`~/.hermes`、`<userData>/hermes`。
-  - 确认 Electron/OpenClaw 运行时已不再写入这些路径后，制定迁移/重命名方案（不强制在本次完成）。
+- 依赖审计：
+  - 根 `package.json`、`server/package.json` 无直接 `hermes-*` / `koa` / `@koa/router` / `socket.io` / `js-tiktoken` / `better-sqlite3` / `sqlite3` 依赖。
+  - `hermes-parser` / `hermes-estree` 仅为 `eslint-plugin-react-hooks` 的传递依赖（Facebook 解析器，非 Hermes 产品）。
+  - `js-yaml` 仅为 `electron-updater` / `electron-builder` 的传递依赖。
+  - 结论：无需修改 `package.json` 或 `pnpm-lock.yaml`。
+- 资源审计：
+  - `resources/`、`public/`、`scripts/` 中无 Hermes 产品相关文件。
+  - `build/openclaw/dist/extensions/migrate-hermes/` 为**外部 OpenClaw runtime 扩展**，禁止触碰。
+- 代码指纹审计：
+  - 生产代码中已无 `HERMES_WEB_UI_HOME` / `HERMES_DATA_DIR` / `HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN` 读取方。
+  - 遗留未使用源文件：`server/src/shared/providers.ts`、`server/src/lib/llm-json.ts`、`server/src/lib/llm-prompt.ts`（候选删除，需单独授权）。
+- 运行时目录审计：
+  - 遗留目录：`~/.hermes-web-ui`、`~/Library/Application Support/ClawDock/hermes`、`~/Library/Application Support/clawdock/hermes`。
+  - 外部目录：`~/.hermes`（Hermes Agent 主目录，禁止触碰）。
+  - 仓库 fixture：`packages/server/data/hermes-web-ui.db`（候选删除，需单独授权）。
+- 可逆处置方案：详见 `docs/2026-07-21-Hermes-server-phase2-batch-e-audit.md`。
 - 验证：
-  - `pnpm run typecheck`、`pnpm run harness:ci`。
-  - 在干净环境中启动应用，确认无 `hermes` 相关目录新建。
+  - `pnpm run typecheck`、`pnpm run harness:ci`、Hermes 回归测试均通过。
+  - 任何用户目录/依赖/lock/资源的删除或迁移均需后续明确授权。
 
 ### 干净环境验证步骤（Batch D/E 复用）
 
