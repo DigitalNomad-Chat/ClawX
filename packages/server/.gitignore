@@ -1,0 +1,2 @@
+# Ignore development database fixtures that may be recreated locally.
+data/*.db
