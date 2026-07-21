@@ -40,4 +40,14 @@ describe('createUvApi', () => {
     const { createUvApi } = await import('../../electron/services/uv-api');
     await expect(createUvApi().installAll()).resolves.toMatchObject({ success: false });
   });
+
+  // P4b-B5 locks: installAll skips installUv when already present; check stays boolean.
+  it('installAll skips installUv when already installed', async () => {
+    checkUvInstalledMock.mockResolvedValue(true);
+    setupManagedPythonMock.mockResolvedValue(undefined);
+    const { createUvApi } = await import('../../electron/services/uv-api');
+    await expect(createUvApi().installAll()).resolves.toEqual({ success: true });
+    expect(installUvMock).not.toHaveBeenCalled();
+    expect(setupManagedPythonMock).toHaveBeenCalled();
+  });
 });

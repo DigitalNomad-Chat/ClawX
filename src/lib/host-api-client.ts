@@ -9,7 +9,8 @@
  *
  * P4b-B1: window / shell / dialog. P4b-B2: settings.setMany.
  * P4b-B3: cron delete/toggle/trigger only (list/create/update stay legacy/HTTP).
- * P4b-B4: logs read-only + openclaw dir/CLI read helpers (no updates/uv/skills/providers).
+ * P4b-B4: logs read-only + openclaw dir/CLI read helpers.
+ * P4b-B5: uv.check + uv.installAll only (no updates service).
  */
 import type { HostInvokeRequest, HostInvokeResponse } from '@/types/electron';
 import { invokeIpc } from '@/lib/api-client';
@@ -23,7 +24,8 @@ export type HostApiModule =
   | 'dialog'
   | 'settings'
   | 'cron'
-  | 'logs';
+  | 'logs'
+  | 'uv';
 export type HostApiActionMap = {
   app: 'openClawDoctor';
   openclaw: 'status' | 'getDir' | 'getConfigDir' | 'getSkillsDir' | 'getCliCommand';
@@ -37,6 +39,8 @@ export type HostApiActionMap = {
   cron: 'delete' | 'toggle' | 'trigger';
   /** P4b-B4 — logs read-only surface (registered on Main). */
   logs: 'getRecent' | 'readFile' | 'getFilePath' | 'getDir' | 'listFiles';
+  /** P4b-B5 — Setup uv check/install only. */
+  uv: 'check' | 'installAll';
 };
 
 function resolveLogTailArg(payload?: unknown, fallback = 100): number {
@@ -217,6 +221,11 @@ const FALLBACKS: {
     getFilePath: async () => await invokeIpc('log:getFilePath'),
     getDir: async () => await invokeIpc('log:getDir'),
     listFiles: async () => await invokeIpc('log:listFiles'),
+  },
+  // P4b-B5: legacy uv:check + uv:install-all (hyphenated channel for installAll).
+  uv: {
+    check: async () => await invokeIpc('uv:check'),
+    installAll: async () => await invokeIpc('uv:install-all'),
   },
 };
 

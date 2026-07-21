@@ -179,16 +179,59 @@ describe('hostApi facade (P4a low-risk)', () => {
     expect(cron.list).toBeUndefined();
     expect(cron.create).toBeUndefined();
     expect(cron.update).toBeUndefined();
-    // P4b-B4: logs + openclaw read helpers present; no updates/uv
+    // P4b-B4/B5: logs + openclaw + uv present; no updates service
     expect(api.logs).toBeDefined();
     expect(api.updates).toBeUndefined();
-    expect(api.uv).toBeUndefined();
+    expect(api.uv).toBeDefined();
+    const uv = api.uv as Record<string, unknown>;
+    expect(uv.check).toEqual(expect.any(Function));
+    expect(uv.installAll).toEqual(expect.any(Function));
     const oc = api.openclaw as Record<string, unknown>;
     expect(oc.status).toEqual(expect.any(Function));
     expect(oc.getDir).toEqual(expect.any(Function));
     expect(oc.getConfigDir).toEqual(expect.any(Function));
     expect(oc.getSkillsDir).toEqual(expect.any(Function));
     expect(oc.getCliCommand).toEqual(expect.any(Function));
+  });
+
+  it('P4b-B5: uv.check and installAll go through hostInvoke', async () => {
+    hostInvoke
+      .mockResolvedValueOnce({ id: '1', ok: true, data: true })
+      .mockResolvedValueOnce({ id: '2', ok: true, data: { success: true } });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.uv.check()).resolves.toBe(true);
+    await expect(hostApi.uv.installAll()).resolves.toEqual({ success: true });
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ module: 'uv', action: 'check' }),
+    );
+    expect(hostInvoke).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ module: 'uv', action: 'installAll' }),
+    );
+  });
+
+  it('P4b-B5: uv.installAll falls back to legacy uv:install-all on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: uv.installAll' },
+    });
+    invokeIpcMock.mockResolvedValueOnce({ success: true });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.uv.installAll()).resolves.toEqual({ success: true });
+    expect(invokeIpcMock).toHaveBeenCalledWith('uv:install-all');
+  });
+
+  it('P4b-B5: uv.check falls back to legacy uv:check when bridge missing', async () => {
+    vi.stubGlobal('window', {
+      clawx: undefined,
+      localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    });
+    invokeIpcMock.mockResolvedValueOnce(false);
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.uv.check()).resolves.toBe(false);
+    expect(invokeIpcMock).toHaveBeenCalledWith('uv:check');
   });
 
   it('P4b-B4: logs.readFile/getDir go through hostInvoke and wrap UI shapes', async () => {

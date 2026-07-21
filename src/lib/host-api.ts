@@ -7,10 +7,10 @@ const HOST_API_PORT = 13210;
 const HOST_API_BASE = `http://127.0.0.1:${HOST_API_PORT}`;
 
 /**
- * Typed hostApi facade (P4a–P4b-B4).
+ * Typed hostApi facade (P4a–P4b-B5).
  * Uses host:invoke first; falls back to hostApiFetch / legacy IPC via invokeHost.
- * Intentionally omits updates/uv Main services, skills/providers writes,
- * chat/sessions/media, full settings CRUD, cron list/create/update, gateway control.
+ * Intentionally omits updates service, skills/providers writes, chat/sessions/media,
+ * full settings CRUD, cron list/create/update, gateway control.
  */
 export const hostApi = {
   app: {
@@ -113,6 +113,16 @@ export const hostApi = {
       return { dir: dir ?? null };
     },
     listFiles: () => invokeHost<unknown[]>('logs', 'listFiles'),
+  },
+  /**
+   * P4b-B5 — Setup UV helpers (Main createUvApi already registered).
+   * check → boolean; installAll → { success, error? } (does not throw on setup failure).
+   * Legacy fallback: uv:check / uv:install-all.
+   */
+  uv: {
+    check: () => invokeHost<boolean>('uv', 'check'),
+    installAll: () =>
+      invokeHost<{ success: boolean; error?: string }>('uv', 'installAll'),
   },
 };
 
