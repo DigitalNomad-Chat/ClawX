@@ -14,8 +14,9 @@ touchedAreas:
   - harness/specs/tasks/remove-hermes-product-paths.md
   - src/pages/Setup/index.tsx
   - src/pages/Settings/index.tsx
-  - src/lib/host-api.ts
-  - src/lib/host-api-client.ts
+  - src/stores/channels.ts
+  - src/stores/skills.ts
+  - src/types/agent.ts
   - src/i18n/locales/*/setup.json
   - src/i18n/locales/*/settings.json
   - src/i18n/locales/*/chat.json
@@ -26,8 +27,9 @@ touchedAreas:
   - src/i18n/locales/*/channels.json
   - electron/services/app-api.ts
   - electron/api/routes/app.ts
-  - electron/preload/index.ts
-  - electron/main/ipc-handlers.ts
+  - electron/api/routes/hermes-proxy.ts
+  - electron/main/index.ts
+  - kernel/src/agent/agent-loader.ts
   - docs/Hermes版
   - tests/unit/hermes-removal.test.ts
   - tests/e2e/hermes-removal.spec.ts
