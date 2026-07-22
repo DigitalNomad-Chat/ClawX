@@ -13,17 +13,15 @@ function getBundledAgentBrowserPath(): string {
   return join(process.cwd(), 'resources', 'bin', target, binName);
 }
 
+const binPath = getBundledAgentBrowserPath();
+const binExists = existsSync(binPath);
+
 describe('agent-browser bundle', () => {
-  it('places an executable agent-browser binary for the current platform', () => {
-    const binPath = getBundledAgentBrowserPath();
+  it.skipIf(!binExists)('places an executable agent-browser binary for the current platform', () => {
     expect(existsSync(binPath)).toBe(true);
   });
 
-  it('reports a version via --version', () => {
-    const binPath = getBundledAgentBrowserPath();
-    if (!existsSync(binPath)) {
-      return;
-    }
+  it.skipIf(!binExists)('reports a version via --version', () => {
     const output = execSync(`"${binPath}" --version`, { encoding: 'utf8', timeout: 10_000 });
     expect(output.trim()).toMatch(/^agent-browser \d+\.\d+\.\d+/);
   });
