@@ -11,17 +11,27 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-const invokeIpc = vi.fn(async (channel: string) => {
-  if (channel === 'dialog:message') return { response: 1 };
-  if (channel === 'shell:openPath') return '';
-  return {};
-});
+const dialogMessage = vi.fn();
+const shellOpenPath = vi.fn();
+const shellShowItemInFolder = vi.fn();
+
+vi.mock('@/lib/host-api', () => ({
+  hostApi: {
+    dialog: {
+      message: (...args: unknown[]) => dialogMessage(...args),
+    },
+    shell: {
+      openPath: (...args: unknown[]) => shellOpenPath(...args),
+      showItemInFolder: (...args: unknown[]) => shellShowItemInFolder(...args),
+    },
+  },
+}));
+
 const readTextFile = vi.fn();
 const statFile = vi.fn();
 const writeTextFile = vi.fn();
 
 vi.mock('@/lib/api-client', () => ({
-  invokeIpc: (...args: unknown[]) => invokeIpc(...args),
   readTextFile: (...args: unknown[]) => readTextFile(...args),
   statFile: (...args: unknown[]) => statFile(...args),
   writeTextFile: (...args: unknown[]) => writeTextFile(...args),
@@ -72,6 +82,9 @@ describe('FilePreviewBody', () => {
   });
 
   it('uses known attachment size to show direct-open fallback for large PDFs', async () => {
+    dialogMessage.mockResolvedValueOnce({ response: 1 });
+    shellOpenPath.mockResolvedValueOnce('');
+
     render(
       <FilePreviewBody
         file={makePreviewTarget()}
@@ -85,10 +98,10 @@ describe('FilePreviewBody', () => {
     fireEvent.click(openButton);
 
     await waitFor(() => {
-      expect(invokeIpc).toHaveBeenCalledWith('dialog:message', expect.objectContaining({
+      expect(dialogMessage).toHaveBeenCalledWith(expect.objectContaining({
         buttons: expect.arrayContaining(['Open directly']),
       }));
-      expect(invokeIpc).toHaveBeenCalledWith('shell:openPath', '/tmp/large-report.pdf');
+      expect(shellOpenPath).toHaveBeenCalledWith('/tmp/large-report.pdf');
     });
   });
 });
