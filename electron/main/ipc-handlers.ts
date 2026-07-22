@@ -168,9 +168,6 @@ export function registerIpcHandlers(
   // Log handlers (for UI to read gateway/app logs)
   registerLogHandlers();
 
-  // Usage handlers
-  registerUsageHandlers();
-
   // Auth / Member handlers
   if (memberModule) {
     registerAuthIpcHandlers(memberModule);
@@ -2227,13 +2224,6 @@ function registerSettingsHandlers(gatewayManager: GatewayManager): void {
   });
   ipcMain.handle('settings:reset', async () => {
     return await settingsApi.reset();
-  });
-}
-function registerUsageHandlers(): void {
-  // P3a: thin wrapper over createUsageApi (shared with HTTP route + host:invoke)
-  const usageApi = createUsageApi();
-  ipcMain.handle('usage:recentTokenHistory', async (_, limit?: number) => {
-    return await usageApi.recentTokenHistory(limit);
   });
 }
 /**

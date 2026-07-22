@@ -102,13 +102,24 @@ async function seedTokenUsageTranscripts(homeDir: string): Promise<void> {
 test.describe('ClawDock token usage history', () => {
 
   async function validateUsageHistory(page: Page): Promise<void> {
-    const usageHistory = await page.evaluate(async () => {
-      return window.electron.ipcRenderer.invoke('usage:recentTokenHistory', 20);
+    type HostRes =
+      | { ok: true; data: unknown }
+      | { ok: false; error: { code: string; message: string } };
+
+    const response = await page.evaluate(async () => {
+      return await window.clawx.hostInvoke({
+        id: 'usage.recentTokenHistory',
+        module: 'usage',
+        action: 'recentTokenHistory',
+        payload: 20,
+      });
     });
-    if (!Array.isArray(usageHistory) || usageHistory.length === 0) {
-      throw new Error('No usage history found in IPC usage:recentTokenHistory');
+    const typedResponse = response as HostRes;
+    if (!typedResponse.ok || !Array.isArray(typedResponse.data) || typedResponse.data.length === 0) {
+      throw new Error('No usage history found in host:invoke usage.recentTokenHistory');
     }
 
+    const usageHistory = typedResponse.data;
     const hasSeededEntries = usageHistory.some((entry) =>
       typeof entry?.sessionId === 'string' && (
         entry.sessionId === ZERO_TOKEN_SESSION_ID
@@ -116,7 +127,7 @@ test.describe('ClawDock token usage history', () => {
       ),
     );
     if (!hasSeededEntries) {
-      throw new Error('Seeded transcript session IDs were not found in IPC usage history');
+      throw new Error('Seeded transcript session IDs were not found in host:invoke usage history');
     }
   }
 
@@ -125,9 +136,22 @@ test.describe('ClawDock token usage history', () => {
     await completeSetup(page);
     await validateUsageHistory(page);
 
-    const usageHistory = await page.evaluate(async () => {
-      return window.electron.ipcRenderer.invoke('usage:recentTokenHistory', 20);
+    type HostRes =
+      | { ok: true; data: unknown }
+      | { ok: false; error: { code: string; message: string } };
+
+    const response = await page.evaluate(async () => {
+      return await window.clawx.hostInvoke({
+        id: 'usage.recentTokenHistory',
+        module: 'usage',
+        action: 'recentTokenHistory',
+        payload: 20,
+      });
     });
+    const typedResponse = response as HostRes;
+    expect(typedResponse.ok).toBe(true);
+    if (!typedResponse.ok) return;
+    const usageHistory = typedResponse.data as Array<Record<string, unknown>>;
 
     const zeroEntry = usageHistory.find((entry) => entry?.sessionId === ZERO_TOKEN_SESSION_ID);
     const nonzeroEntry = usageHistory.find((entry) => entry?.sessionId === NONZERO_TOKEN_SESSION_ID);
