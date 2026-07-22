@@ -40,12 +40,6 @@ const electronAPI = {
         'dialog:save',
         'dialog:message',
         // App
-        'app:version',
-        'app:name',
-        'app:getPath',
-        'app:platform',
-        'app:quit',
-        'app:relaunch',
         'app:request',
         // Window controls
         'window:minimize',

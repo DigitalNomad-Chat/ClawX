@@ -159,9 +159,6 @@ export function registerIpcHandlers(
   // Session handlers
   registerSessionHandlers();
 
-  // App handlers
-  registerAppHandlers();
-
   // Settings handlers
   registerSettingsHandlers(gatewayManager);
 
@@ -2245,42 +2242,6 @@ function registerDialogHandlers(): void {
       // File doesn't exist, nothing to clear
     }
     return true;
-  });
-}
-
-/**
- * App-related IPC handlers
- */
-function registerAppHandlers(): void {
-  // Get app version
-  ipcMain.handle('app:version', () => {
-    return app.getVersion();
-  });
-
-  // Get app name
-  ipcMain.handle('app:name', () => {
-    return app.getName();
-  });
-
-  // Get app path
-  ipcMain.handle('app:getPath', (_, name: Parameters<typeof app.getPath>[0]) => {
-    return app.getPath(name);
-  });
-
-  // Get platform
-  ipcMain.handle('app:platform', () => {
-    return process.platform;
-  });
-
-  // Quit app
-  ipcMain.handle('app:quit', () => {
-    app.quit();
-  });
-
-  // Relaunch app
-  ipcMain.handle('app:relaunch', () => {
-    app.relaunch();
-    app.quit();
   });
 }
 

@@ -78,4 +78,16 @@ describe('P5-B app metadata legacy IPC zero-call evidence', () => {
     }
     expect(hits).toEqual([]);
   });
+
+  it('has no ipcMain.handle registration for app metadata in main process', () => {
+    const mainHandlers = readFileSync(join(repoRoot, 'electron/main/ipc-handlers.ts'), 'utf8');
+    const hits: string[] = [];
+    for (const channel of metadataChannels) {
+      const regex = new RegExp(`ipcMain\\.handle\\(['"]${channel}['"]`, 'g');
+      if (regex.test(mainHandlers)) {
+        hits.push(`electron/main/ipc-handlers.ts:${channel}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
 });

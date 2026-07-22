@@ -47,9 +47,6 @@ export type ApiClientTransportConfig = {
 };
 
 const UNIFIED_CHANNELS = new Set<string>([
-  'app:version',
-  'app:name',
-  'app:platform',
   'settings:getAll',
   'settings:get',
   'settings:set',
