@@ -33,12 +33,9 @@ const electronAPI = {
         'openclaw:isReady',
         // Shell
         'shell:openExternal',
-        'shell:showItemInFolder',
         'shell:openPath',
         // Dialog
         'dialog:open',
-        'dialog:save',
-        'dialog:message',
         // App
         'app:request',
         // Window controls

@@ -439,16 +439,43 @@ describe('hostApi facade (P4a low-risk)', () => {
     );
   });
 
-  it('P4b-B1: shell falls back to legacy shell:* IPC on UNSUPPORTED', async () => {
+  it('P5-C: shell.showItemInFolder does not fallback to legacy IPC on UNSUPPORTED', async () => {
     hostInvoke.mockResolvedValueOnce({
       id: 'req',
       ok: false,
       error: { code: 'UNSUPPORTED', message: 'Unsupported host request: shell.showItemInFolder' },
     });
-    invokeIpcMock.mockResolvedValueOnce(undefined);
     const { hostApi } = await import('@/lib/host-api');
-    await expect(hostApi.shell.showItemInFolder('/tmp/file.txt')).resolves.toBeUndefined();
-    expect(invokeIpcMock).toHaveBeenCalledWith('shell:showItemInFolder', '/tmp/file.txt');
+    await expect(hostApi.shell.showItemInFolder('/tmp/file.txt')).rejects.toThrow(
+      /Legacy fallback removed for shell\.showItemInFolder/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
+  });
+
+  it('P5-C: dialog.save does not fallback to legacy IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: dialog.save' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.dialog.save({ defaultPath: '/tmp' })).rejects.toThrow(
+      /Legacy fallback removed for dialog\.save/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
+  });
+
+  it('P5-C: dialog.message does not fallback to legacy IPC on UNSUPPORTED', async () => {
+    hostInvoke.mockResolvedValueOnce({
+      id: 'req',
+      ok: false,
+      error: { code: 'UNSUPPORTED', message: 'Unsupported host request: dialog.message' },
+    });
+    const { hostApi } = await import('@/lib/host-api');
+    await expect(hostApi.dialog.message({ type: 'info', message: 'hi' })).rejects.toThrow(
+      /Legacy fallback removed for dialog\.message/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 
   it('P4b-B1: window falls back to legacy window:* IPC when bridge missing', async () => {

@@ -3,7 +3,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const repoRoot = process.cwd();
-const excludedFallbackFiles = new Set(['src/lib/host-api-client.ts']);
 
 function* walk(dir: string, extensions: string[]): Generator<string> {
   for (const entry of readdirSync(dir)) {
@@ -22,9 +21,7 @@ function readFiles(dirs: string[], extensions: string[]): Array<{ path: string; 
   const files: Array<{ path: string; content: string }> = [];
   for (const dir of dirs) {
     for (const file of walk(join(repoRoot, dir), extensions)) {
-      const rel = relative(repoRoot, file);
-      if (excludedFallbackFiles.has(rel)) continue;
-      files.push({ path: rel, content: readFileSync(file, 'utf8') });
+      files.push({ path: relative(repoRoot, file), content: readFileSync(file, 'utf8') });
     }
   }
   return files;
@@ -33,7 +30,7 @@ function readFiles(dirs: string[], extensions: string[]): Array<{ path: string; 
 const channels = ['dialog:save', 'dialog:message', 'shell:showItemInFolder'];
 
 describe('P5-C dialog save/message + shell showItemInFolder zero-call evidence', () => {
-  it('has no direct business invokeIpc calls in renderer/preload (excluding fallback shim)', () => {
+  it('has no invokeIpc fallback or business calls in src/preload/host-api-client', () => {
     const files = readFiles(['src', 'electron/preload'], ['.ts', '.tsx']);
     const hits: string[] = [];
     for (const { path, content } of files) {
@@ -61,12 +58,24 @@ describe('P5-C dialog save/message + shell showItemInFolder zero-call evidence',
     expect(hits).toEqual([]);
   });
 
+  it('has no ipcMain.handle registration for these channels in main process', () => {
+    const mainHandlers = readFileSync(join(repoRoot, 'electron/main/ipc-handlers.ts'), 'utf8');
+    const hits: string[] = [];
+    for (const channel of channels) {
+      const regex = new RegExp(`ipcMain\\.handle\\(['"]${channel}['"]`, 'g');
+      if (regex.test(mainHandlers)) {
+        hits.push(`electron/main/ipc-handlers.ts:${channel}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
   it('has no direct test calls for these legacy channels', () => {
     const files = readFiles(['tests'], ['.ts', '.tsx']);
     const hits: string[] = [];
     for (const { path, content } of files) {
       for (const channel of channels) {
-        const regex = new RegExp(`(invokeIpc\\(['"]|ipcRenderer\\.invoke\\(['"])${channel}['"]`, 'g');
+        const regex = new RegExp(`invokeIpc\\(['"]${channel}['"]`, 'g');
         if (regex.test(content)) {
           hits.push(`${path}:${channel}`);
         }

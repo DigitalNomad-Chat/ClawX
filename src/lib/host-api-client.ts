@@ -86,6 +86,16 @@ function resolveShellUrlArg(payload?: unknown): string {
   throw new Error('url is required');
 }
 
+/** P5-C: explicit no-op fallback that preserves host-failure semantics. */
+function noFallback(module: HostApiModule, action: string): FallbackHandler {
+  return async () => {
+    throw new HostTransportError(
+      'UNSUPPORTED',
+      `Legacy fallback removed for ${module}.${action}`,
+    );
+  };
+}
+
 /** Explicit transport failure codes that allow dual-path fallback. */
 export type HostTransportCode =
   | 'UNSUPPORTED'
@@ -187,15 +197,13 @@ const FALLBACKS: {
     openExternal: async (payload) => {
       await invokeIpc('shell:openExternal', resolveShellUrlArg(payload));
     },
-    showItemInFolder: async (payload) => {
-      await invokeIpc('shell:showItemInFolder', resolveShellPathArg(payload));
-    },
+    showItemInFolder: noFallback('shell', 'showItemInFolder'),
     openPath: async (payload) => await invokeIpc('shell:openPath', resolveShellPathArg(payload)),
   },
   dialog: {
     open: async (payload) => await invokeIpc('dialog:open', payload ?? {}),
-    save: async (payload) => await invokeIpc('dialog:save', payload ?? {}),
-    message: async (payload) => await invokeIpc('dialog:message', payload ?? {}),
+    save: noFallback('dialog', 'save'),
+    message: noFallback('dialog', 'message'),
   },
   // P4b-B2: same patch object as legacy settings:setMany (proxy/launch side effects on Main).
   settings: {

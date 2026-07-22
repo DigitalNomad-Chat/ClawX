@@ -2107,9 +2107,6 @@ function registerShellHandlers(): void {
   ipcMain.handle('shell:openExternal', async (_, url: string) => {
     await shellApi.openExternal(url);
   });
-  ipcMain.handle('shell:showItemInFolder', async (_, path: string) => {
-    shellApi.showItemInFolder(path);
-  });
   ipcMain.handle('shell:openPath', async (_, path: string) => {
     return await shellApi.openPath(path);
   });
@@ -2179,13 +2176,6 @@ function registerDialogHandlers(): void {
   ipcMain.handle('dialog:open', async (_, options: Electron.OpenDialogOptions) => {
     return await dialogApi.open(options);
   });
-  ipcMain.handle('dialog:save', async (_, options: Electron.SaveDialogOptions) => {
-    return await dialogApi.save(options);
-  });
-  ipcMain.handle('dialog:message', async (_, options: Electron.MessageBoxOptions) => {
-    return await dialogApi.message(options);
-  });
-
   // ── Read-Write Workspace: read / set / clear marker in AGENTS.md ──
 
   const RW_MARKER_RE = /<!-- openclaw:rw-workspace:(.*?) -->/s;
