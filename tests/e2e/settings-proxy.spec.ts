@@ -11,7 +11,19 @@ async function ensureSwitchState(toggle: Locator, checked: boolean): Promise<voi
 
 async function readProxyEnabled(page: Page): Promise<boolean> {
   return await page.evaluate(async () => {
-    const settings = await window.electron.ipcRenderer.invoke('settings:getAll');
+    type HostRes =
+      | { ok: true; data: unknown }
+      | { ok: false; error: { code: string; message: string } };
+
+    const response = (await window.electron.ipcRenderer.invoke('app:request', {
+      id: 'settings.getAll',
+      module: 'settings',
+      action: 'getAll',
+    })) as HostRes;
+    if (!response.ok) {
+      throw new Error(response.error.message);
+    }
+    const settings = response.data as Record<string, unknown> | undefined;
     return Boolean(settings?.proxyEnabled);
   });
 }

@@ -30,16 +30,16 @@ describe('api-client', () => {
 
   it('forwards invoke arguments and returns result', async () => {
     const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
-    invoke.mockResolvedValueOnce({ ok: true, data: { ok: true } });
+    invoke.mockResolvedValueOnce({ ok: true, data: [{ id: 'openai' }] });
 
-    const result = await invokeIpc<{ ok: boolean }>('settings:getAll', { a: 1 });
+    const result = await invokeIpc<Array<{ id: string }>>('provider:list');
 
-    expect(result.ok).toBe(true);
+    expect(result).toEqual([{ id: 'openai' }]);
     expect(invoke).toHaveBeenCalledWith(
       'app:request',
       expect.objectContaining({
-        module: 'settings',
-        action: 'getAll',
+        module: 'provider',
+        action: 'list',
       }),
     );
   });
@@ -81,12 +81,12 @@ describe('api-client', () => {
   it('falls back to legacy channel when unified route is unsupported', async () => {
     const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
     invoke
-      .mockRejectedValueOnce(new Error('APP_REQUEST_UNSUPPORTED:settings.getAll'))
-      .mockResolvedValueOnce({ foo: 'bar' });
+      .mockRejectedValueOnce(new Error('APP_REQUEST_UNSUPPORTED:provider.list'))
+      .mockResolvedValueOnce([{ id: 'openai' }]);
 
-    const result = await invokeIpc<{ foo: string }>('settings:getAll');
-    expect(result.foo).toBe('bar');
-    expect(invoke).toHaveBeenNthCalledWith(2, 'settings:getAll');
+    const result = await invokeIpc<Array<{ id: string }>>('provider:list');
+    expect(result).toEqual([{ id: 'openai' }]);
+    expect(invoke).toHaveBeenNthCalledWith(2, 'provider:list');
   });
 
   it('sends tuple payload for multi-arg unified requests', async () => {

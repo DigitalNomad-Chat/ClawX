@@ -43,11 +43,6 @@ const electronAPI = {
         'window:maximize',
         'window:close',
         'window:isMaximized',
-        // Settings
-        'settings:get',
-        'settings:set',
-        'settings:getAll',
-        'settings:reset',
         // Update
         'update:status',
         'update:version',

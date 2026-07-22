@@ -159,9 +159,6 @@ export function registerIpcHandlers(
   // Session handlers
   registerSessionHandlers();
 
-  // Settings handlers
-  registerSettingsHandlers(gatewayManager);
-
   // UV handlers
   registerUvHandlers();
 
@@ -2207,22 +2204,6 @@ function registerDialogHandlers(): void {
   });
 }
 
-function registerSettingsHandlers(gatewayManager: GatewayManager): void {
-  // P3b: thin wrappers over createSettingsApi (preserves proxy/launch side effects)
-  const settingsApi = createSettingsApi({ gatewayManager });
-  ipcMain.handle('settings:get', async (_, key: keyof AppSettings) => {
-    return await settingsApi.get(key);
-  });
-  ipcMain.handle('settings:getAll', async () => {
-    return await settingsApi.getAll();
-  });
-  ipcMain.handle('settings:set', async (_, key: keyof AppSettings, value: AppSettings[keyof AppSettings]) => {
-    return await settingsApi.set({ key, value });
-  });
-  ipcMain.handle('settings:reset', async () => {
-    return await settingsApi.reset();
-  });
-}
 /**
  * Window control handlers (for custom title bar on Windows)
  */
