@@ -205,9 +205,9 @@ const FALLBACKS: {
     save: noFallback('dialog', 'save'),
     message: noFallback('dialog', 'message'),
   },
-  // P4b-B2: same patch object as legacy settings:setMany (proxy/launch side effects on Main).
+  // P4b-B2: settings.setMany now requires host:invoke; legacy fallback removed (P5-D-S1).
   settings: {
-    setMany: async (payload) => await invokeIpc('settings:setMany', payload ?? {}),
+    setMany: noFallback('settings', 'setMany'),
   },
   // P4b-B3: legacy IPC uses bare id (+ enabled for toggle), same as ipc-handlers thin wrappers.
   cron: {

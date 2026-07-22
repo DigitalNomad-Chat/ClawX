@@ -380,17 +380,18 @@ describe('hostApi facade (P4a low-risk)', () => {
     );
   });
 
-  it('P4b-B2: settings.setMany falls back to legacy settings:setMany on UNSUPPORTED', async () => {
+  it('P5-D-S1: settings.setMany throws on UNSUPPORTED without legacy fallback', async () => {
     hostInvoke.mockResolvedValueOnce({
       id: 'req',
       ok: false,
       error: { code: 'UNSUPPORTED', message: 'Unsupported host request: settings.setMany' },
     });
-    invokeIpcMock.mockResolvedValueOnce({ success: true });
     const { hostApi } = await import('@/lib/host-api');
     const patch = { launchAtStartup: true };
-    await expect(hostApi.settings.setMany(patch)).resolves.toEqual({ success: true });
-    expect(invokeIpcMock).toHaveBeenCalledWith('settings:setMany', patch);
+    await expect(hostApi.settings.setMany(patch)).rejects.toThrow(
+      /Legacy fallback removed for settings.setMany/,
+    );
+    expect(invokeIpcMock).not.toHaveBeenCalled();
   });
 
   it('P4b-B2: settings.setMany business INTERNAL does not fallback', async () => {

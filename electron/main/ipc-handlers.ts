@@ -2219,9 +2219,6 @@ function registerSettingsHandlers(gatewayManager: GatewayManager): void {
   ipcMain.handle('settings:set', async (_, key: keyof AppSettings, value: AppSettings[keyof AppSettings]) => {
     return await settingsApi.set({ key, value });
   });
-  ipcMain.handle('settings:setMany', async (_, patch: Partial<AppSettings>) => {
-    return await settingsApi.setMany(patch);
-  });
   ipcMain.handle('settings:reset', async () => {
     return await settingsApi.reset();
   });
