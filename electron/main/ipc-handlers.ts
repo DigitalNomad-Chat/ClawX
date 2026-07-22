@@ -176,9 +176,6 @@ export function registerIpcHandlers(
     registerAuthIpcHandlers(memberModule);
   }
 
-  // Skill config handlers (direct file access, no Gateway RPC)
-  registerSkillConfigHandlers();
-
   // Cron task handlers (proxy to Gateway RPC)
   registerCronHandlers(gatewayManager);
 
@@ -756,28 +753,6 @@ function registerUnifiedRequestHandlers(gatewayManager: GatewayManager): void {
         },
       };
     }
-  });
-}
-
-/**
- * Skill config IPC handlers
- * Direct read/write to ~/.openclaw/openclaw.json (bypasses Gateway RPC)
- */
-function registerSkillConfigHandlers(): void {
-  // P3c: thin wrappers over createSkillsApi (credentials never logged)
-  const skillsApi = createSkillsApi();
-  ipcMain.handle('skill:updateConfig', async (_, params: {
-    skillKey: string;
-    apiKey?: string;
-    env?: Record<string, string>;
-  }) => {
-    return await skillsApi.updateConfig(params);
-  });
-  ipcMain.handle('skill:getConfig', async (_, skillKey: string) => {
-    return await skillsApi.getConfig(skillKey);
-  });
-  ipcMain.handle('skill:getAllConfigs', async () => {
-    return await skillsApi.getAllConfigs();
   });
 }
 

@@ -106,10 +106,6 @@ const electronAPI = {
         // UV
         'uv:check',
         'uv:install-all',
-        // Skill config (direct file access)
-        'skill:updateConfig',
-        'skill:getConfig',
-        'skill:getAllConfigs',
         // Logs
         'log:getRecent',
         'log:readFile',

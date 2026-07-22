@@ -2,10 +2,10 @@ import { closeElectronApp, expect, getStableWindow, installIpcMocks, test } from
 
 /**
  * P3c: skills config surface remains available via IPC after service extraction.
- * Asserts Skills page loads and skill:getAllConfigs is served by Main handlers.
+ * Asserts Skills page loads and skills config is served by the host:invoke registry.
  */
 test.describe('P3c skills config boundary', () => {
-  test('skills page can load configs through extracted skill handlers', async ({ launchElectronApp }) => {
+  test('skills page can load configs through host:invoke registry', async ({ launchElectronApp }) => {
     const app = await launchElectronApp({ skipSetup: true });
 
     try {
@@ -14,15 +14,15 @@ test.describe('P3c skills config boundary', () => {
       });
 
       await app.evaluate(({ ipcMain }) => {
-        ipcMain.removeHandler('skill:getAllConfigs');
-        ipcMain.handle('skill:getAllConfigs', async () => ({
-          'demo-skill': { enabled: true },
-        }));
-        ipcMain.removeHandler('skill:updateConfig');
-        ipcMain.handle('skill:updateConfig', async (_e, params: { skillKey?: string }) => ({
-          success: true,
-          skillKey: params?.skillKey,
-        }));
+        // Mock host:invoke skills config path for the renderer smoke probe
+        ipcMain.removeHandler('host:invoke');
+        ipcMain.handle('host:invoke', async (_event, request: { module?: string; action?: string }) => {
+          if (request?.module === 'skills' && request?.action === 'getAllConfigs') {
+            return { 'demo-skill': { enabled: true } };
+          }
+          return { ok: false, error: { code: 'UNSUPPORTED', message: 'Not mocked' } };
+        });
+
         // Prefer hostapi skills status for page load when used
         ipcMain.removeHandler('hostapi:fetch');
         ipcMain.handle('hostapi:fetch', async (_e, request: { path?: string; method?: string }) => {
@@ -77,9 +77,9 @@ test.describe('P3c skills config boundary', () => {
         page.getByRole('heading', { name: /Skills|技能/i }).or(page.locator('text=Skills')).first(),
       ).toBeVisible({ timeout: 45_000 });
 
-      // Smoke: invoke extracted IPC path from renderer
+      // Smoke: invoke skills config through host:invoke registry
       const configs = await page.evaluate(async () => {
-        return await window.electron.ipcRenderer.invoke('skill:getAllConfigs');
+        return await window.clawx.hostInvoke({ module: 'skills', action: 'getAllConfigs' });
       });
       expect(configs).toMatchObject({ 'demo-skill': { enabled: true } });
     } finally {
