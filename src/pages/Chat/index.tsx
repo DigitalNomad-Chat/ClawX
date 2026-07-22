@@ -12,8 +12,7 @@ import { buildBaselineRunKey, getBaseline } from '@/stores/baseline-cache';
 import { useAgentsStore } from '@/stores/agents';
 import { useGatewayStore } from '@/stores/gateway';
 import { useArtifactPanel } from '@/stores/artifact-panel';
-import { hostApiFetch } from '@/lib/host-api';
-import { invokeIpc } from '@/lib/api-client';
+import { hostApi, hostApiFetch } from '@/lib/host-api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -206,7 +205,7 @@ export function Chat() {
   const handleOpenAttachedFile = useCallback((file: AttachedFileMeta) => {
     if (!file.filePath) return;
     if (file.mimeType === 'application/x-directory') {
-      void invokeIpc('shell:openPath', file.filePath)
+      void hostApi.shell.openPath(file.filePath)
         .then((error) => {
           if (typeof error === 'string' && error) {
             toast.error(error);
