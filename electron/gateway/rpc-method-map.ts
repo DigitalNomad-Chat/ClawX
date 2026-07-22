@@ -42,9 +42,10 @@ export class UnsupportedGatewayMethodError extends Error {
  * the legacy method is unsupported.
  */
 export const GATEWAY_CLIENT_LEGACY_TO_METHOD_MAP: Record<string, string | null> = {
-  // chat: stable
-  'chat.send': 'chat.send',
-  'chat.history': 'chat.history',
+  // chat: method names survive but the parameter/response semantics changed
+  // enough that the old GatewayClient signatures are no longer compatible.
+  'chat.send': null,
+  'chat.history': null,
   'chat.clear': null, // no equivalent advertised method in 2026.6.6
 
   // cron: list is stable; write/delete/run shapes changed, mark unsupported
@@ -60,9 +61,10 @@ export const GATEWAY_CLIENT_LEGACY_TO_METHOD_MAP: Record<string, string | null> 
   'system.updateConfig': null, // config.patch requires a patch envelope
   'system.version': null, // no equivalent advertised method
 
-  // providers: renamed to models, but response shape is different; keep mapping
-  // because the intent is the same and there are no parameters.
-  'providers.list': 'models.list',
+  // providers: renamed to models, and the response shape is different. The
+  // old GatewayClient signature promised ProviderConfig[], so mark unsupported
+  // rather than silently returning a different model-list shape.
+  'providers.list': null,
   'providers.set': null,
   'providers.remove': null,
   'providers.test': null,

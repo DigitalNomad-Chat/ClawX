@@ -31,8 +31,8 @@ requiredTests:
   - pnpm run comms:compare
 acceptance:
   - GatewayClient calls resolveGatewayClientMethod before every RPC.
-  - Compatible legacy methods map to OpenClaw 2026.6.6 advertised methods (e.g. system.health -> health, system.config -> config.get, providers.list -> models.list).
-  - Removed or incompatible methods throw UnsupportedGatewayMethodError and are never sent over the wire.
+  - Only legacy methods whose method name and parameter/response shape are both compatible map to OpenClaw 2026.6.6 advertised methods (e.g. system.health -> health, system.config -> config.get, cron.list -> cron.list).
+  - Removed or incompatible methods throw UnsupportedGatewayMethodError and are never sent over the wire. This explicitly includes chat.send, chat.history, providers.list, channels.*, skills.*, chat.clear, cron write/delete/run, providers.set/remove/test, and system.updateConfig/version.
   - Renderer and Main do not add new direct IPC or direct Gateway HTTP calls.
   - Comms replay and compare pass without regression.
 docs:

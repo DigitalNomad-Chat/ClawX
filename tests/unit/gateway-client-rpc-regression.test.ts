@@ -191,21 +191,10 @@ describe.skipIf(!existsSync(OPENCLAW_ENTRY))(
       expect(typeof result).toBe('object');
     });
 
-    it('listProviders maps to models.list and resolves', async () => {
-      const result = await client!.listProviders();
-      expect(result).toBeDefined();
-    });
-
     it('listCronTasks maps to cron.list and resolves', async () => {
       const result = await client!.listCronTasks();
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
-    });
-
-    it('getChatHistory maps to chat.history without METHOD_NOT_FOUND', async () => {
-      // chat.history may fail for other reasons (no sessions), but it must not
-      // fail because the method is unadvertised.
-      await expect(client!.getChatHistory(10, 0)).rejects.not.toThrow(/METHOD_NOT_FOUND/);
     });
 
     it('removed channel methods throw UnsupportedGatewayMethodError before the wire', async () => {
@@ -214,6 +203,15 @@ describe.skipIf(!existsSync(OPENCLAW_ENTRY))(
 
     it('removed skill methods throw UnsupportedGatewayMethodError before the wire', async () => {
       await expect(client!.enableSkill('skill-1')).rejects.toThrow(UnsupportedGatewayMethodError);
+    });
+
+    it('removed chat methods throw UnsupportedGatewayMethodError before the wire', async () => {
+      await expect(client!.sendMessage('hello')).rejects.toThrow(UnsupportedGatewayMethodError);
+      await expect(client!.getChatHistory(10, 0)).rejects.toThrow(UnsupportedGatewayMethodError);
+    });
+
+    it('removed provider methods throw UnsupportedGatewayMethodError before the wire', async () => {
+      await expect(client!.listProviders()).rejects.toThrow(UnsupportedGatewayMethodError);
     });
 
     it('removed cron write methods throw UnsupportedGatewayMethodError before the wire', async () => {

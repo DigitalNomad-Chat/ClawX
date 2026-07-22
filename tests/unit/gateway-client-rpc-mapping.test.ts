@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GatewayClient } from '../../electron/gateway/client';
 import { GatewayManager } from '../../electron/gateway/manager';
 import {
@@ -23,14 +23,15 @@ describe('GatewayClient RPC method mapping for OpenClaw 2026.6.6', () => {
     it('maps legacy names to the real 2026.6.6 method names', () => {
       expect(resolveGatewayClientMethod('system.health')).toBe('health');
       expect(resolveGatewayClientMethod('system.config')).toBe('config.get');
-      expect(resolveGatewayClientMethod('providers.list')).toBe('models.list');
-      expect(resolveGatewayClientMethod('chat.send')).toBe('chat.send');
       expect(resolveGatewayClientMethod('cron.list')).toBe('cron.list');
     });
 
     it('throws UnsupportedGatewayMethodError for unsupported legacy names', () => {
       expect(() => resolveGatewayClientMethod('channels.list')).toThrow(UnsupportedGatewayMethodError);
       expect(() => resolveGatewayClientMethod('skills.enable')).toThrow(UnsupportedGatewayMethodError);
+      expect(() => resolveGatewayClientMethod('chat.send')).toThrow(UnsupportedGatewayMethodError);
+      expect(() => resolveGatewayClientMethod('chat.history')).toThrow(UnsupportedGatewayMethodError);
+      expect(() => resolveGatewayClientMethod('providers.list')).toThrow(UnsupportedGatewayMethodError);
       expect(() => resolveGatewayClientMethod('system.version')).toThrow(UnsupportedGatewayMethodError);
     });
 
@@ -53,27 +54,6 @@ describe('GatewayClient RPC method mapping for OpenClaw 2026.6.6', () => {
       expect(rpc.mock.calls[0][0]).toBe('config.get');
     });
 
-    it('listProviders calls models.list', async () => {
-      const { client, rpc } = createClient();
-      await client.listProviders();
-      expect(rpc.mock.calls[0][0]).toBe('models.list');
-    });
-
-    it('sendMessage calls chat.send with content and channelId', async () => {
-      const { client, rpc } = createClient();
-      await client.sendMessage('hello', 'ch-1');
-      expect(rpc.mock.calls[0][0]).toBe('chat.send');
-      expect(rpc.mock.calls[0][1]).toEqual({ content: 'hello', channelId: 'ch-1' });
-      expect(rpc.mock.calls[0][2]).toBe(180_000);
-    });
-
-    it('getChatHistory calls chat.history with limit and offset', async () => {
-      const { client, rpc } = createClient();
-      await client.getChatHistory(10, 5);
-      expect(rpc.mock.calls[0][0]).toBe('chat.history');
-      expect(rpc.mock.calls[0][1]).toEqual({ limit: 10, offset: 5 });
-    });
-
     it('listCronTasks calls cron.list', async () => {
       const { client, rpc } = createClient();
       await client.listCronTasks();
@@ -93,7 +73,10 @@ describe('GatewayClient RPC method mapping for OpenClaw 2026.6.6', () => {
       { name: 'disableSkill', call: (c) => c.disableSkill('s') },
       { name: 'getSkillConfig', call: (c) => c.getSkillConfig('s') },
       { name: 'updateSkillConfig', call: (c) => c.updateSkillConfig('s', {}) },
+      { name: 'sendMessage', call: (c) => c.sendMessage('hello') },
+      { name: 'getChatHistory', call: (c) => c.getChatHistory() },
       { name: 'clearChatHistory', call: (c) => c.clearChatHistory() },
+      { name: 'listProviders', call: (c) => c.listProviders() },
       { name: 'createCronTask', call: (c) => c.createCronTask({ name: 't', schedule: '* * * * *', command: 'echo', enabled: true }) },
       { name: 'updateCronTask', call: (c) => c.updateCronTask('t', {}) },
       { name: 'deleteCronTask', call: (c) => c.deleteCronTask('t') },
