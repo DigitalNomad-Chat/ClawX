@@ -43,7 +43,9 @@ const PLUGINS = [
   { npmName: '@wecom/wecom-openclaw-plugin', pluginId: 'wecom' },
   { npmName: '@larksuite/openclaw-lark', pluginId: 'feishu-openclaw-plugin' },
   { npmName: '@openclaw/discord', pluginId: 'discord' },
+  { npmName: '@openclaw/feishu', pluginId: 'feishu' },
   { npmName: '@openclaw/qqbot', pluginId: 'qqbot' },
+  { npmName: '@openclaw/slack', pluginId: 'slack' },
   { npmName: '@openclaw/whatsapp', pluginId: 'whatsapp' },
   { npmName: '@tencent-weixin/openclaw-weixin', pluginId: 'openclaw-weixin' },
 ];

@@ -25,6 +25,7 @@
  * channel.
  */
 import { createRequire } from 'module';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getOpenClawDir, getOpenClawResolvedDir } from './paths';
 
@@ -32,6 +33,10 @@ const _openclawResolvedPath = getOpenClawResolvedDir();
 const _openclawPath = getOpenClawDir();
 const _openclawSdkRequire = createRequire(join(_openclawResolvedPath, 'package.json'));
 const _projectSdkRequire = createRequire(join(_openclawPath, 'package.json'));
+// Project root require resolves dev dependencies (e.g. node_modules/@openclaw/<channel>)
+// from the repository/app root. In packaged builds this is a fallback; the packaged
+// plugin path below is preferred.
+const _projectRootRequire = createRequire(join(process.cwd(), 'package.json'));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -60,6 +65,34 @@ function requireExtensionApi(relativePath: string): Record<string, unknown> | nu
     } catch {
       return null;
     }
+  }
+}
+
+/**
+ * Load an external channel plugin API module.
+ *
+ * In development the plugin lives in node_modules/@openclaw/<channel>.
+ * In packaged builds it lives next to the bundled openclaw runtime at
+ * resources/openclaw-plugins/<pluginId>/dist/api.js.
+ */
+function requireExternalPluginApi(channel: string, pluginId: string): Record<string, unknown> | null {
+  // 1. Dev path: project root node_modules
+  try {
+    return _projectRootRequire(`@openclaw/${channel}/dist/api.js`);
+  } catch {
+    // fall through
+  }
+
+  // 2. Packaged path: resources/openclaw-plugins/<pluginId>/dist/api.js
+  const packagedApiPath = join(_openclawPath, '..', 'openclaw-plugins', pluginId, 'dist', 'api.js');
+  if (!existsSync(packagedApiPath)) {
+    return null;
+  }
+  try {
+    const pluginRequire = createRequire(join(packagedApiPath, '..', '..', 'package.json'));
+    return pluginRequire('./dist/api.js');
+  } catch {
+    return null;
   }
 }
 
@@ -113,6 +146,7 @@ interface WhatsappSdk {
 function loadChannelSdk<T>(
   legacySubpath: string,
   extensionRelPath: string,
+  externalPluginId: string | undefined,
   fallback: T,
   keys: (keyof T)[],
 ): ChannelSdk<T> {
@@ -122,19 +156,29 @@ function loadChannelSdk<T>(
     return legacy as unknown as T;
   }
 
-  // 2. Try extension API file (openclaw >=4.5)
+  // 2. Try bundled extension API file (openclaw >=4.5, still in bundle)
   const ext = requireExtensionApi(extensionRelPath);
   if (ext && keys.every((k) => typeof ext[k as string] === 'function')) {
     return ext as unknown as T;
   }
 
-  // 3. Fallback to no-op stubs
+  // 3. Try external plugin API (openclaw 2026.6.6+ bundle-removed channels)
+  if (externalPluginId) {
+    const channel = legacySubpath.split('/').pop() ?? externalPluginId;
+    const external = requireExternalPluginApi(channel, externalPluginId);
+    if (external && keys.every((k) => typeof external[k as string] === 'function')) {
+      return external as unknown as T;
+    }
+  }
+
+  // 4. Fallback to no-op stubs
   return fallback;
 }
 
 const _discordSdk = loadChannelSdk<DiscordSdk>(
   'openclaw/plugin-sdk/discord',
   './dist/extensions/discord/api.js',
+  'discord',
   {
     listDiscordDirectoryGroupsFromConfig: noopAsyncList,
     listDiscordDirectoryPeersFromConfig: noopAsyncList,
@@ -146,6 +190,7 @@ const _discordSdk = loadChannelSdk<DiscordSdk>(
 const _telegramSdk = loadChannelSdk<TelegramSdk>(
   'openclaw/plugin-sdk/telegram-surface',
   './dist/extensions/telegram/api.js',
+  undefined,
   {
     listTelegramDirectoryGroupsFromConfig: noopAsyncList,
     listTelegramDirectoryPeersFromConfig: noopAsyncList,
@@ -157,6 +202,7 @@ const _telegramSdk = loadChannelSdk<TelegramSdk>(
 const _slackSdk = loadChannelSdk<SlackSdk>(
   'openclaw/plugin-sdk/slack',
   './dist/extensions/slack/api.js',
+  'slack',
   {
     listSlackDirectoryGroupsFromConfig: noopAsyncList,
     listSlackDirectoryPeersFromConfig: noopAsyncList,
@@ -168,6 +214,7 @@ const _slackSdk = loadChannelSdk<SlackSdk>(
 const _whatsappSdk = loadChannelSdk<WhatsappSdk>(
   'openclaw/plugin-sdk/whatsapp-shared',
   './dist/extensions/whatsapp/api.js',
+  'whatsapp',
   {
     normalizeWhatsAppMessagingTarget: noopNormalize,
   },
