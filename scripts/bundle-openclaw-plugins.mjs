@@ -22,6 +22,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+function isModuleMain() {
+  const modulePath = pathToFileURL(path.resolve(fileURLToPath(import.meta.url))).href;
+  const candidates = [process.argv[1], ...(process.argv.slice(2) ?? [])]
+    .filter((arg) => typeof arg === 'string' && arg.length > 0)
+    .map((arg) => {
+      try {
+        return pathToFileURL(path.resolve(arg)).href;
+      } catch {
+        return null;
+      }
+    });
+  return candidates.includes(modulePath);
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_ROOT = path.join(ROOT, 'build', 'openclaw-plugins');
@@ -246,7 +260,7 @@ export { PLUGINS };
 
 // Only run the bundler when this module is the entry point. Importing it from
 // tests should not trigger a full bundle.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isModuleMain()) {
   echo`📦 Bundling OpenClaw plugin mirrors...`;
   fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
 
