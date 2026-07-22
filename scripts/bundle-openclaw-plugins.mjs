@@ -20,7 +20,7 @@
 import 'zx/globals';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -242,11 +242,17 @@ function patchPluginId(pluginDir, expectedId) {
   }
 }
 
-echo`📦 Bundling OpenClaw plugin mirrors...`;
-fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
+export { PLUGINS };
 
-for (const plugin of PLUGINS) {
-  bundleOnePlugin(plugin);
+// Only run the bundler when this module is the entry point. Importing it from
+// tests should not trigger a full bundle.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  echo`📦 Bundling OpenClaw plugin mirrors...`;
+  fs.mkdirSync(OUTPUT_ROOT, { recursive: true });
+
+  for (const plugin of PLUGINS) {
+    bundleOnePlugin(plugin);
+  }
+
+  echo`✅ Plugin mirrors ready: ${OUTPUT_ROOT}`;
 }
-
-echo`✅ Plugin mirrors ready: ${OUTPUT_ROOT}`;

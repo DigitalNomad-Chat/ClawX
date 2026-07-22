@@ -164,8 +164,9 @@ function loadChannelSdk<T>(
 
   // 3. Try external plugin API (openclaw 2026.6.6+ bundle-removed channels)
   if (externalPluginId) {
-    const channel = legacySubpath.split('/').pop() ?? externalPluginId;
-    const external = requireExternalPluginApi(channel, externalPluginId);
+    // externalPluginId doubles as the @openclaw/<id> package suffix and the
+    // resources/openclaw-plugins/<id> directory name.
+    const external = requireExternalPluginApi(externalPluginId, externalPluginId);
     if (external && keys.every((k) => typeof external[k as string] === 'function')) {
       return external as unknown as T;
     }

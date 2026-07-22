@@ -695,6 +695,24 @@ function bundlePlugin(nodeModulesRoot, npmName, destDir) {
   return true;
 }
 
+// ── Bundled plugin manifest ──────────────────────────────────────────────────
+// Keep this list in sync with scripts/bundle-openclaw-plugins.mjs.
+// The unit test tests/unit/after-pack-plugin-list.test.ts enforces parity.
+const BUNDLED_PLUGINS = [
+  { npmName: '@soimy/dingtalk', pluginId: 'dingtalk' },
+  { npmName: '@wecom/wecom-openclaw-plugin', pluginId: 'wecom' },
+  { npmName: '@larksuite/openclaw-lark', pluginId: 'feishu-openclaw-plugin' },
+  { npmName: '@openclaw/discord', pluginId: 'discord' },
+  { npmName: '@openclaw/feishu', pluginId: 'feishu' },
+  { npmName: '@openclaw/qqbot', pluginId: 'qqbot' },
+  { npmName: '@openclaw/slack', pluginId: 'slack' },
+  { npmName: '@openclaw/whatsapp', pluginId: 'whatsapp' },
+  { npmName: '@tencent-weixin/openclaw-weixin', pluginId: 'openclaw-weixin' },
+];
+
+// Expose for unit-test parity checks without executing the hook.
+exports.__test.BUNDLED_PLUGINS = BUNDLED_PLUGINS;
+
 // ── Main hook ────────────────────────────────────────────────────────────────
 
 exports.default = async function afterPack(context) {
@@ -753,16 +771,6 @@ exports.default = async function afterPack(context) {
   //     - electron-builder silently skips extraResources entries whose source
   //       directory doesn't exist (build/openclaw-plugins/ may not be pre-generated)
   //     - node_modules/ is excluded by .gitignore so the deps copy must be manual
-  const BUNDLED_PLUGINS = [
-    { npmName: '@soimy/dingtalk', pluginId: 'dingtalk' },
-    { npmName: '@wecom/wecom-openclaw-plugin', pluginId: 'wecom' },
-    { npmName: '@larksuite/openclaw-lark', pluginId: 'feishu-openclaw-plugin' },
-    { npmName: '@openclaw/discord', pluginId: 'discord' },
-    { npmName: '@openclaw/qqbot', pluginId: 'qqbot' },
-    { npmName: '@openclaw/whatsapp', pluginId: 'whatsapp' },
-    { npmName: '@tencent-weixin/openclaw-weixin', pluginId: 'openclaw-weixin' },
-  ];
-
   mkdirSync(pluginsDestRoot, { recursive: true });
   for (const { npmName, pluginId } of BUNDLED_PLUGINS) {
     const pluginDestDir = join(pluginsDestRoot, pluginId);
